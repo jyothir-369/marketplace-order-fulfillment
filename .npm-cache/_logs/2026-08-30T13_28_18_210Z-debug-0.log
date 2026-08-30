@@ -1,0 +1,115 @@
+0 verbose cli C:\Program Files\nodejs\node.exe C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js
+1 info using npm@11.11.0
+2 info using node@v24.14.1
+3 silly config load:file:C:\Program Files\nodejs\node_modules\npm\npmrc
+4 silly config load:file:C:\Users\raghava\OneDrive\Desktop\marketplace-order-fulfillment\.npmrc
+5 silly config load:file:C:\Users\raghava\.npmrc
+6 silly config load:file:C:\Users\raghava\AppData\Roaming\npm\etc\npmrc
+7 verbose title npm install
+8 verbose argv "install" "--cache" ".npm-cache"
+9 verbose logfile logs-max:10 dir:C:\Users\raghava\OneDrive\Desktop\marketplace-order-fulfillment\.npm-cache\_logs\2026-08-30T13_28_18_210Z-
+10 verbose logfile C:\Users\raghava\OneDrive\Desktop\marketplace-order-fulfillment\.npm-cache\_logs\2026-08-30T13_28_18_210Z-debug-0.log
+11 silly logfile done cleaning log files
+12 http fetch GET https://registry.npmjs.org/npm attempt 1 failed with ECONNREFUSED
+13 silly packumentCache heap:4496293888 maxSize:1124073472 maxEntrySize:562036736
+14 silly idealTree buildDeps
+15 silly fetch manifest @nestjs/bullmq@^11.0.0
+16 silly packumentCache full:https://registry.npmjs.org/@nestjs%2fbullmq cache-miss
+17 silly fetch manifest @nestjs/common@^10.4.15
+18 silly packumentCache full:https://registry.npmjs.org/@nestjs%2fcommon cache-miss
+19 silly fetch manifest @nestjs/config@^3.3.0
+20 silly packumentCache full:https://registry.npmjs.org/@nestjs%2fconfig cache-miss
+21 silly fetch manifest @nestjs/core@^10.4.15
+22 silly packumentCache full:https://registry.npmjs.org/@nestjs%2fcore cache-miss
+23 silly fetch manifest @nestjs/platform-express@^10.4.15
+24 silly packumentCache full:https://registry.npmjs.org/@nestjs%2fplatform-express cache-miss
+25 silly fetch manifest @nestjs/schedule@^4.1.2
+26 silly packumentCache full:https://registry.npmjs.org/@nestjs%2fschedule cache-miss
+27 silly fetch manifest @nestjs/typeorm@^10.0.2
+28 silly packumentCache full:https://registry.npmjs.org/@nestjs%2ftypeorm cache-miss
+29 silly fetch manifest bullmq@^5.45.2
+30 silly packumentCache full:https://registry.npmjs.org/bullmq cache-miss
+31 silly fetch manifest class-transformer@^0.5.1
+32 silly packumentCache full:https://registry.npmjs.org/class-transformer cache-miss
+33 silly fetch manifest class-validator@^0.14.1
+34 silly packumentCache full:https://registry.npmjs.org/class-validator cache-miss
+35 silly fetch manifest ioredis@^5.6.1
+36 silly packumentCache full:https://registry.npmjs.org/ioredis cache-miss
+37 silly fetch manifest pg@^8.16.0
+38 silly packumentCache full:https://registry.npmjs.org/pg cache-miss
+39 silly fetch manifest reflect-metadata@^0.2.2
+40 silly packumentCache full:https://registry.npmjs.org/reflect-metadata cache-miss
+41 silly fetch manifest rxjs@^7.8.2
+42 silly packumentCache full:https://registry.npmjs.org/rxjs cache-miss
+43 silly fetch manifest typeorm@^0.3.21
+44 silly packumentCache full:https://registry.npmjs.org/typeorm cache-miss
+45 silly fetch manifest uuid@^11.1.0
+46 silly packumentCache full:https://registry.npmjs.org/uuid cache-miss
+47 silly fetch manifest @nestjs/cli@^10.4.9
+48 silly packumentCache full:https://registry.npmjs.org/@nestjs%2fcli cache-miss
+49 silly fetch manifest @nestjs/testing@^10.4.15
+50 silly packumentCache full:https://registry.npmjs.org/@nestjs%2ftesting cache-miss
+51 silly fetch manifest @types/express@^5.0.3
+52 silly packumentCache full:https://registry.npmjs.org/@types%2fexpress cache-miss
+53 silly fetch manifest @types/jest@^29.5.14
+54 silly packumentCache full:https://registry.npmjs.org/@types%2fjest cache-miss
+55 silly fetch manifest @types/node@^22.15.21
+56 silly packumentCache full:https://registry.npmjs.org/@types%2fnode cache-miss
+57 silly fetch manifest jest@^29.7.0
+58 silly packumentCache full:https://registry.npmjs.org/jest cache-miss
+59 silly fetch manifest ts-jest@^29.4.12
+60 silly packumentCache full:https://registry.npmjs.org/ts-jest cache-miss
+61 silly fetch manifest ts-node@^10.9.2
+62 silly packumentCache full:https://registry.npmjs.org/ts-node cache-miss
+63 silly fetch manifest tsconfig-paths@^4.2.0
+64 silly packumentCache full:https://registry.npmjs.org/tsconfig-paths cache-miss
+65 silly fetch manifest typescript@^5.8.3
+66 silly packumentCache full:https://registry.npmjs.org/typescript cache-miss
+67 silly placeDep ROOT @nestjs/bullmq@ OK for: marketplace-order-fulfillment@1.0.0 want: ^11.0.0
+68 silly placeDep ROOT @nestjs/cli@ OK for: marketplace-order-fulfillment@1.0.0 want: ^10.4.9
+69 silly placeDep ROOT @nestjs/common@ OK for: marketplace-order-fulfillment@1.0.0 want: ^10.4.15
+70 silly placeDep ROOT @nestjs/config@ OK for: marketplace-order-fulfillment@1.0.0 want: ^3.3.0
+71 silly placeDep ROOT @nestjs/core@ OK for: marketplace-order-fulfillment@1.0.0 want: ^10.4.15
+72 silly placeDep ROOT @nestjs/platform-express@ OK for: marketplace-order-fulfillment@1.0.0 want: ^10.4.15
+73 silly placeDep ROOT @nestjs/schedule@ OK for: marketplace-order-fulfillment@1.0.0 want: ^4.1.2
+74 silly placeDep ROOT @nestjs/testing@ OK for: marketplace-order-fulfillment@1.0.0 want: ^10.4.15
+75 silly placeDep ROOT @nestjs/typeorm@ OK for: marketplace-order-fulfillment@1.0.0 want: ^10.0.2
+76 silly placeDep ROOT @types/express@ OK for: marketplace-order-fulfillment@1.0.0 want: ^5.0.3
+77 silly placeDep ROOT @types/jest@ OK for: marketplace-order-fulfillment@1.0.0 want: ^29.5.14
+78 silly placeDep ROOT @types/node@ OK for: marketplace-order-fulfillment@1.0.0 want: ^22.15.21
+79 silly placeDep ROOT bullmq@ OK for: marketplace-order-fulfillment@1.0.0 want: ^5.45.2
+80 silly placeDep ROOT class-transformer@ OK for: marketplace-order-fulfillment@1.0.0 want: ^0.5.1
+81 silly placeDep ROOT class-validator@ OK for: marketplace-order-fulfillment@1.0.0 want: ^0.14.1
+82 silly placeDep ROOT ioredis@ OK for: marketplace-order-fulfillment@1.0.0 want: ^5.6.1
+83 silly placeDep ROOT jest@ OK for: marketplace-order-fulfillment@1.0.0 want: ^29.7.0
+84 silly placeDep ROOT pg@ OK for: marketplace-order-fulfillment@1.0.0 want: ^8.16.0
+85 silly placeDep ROOT reflect-metadata@ OK for: marketplace-order-fulfillment@1.0.0 want: ^0.2.2
+86 silly placeDep ROOT rxjs@ OK for: marketplace-order-fulfillment@1.0.0 want: ^7.8.2
+87 silly placeDep ROOT ts-jest@ OK for: marketplace-order-fulfillment@1.0.0 want: ^29.4.12
+88 silly placeDep ROOT ts-node@ OK for: marketplace-order-fulfillment@1.0.0 want: ^10.9.2
+89 silly placeDep ROOT tsconfig-paths@ OK for: marketplace-order-fulfillment@1.0.0 want: ^4.2.0
+90 silly placeDep ROOT typeorm@ OK for: marketplace-order-fulfillment@1.0.0 want: ^0.3.21
+91 silly placeDep ROOT typescript@ OK for: marketplace-order-fulfillment@1.0.0 want: ^5.8.3
+92 silly placeDep ROOT uuid@ OK for: marketplace-order-fulfillment@1.0.0 want: ^11.1.0
+93 verbose stack Error: request to https://registry.npmjs.org/@nestjs%2fbullmq failed: cache mode is 'only-if-cached' but no cached response is available.
+93 verbose stack     at cacheFetch (C:\Program Files\nodejs\node_modules\npm\node_modules\make-fetch-happen\lib\cache\index.js:12:13)
+93 verbose stack     at async fetch (C:\Program Files\nodejs\node_modules\npm\node_modules\make-fetch-happen\lib\fetch.js:98:7)
+93 verbose stack     at async RegistryFetcher.packument (C:\Program Files\nodejs\node_modules\npm\node_modules\pacote\lib\registry.js:90:19)
+93 verbose stack     at async RegistryFetcher.manifest (C:\Program Files\nodejs\node_modules\npm\node_modules\pacote\lib\registry.js:128:23)
+93 verbose stack     at async #fetchManifest (C:\Program Files\nodejs\node_modules\npm\node_modules\@npmcli\arborist\lib\arborist\build-ideal-tree.js:1227:20)
+93 verbose stack     at async #nodeFromEdge (C:\Program Files\nodejs\node_modules\npm\node_modules\@npmcli\arborist\lib\arborist\build-ideal-tree.js:1061:19)
+93 verbose stack     at async #buildDepStep (C:\Program Files\nodejs\node_modules\npm\node_modules\@npmcli\arborist\lib\arborist\build-ideal-tree.js:917:11)
+93 verbose stack     at async Arborist.buildIdealTree (C:\Program Files\nodejs\node_modules\npm\node_modules\@npmcli\arborist\lib\arborist\build-ideal-tree.js:170:7)
+93 verbose stack     at async Promise.all (index 1)
+93 verbose stack     at async Arborist.reify (C:\Program Files\nodejs\node_modules\npm\node_modules\@npmcli\arborist\lib\arborist\reify.js:110:5)
+94 error code ENOTCACHED
+95 error request to https://registry.npmjs.org/@nestjs%2fbullmq failed: cache mode is 'only-if-cached' but no cached response is available.
+96 silly unfinished npm timer reify 1788096499005
+97 silly unfinished npm timer reify:loadTrees 1788096499006
+98 verbose cwd C:\Users\raghava\OneDrive\Desktop\marketplace-order-fulfillment
+99 verbose os Windows_NT 10.0.26200
+100 verbose node v24.14.1
+101 verbose npm  v11.11.0
+102 verbose exit 1
+103 verbose code 1
+104 error A complete log of this run can be found in: C:\Users\raghava\OneDrive\Desktop\marketplace-order-fulfillment\.npm-cache\_logs\2026-08-30T13_28_18_210Z-debug-0.log
