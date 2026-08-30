@@ -1,0 +1,5 @@
+### 2. Marketplace Order & Fulfillment System
+**Problem:** Buyers place orders against a multi-vendor catalog; inventory must decrement correctly under concurrent checkouts, and fulfillment status must sync from vendor systems.
+**Blueprint patterns exercised:** Explicit transactions for multi-write invariants (§8.5), bounded concurrency in workers (§7.3, §9.4), reconciliation job for ambiguous vendor-sync operations (§7.5), expand-and-contract migration when the order-state model changes mid-project (§8.3).
+**Stack:** NestJS `orders`/`inventory`/`fulfillment` modules, PostgreSQL row locking on inventory decrement, BullMQ for vendor-sync jobs with dead-letter handling, Terraform-provisioned Postgres + Redis.
+**What makes it resume-worthy:** Concurrent-checkout correctness is a classic system-design interview question — this project is the working proof, not a whiteboard answer.
