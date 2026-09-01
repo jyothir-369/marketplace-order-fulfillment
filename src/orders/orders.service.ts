@@ -68,8 +68,8 @@ export class OrdersService {
         const p2 = lockedProducts.find((p) => p.id === item.productId);
         if (p2) {
           const newStock = p2.stockCount - item.quantity;
-          await manager.createQueryBuilder()
-            .update(Product)
+          await manager.createQueryBuilder(Product, 'product')
+            .update()
             .set({ stockCount: newStock })
             .where('id = :id', { id: item.productId })
             .execute();

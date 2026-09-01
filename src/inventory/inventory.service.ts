@@ -56,8 +56,8 @@ export class InventoryService {
           var previousStock = product.stockCount;
           var newStock = previousStock - dto.quantity;
 
-          return manager.createQueryBuilder()
-            .update(Product)
+          return manager.createQueryBuilder(Product, 'product')
+            .update()
             .set({ stockCount: newStock })
             .where('id = :id', { id: dto.productId })
             .execute()
