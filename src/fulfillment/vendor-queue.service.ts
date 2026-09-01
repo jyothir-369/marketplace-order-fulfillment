@@ -115,7 +115,10 @@ export class VendorQueueService implements OnModuleInit, OnModuleDestroy {
       removeOnFail: 1000,
     };
 
-    await queue.add('vendor-sync', data, jobOptions);
+    await queue.add('vendor-sync', data, {
+      ...jobOptions,
+      jobId: data.jobId,
+    });
     
     this.logger.log(
       'Job added to vendor queue: ' + vendorId + ' for sync job: ' + data.jobId,
