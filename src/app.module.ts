@@ -28,7 +28,7 @@ import { Vendor, Product, Order, OrderLineItem, VendorSyncJob } from './common/e
           username: configService.get('DB_USERNAME', 'postgres'),
           password: configService.get('DB_PASSWORD', 'postgres'),
           database: configService.get('DB_DATABASE', 'marketplace'),
-          entities: [Vendor, Product, Order, OrderLineItem, VendorSyncJob, AuditLog],
+          entities: [Vendor, Order, Product, OrderLineItem, VendorSyncJob, AuditLog],
           synchronize: configService.get('NODE_ENV') !== 'production',
           logging: configService.get('NODE_ENV') === 'development',
         };
