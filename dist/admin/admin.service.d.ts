@@ -1,0 +1,31 @@
+import { Repository } from 'typeorm';
+import { Order } from '../common/entities/order.entity';
+import { OrderLineItem } from '../common/entities/order-line-item.entity';
+import { VendorSyncJob } from '../common/entities/vendor-sync-job.entity';
+import { AdminResolveDto, AdminDashboardDto, StuckOrdersResponseDto } from './dto/admin.dto';
+import { OrdersService } from '../orders/orders.service';
+import { FulfillmentService } from '../fulfillment/fulfillment.service';
+import { AuditService, AuditLogQuery } from '../common/audit';
+import { AuditLog } from '../common/audit/audit-log.entity';
+export declare class AdminService {
+    private readonly orderRepository;
+    private readonly lineItemRepository;
+    private readonly syncJobRepository;
+    private readonly ordersService;
+    private readonly fulfillmentService;
+    private readonly auditService;
+    private readonly logger;
+    constructor(orderRepository: Repository<Order>, lineItemRepository: Repository<OrderLineItem>, syncJobRepository: Repository<VendorSyncJob>, ordersService: OrdersService, fulfillmentService: FulfillmentService, auditService: AuditService);
+    getDashboard(correlationId: string): Promise<AdminDashboardDto>;
+    getStuckOrders(correlationId: string): Promise<StuckOrdersResponseDto>;
+    private determineStuckReason;
+    resolveOrderLineItem(lineItemId: string, dto: AdminResolveDto, correlationId: string): Promise<void>;
+    cancelOrder(orderId: string, correlationId: string): Promise<void>;
+    getDeadLetterDetails(correlationId: string): Promise<VendorSyncJob[]>;
+    retryDeadLetterJob(jobId: string, correlationId: string): Promise<void>;
+    getAuditLogs(query: AuditLogQuery, correlationId: string): Promise<{
+        logs: AuditLog[];
+        total: number;
+    }>;
+    getTrace(correlationId: string): Promise<AuditLog[]>;
+}

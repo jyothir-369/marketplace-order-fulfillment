@@ -7,6 +7,7 @@ import { Product } from '../common/entities/product.entity';
 import { CheckoutDto, CheckoutResponseDto, OrderResponseDto, OrderLineItemResponseDto } from './dto/orders.dto';
 import { InventoryService } from '../inventory/inventory.service';
 import { AuditService } from '../common/audit';
+import { VendorQueueService } from '../fulfillment/vendor-queue.service';
 
 @Injectable()
 export class OrdersService {
@@ -22,6 +23,7 @@ export class OrdersService {
     private readonly dataSource: DataSource,
     private readonly inventoryService: InventoryService,
     private readonly auditService: AuditService,
+    private readonly vendorQueueService: VendorQueueService,
   ) {}
 
   async checkout(dto: CheckoutDto, correlationId: string): Promise<CheckoutResponseDto> {
@@ -41,7 +43,7 @@ export class OrdersService {
     const productMap = new Map<string, Product>();
     products.forEach((p) => productMap.set(p.id, p));
 
-    return this.dataSource.transaction(async (manager) => {
+    const result = await this.dataSource.transaction(async (manager) => {
       const sortedProductIds = [...productIds].sort();
       const lockedProducts: Product[] = [];
 
@@ -84,14 +86,12 @@ export class OrdersService {
         }
       }
 
-      // DUAL-WRITE: Write to new shipping_address field (Phase 7 expand-and-contract)
-      // The old field (if any) remains for backward compatibility during transition
       const order = manager.create(Order, {
         buyerId: dto.buyerId,
         status: OrderStatus.PLACED,
         correlationId: correlationId,
         totalAmount: 0,
-        shippingAddress: dto.shippingAddress || null, // New field from Phase 7
+        shippingAddress: dto.shippingAddress || null,
       });
 
       const savedOrder = await manager.save(Order, order);
@@ -126,16 +126,36 @@ export class OrdersService {
       await this.auditService.logOrderCreated(correlationId, savedOrder.id, dto.buyerId, totalAmount);
 
       this.logger.log('Order ' + savedOrder.id + ' created with total ' + totalAmount, OrdersService.name, correlationId);
-
-      const response = await this.getOrderById(savedOrder.id, correlationId);
-
-      return {
-        success: true,
-        order: response,
-        message: 'Order placed successfully',
-        correlationId: correlationId,
-      };
+      
+      return { savedOrder, lineItems };
     });
+    
+    // Post-transaction: Enqueue fulfillment jobs
+    for (const item of result.lineItems) {
+      try {
+        await this.vendorQueueService.addJobToVendorQueue(item.vendorId, {
+          jobId: 'sync-' + item.id,
+          orderLineItemId: item.id,
+          vendorId: item.vendorId,
+          correlationId: correlationId,
+        });
+      } catch (error) {
+        this.logger.error('Failed to enqueue fulfillment job for line item ' + item.id, error, OrdersService.name, correlationId);
+        await this.lineItemRepository.update(item.id, {
+          fulfillmentStatus: FulfillmentStatus.FAILED,
+          failureReason: 'Failed to enqueue fulfillment job',
+        });
+      }
+    }
+
+    const response = await this.getOrderById(result.savedOrder.id, correlationId);
+
+    return {
+      success: true,
+      order: response,
+      message: 'Order placed successfully',
+      correlationId: correlationId,
+    };
   }
 
   async getOrderById(id: string, correlationId: string): Promise<OrderResponseDto> {
