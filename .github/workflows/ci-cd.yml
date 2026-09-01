@@ -1,6 +1,6 @@
-============================================
-GitHub Actions CI/CD Workflow
-============================================
+# ============================================
+# GitHub Actions CI/CD Workflow
+# ============================================
 
 name: CI/CD Pipeline
 
@@ -11,15 +11,15 @@ pull_request:
 branches: [main]
 
 env:
-NODE_VERSION: '20'
+NODE_VERSION: '24'
 REGISTRY: ghcr.io
 IMAGE_NAME: ${{ github.repository }}
 
 jobs:
 
-============================================
-Lint and Type Check
-============================================
+# ============================================
+# Lint and Type Check
+# ============================================
 
 lint:
 name: Lint & Type Check
@@ -44,9 +44,9 @@ steps:
   - name: Type check
     run: npx tsc --noEmit
 
-============================================
-Build Application
-============================================
+# ============================================
+# Build Application
+# ============================================
 
 build:
 name: Build Application
@@ -76,9 +76,9 @@ steps:
       path: dist/
       retention-days: 7
 
-============================================
-Docker Build and Push to GitHub Container Registry
-============================================
+# ============================================
+# Docker Build and Push to GitHub Container Registry
+# ============================================
 
 docker:
 name: Docker Build & Push
@@ -130,9 +130,9 @@ steps:
       cache-from: type=gha
       cache-to: type=gha,mode=max
 
-============================================
-Terraform Validation on Pull Requests
-============================================
+# ============================================
+# Terraform Validation on Pull Requests
+# ============================================
 
 terraform-plan:
 name: Terraform Validation
