@@ -6,7 +6,7 @@ import { OrderLineItem, FulfillmentStatus } from '../common/entities/order-line-
 import { Product } from '../common/entities/product.entity';
 import { CheckoutDto, CheckoutResponseDto, OrderResponseDto, OrderLineItemResponseDto } from './dto/orders.dto';
 import { InventoryService } from '../inventory/inventory.service';
-import { AuditService } from '../common/audit';
+import { AuditService } from '../common/audit/audit.service';
 import { VendorQueueService } from '../fulfillment/vendor-queue.service';
 
 @Injectable()
@@ -27,7 +27,7 @@ export class OrdersService {
   ) {}
 
   async checkout(dto: CheckoutDto, correlationId: string): Promise<CheckoutResponseDto> {
-    this.logger.log('Starting checkout for buyer ' + dto.buyerId + ' with ' + dto.items.length + ' items', OrdersService.name, correlationId);
+    this.logger.log(`Starting checkout for buyer ${dto.buyerId} with ${dto.items.length} items`, OrdersService.name, correlationId);
 
     const productIds = dto.items.map((i) => i.productId);
     const products = await this.productRepository
@@ -54,7 +54,7 @@ export class OrdersService {
           .getOne();
 
         if (!product) {
-          throw new NotFoundException('Product ' + productId + ' not found');
+          throw new NotFoundException(`Product ${productId} not found`);
         }
         lockedProducts.push(product);
       }
@@ -62,7 +62,7 @@ export class OrdersService {
       for (const item of dto.items) {
         const prod = lockedProducts.find((p) => p.id === item.productId);
         if (prod && prod.stockCount < item.quantity) {
-          throw new BadRequestException('Insufficient stock for ' + prod.name + ': requested ' + item.quantity + ', available ' + prod.stockCount);
+          throw new BadRequestException(`Insufficient stock for ${prod.name}: requested ${item.quantity}, available ${prod.stockCount}`);
         }
       }
 
@@ -75,7 +75,7 @@ export class OrdersService {
             .set({ stockCount: newStock })
             .where('id = :id', { id: item.productId })
             .execute();
-            
+
           await this.auditService.logInventoryDecrement(
             correlationId,
             item.productId,
@@ -125,11 +125,11 @@ export class OrdersService {
 
       await this.auditService.logOrderCreated(correlationId, savedOrder.id, dto.buyerId, totalAmount);
 
-      this.logger.log('Order ' + savedOrder.id + ' created with total ' + totalAmount, OrdersService.name, correlationId);
-      
+      this.logger.log(`Order ${savedOrder.id} created with total ${totalAmount}`, OrdersService.name, correlationId);
+
       return { savedOrder, lineItems };
     });
-    
+
     // Post-transaction: Enqueue fulfillment jobs
     for (const item of result.lineItems) {
       try {
@@ -140,7 +140,7 @@ export class OrdersService {
           correlationId: correlationId,
         });
       } catch (error) {
-        this.logger.error('Failed to enqueue fulfillment job for line item ' + item.id, error, OrdersService.name, correlationId);
+        this.logger.error(`Failed to enqueue fulfillment job for line item ${item.id}`, error, OrdersService.name, correlationId);
         await this.lineItemRepository.update(item.id, {
           fulfillmentStatus: FulfillmentStatus.FAILED,
           failureReason: 'Failed to enqueue fulfillment job',
@@ -166,7 +166,7 @@ export class OrdersService {
     });
 
     if (!order) {
-      throw new NotFoundException('Order ' + id + ' not found');
+      throw new NotFoundException(`Order ${id} not found`);
     }
 
     return this.toOrderResponseDto(order);
@@ -184,7 +184,7 @@ export class OrdersService {
   }
 
   async cancelOrder(orderId: string, correlationId: string): Promise<OrderResponseDto> {
-    this.logger.log('Cancelling order ' + orderId, OrdersService.name, correlationId);
+    this.logger.log(`Cancelling order ${orderId}`, OrdersService.name, correlationId);
 
     const order = await this.orderRepository.findOne({
       where: { id: orderId },
@@ -192,13 +192,13 @@ export class OrdersService {
     });
 
     if (!order) {
-      throw new NotFoundException('Order ' + orderId + ' not found');
+      throw new NotFoundException(`Order ${orderId} not found`);
     }
 
     // Strict State Transition Validation
     const validCancelStatuses = [OrderStatus.PLACED, OrderStatus.CONFIRMED, OrderStatus.FULFILLING];
     if (!validCancelStatuses.includes(order.status)) {
-      throw new BadRequestException('Cannot cancel order in status: ' + order.status);
+      throw new BadRequestException(`Cannot cancel order in status: ${order.status}`);
     }
 
     const previousStatus = order.status;
@@ -230,7 +230,7 @@ export class OrdersService {
       status: order.status,
       totalAmount: Number(order.totalAmount),
       correlationId: order.correlationId || '',
-      shippingAddress: order.shippingAddress || '', // CUT-OVER: Read from new field
+      shippingAddress: order.shippingAddress || '',
       lineItems: (order.lineItems || []).map((item) => this.toLineItemResponseDto(item)),
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,

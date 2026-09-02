@@ -5,7 +5,8 @@ import { AdminService } from './admin.service';
 import { Order } from '../common/entities/order.entity';
 import { OrderLineItem } from '../common/entities/order-line-item.entity';
 import { VendorSyncJob } from '../common/entities/vendor-sync-job.entity';
-import { AuditModule, AuditLog } from '../common/audit';
+import { AuditModule } from '../common/audit/audit.module';
+import { AuditLog } from '../common/audit/audit-log.entity';
 import { OrdersModule } from '../orders/orders.module';
 import { FulfillmentModule } from '../fulfillment/fulfillment.module';
 

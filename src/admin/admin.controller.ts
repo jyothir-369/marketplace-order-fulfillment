@@ -3,7 +3,7 @@ import { AdminService } from './admin.service';
 import { AdminResolveDto, AdminDashboardDto, AdminOrderFilterDto, AdminOrderResponseDto, AdminAuditLogResponseDto } from './dto/admin.dto';
 import { VendorSyncJob } from '../common/entities/vendor-sync-job.entity';
 import { CorrelationId } from '../common/decorators/correlation-id.decorator';
-import { AuditEntityType, AuditAction } from '../common/audit';
+import { AuditEntityType, AuditAction } from '../common/audit/index';
 
 @Controller('admin')
 export class AdminController {
