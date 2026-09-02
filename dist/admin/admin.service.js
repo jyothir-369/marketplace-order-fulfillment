@@ -58,6 +58,40 @@ let AdminService = AdminService_1 = class AdminService {
             ambiguousJobs: ambiguousJobs,
         };
     }
+    async getOrders(filter, correlationId) {
+        if (filter.type === 'stuck') {
+            return this.getStuckOrders(correlationId);
+        }
+        const query = this.orderRepository.createQueryBuilder('order');
+        if (filter.status) {
+            query.andWhere('order.status = :status', { status: filter.status });
+        }
+        query.leftJoinAndSelect('order.lineItems', 'lineItems');
+        if (filter.vendorId) {
+            query.andWhere('lineItems.vendorId = :vendorId', { vendorId: filter.vendorId });
+        }
+        const total = await query.getCount();
+        const orders = await query
+            .skip(filter.offset || 0)
+            .take(filter.limit || 100)
+            .getMany();
+        return {
+            total,
+            orders: orders.map((o) => ({
+                orderId: o.id,
+                buyerId: o.buyerId,
+                status: o.status,
+                createdAt: o.createdAt,
+                lineItems: (o.lineItems || []).map((li) => ({
+                    lineItemId: li.id,
+                    productId: li.productId,
+                    vendorId: li.vendorId,
+                    fulfillmentStatus: li.fulfillmentStatus,
+                    attempts: 0,
+                })),
+            })),
+        };
+    }
     async getStuckOrders(correlationId) {
         this.logger.log('Querying stuck orders', AdminService_1.name, correlationId);
         const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
@@ -95,7 +129,7 @@ let AdminService = AdminService_1 = class AdminService {
                     status: item.order.status,
                     createdAt: item.order.createdAt,
                     stuckReason: stuckReason,
-                    stuckLineItems: [],
+                    lineItems: [],
                 });
             }
             const lineItemDto = {
@@ -107,7 +141,7 @@ let AdminService = AdminService_1 = class AdminService {
                 attempts: item.syncJob?.attempts || 0,
                 lastAttemptedAt: item.syncJob?.lastAttemptedAt || undefined,
             };
-            orderMap.get(item.orderId).stuckLineItems.push(lineItemDto);
+            orderMap.get(item.orderId).lineItems.push(lineItemDto);
         }
         const orders = Array.from(orderMap.values());
         return {

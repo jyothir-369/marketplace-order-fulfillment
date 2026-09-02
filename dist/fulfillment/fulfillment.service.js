@@ -204,7 +204,7 @@ let FulfillmentService = FulfillmentService_1 = class FulfillmentService {
             where: { id: orderId },
             relations: { lineItems: true },
         });
-        if (!order)
+        if (!order || order.status === order_entity_1.OrderStatus.CANCELLED)
             return;
         const lineItems = order.lineItems;
         const anySyncing = lineItems.some((item) => item.fulfillmentStatus === order_line_item_entity_1.FulfillmentStatus.SYNCING || item.fulfillmentStatus === order_line_item_entity_1.FulfillmentStatus.PENDING);
@@ -221,8 +221,8 @@ let FulfillmentService = FulfillmentService_1 = class FulfillmentService {
             if (anyConfirmed && !anyFailed) {
                 newStatus = order_entity_1.OrderStatus.FULFILLED;
             }
-            else if (anyFailed && !anyConfirmed) {
-                newStatus = order_entity_1.OrderStatus.CANCELLED;
+            else if (anyFailed) {
+                newStatus = anyConfirmed ? order_entity_1.OrderStatus.FULFILLED : order_entity_1.OrderStatus.CANCELLED;
             }
         }
         if (newStatus !== order.status) {
