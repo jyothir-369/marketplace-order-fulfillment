@@ -1,13 +1,31 @@
-﻿import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, FindOptionsRelations } from 'typeorm';
 import { Order, OrderStatus } from '../common/entities/order.entity';
 import { OrderLineItem, FulfillmentStatus } from '../common/entities/order-line-item.entity';
 import { Product } from '../common/entities/product.entity';
-import { CheckoutDto, CheckoutResponseDto, OrderResponseDto, OrderLineItemResponseDto } from './dto/orders.dto';
+import {
+  CheckoutDto,
+  CheckoutResponseDto,
+  OrderResponseDto,
+  OrderLineItemResponseDto,
+  TransitionOrderDto,
+  OrderTransitionAction,
+} from './dto/orders.dto';
 import { InventoryService } from '../inventory/inventory.service';
 import { AuditService } from '../common/audit/audit.service';
 import { VendorQueueService } from '../fulfillment/vendor-queue.service';
+
+/**
+ * Maps a vendor-facing action to the resulting OrderStatus.
+ * Kept centralized so the controller, service, and tests share one truth.
+ */
+const TRANSITION_TARGET: Record<OrderTransitionAction, { from: OrderStatus[]; to: OrderStatus }> = {
+  CONFIRM: { from: [OrderStatus.PLACED], to: OrderStatus.CONFIRMED },
+  FULFILL: { from: [OrderStatus.CONFIRMED], to: OrderStatus.FULFILLING },
+  SHIP:    { from: [OrderStatus.FULFILLING], to: OrderStatus.FULFILLED },
+  CANCEL:  { from: [OrderStatus.PLACED, OrderStatus.CONFIRMED, OrderStatus.FULFILLING], to: OrderStatus.CANCELLED },
+};
 
 @Injectable()
 export class OrdersService {
@@ -181,6 +199,81 @@ export class OrdersService {
     });
 
     return orders.map((o) => this.toOrderResponseDto(o));
+  }
+
+  /**
+   * Returns all orders that contain at least one line item belonging to the
+   * given vendor. Used by the vendor portal orders dashboard.
+   */
+  async getOrdersByVendor(vendorId: string): Promise<OrderResponseDto[]> {
+    const orderIds = await this.lineItemRepository
+      .createQueryBuilder('lineItem')
+      .select('DISTINCT lineItem.orderId', 'orderId')
+      .where('lineItem.vendorId = :vendorId', { vendorId })
+      .getRawMany<{ orderId: string }>();
+
+    if (orderIds.length === 0) {
+      return [];
+    }
+
+    const relations: FindOptionsRelations<Order> = { lineItems: { product: true, vendor: true } };
+    const orders = await this.orderRepository.find({
+      where: orderIds.map((row) => ({ id: row.orderId })),
+      relations: relations,
+      order: { createdAt: 'DESC' },
+    });
+
+    return orders.map((o) => this.toOrderResponseDto(o));
+  }
+
+  /**
+   * Drive an order through its lifecycle via a single vendor-facing action.
+   * CANCEL delegates to {@link cancelOrder} to preserve inventory restoration
+   * behavior. All other actions are pure status transitions that write an
+   * ORDER_STATUS_CHANGED audit entry.
+   */
+  async transitionOrder(
+    orderId: string,
+    dto: TransitionOrderDto,
+    correlationId: string,
+    actorId?: string,
+  ): Promise<OrderResponseDto> {
+    this.logger.log(
+      `Transitioning order ${orderId} via ${dto.action}` + (dto.reason ? ` (reason: ${dto.reason})` : ''),
+      OrdersService.name,
+      correlationId,
+    );
+
+    if (dto.action === 'CANCEL') {
+      const cancelled = await this.cancelOrder(orderId, correlationId);
+      // cancelOrder already writes its own audit entry; nothing more to do here.
+      return cancelled;
+    }
+
+    const order = await this.orderRepository.findOne({ where: { id: orderId } });
+    if (!order) {
+      throw new NotFoundException(`Order ${orderId} not found`);
+    }
+
+    const rule = TRANSITION_TARGET[dto.action];
+    if (!rule.from.includes(order.status)) {
+      throw new BadRequestException(
+        `Illegal transition ${dto.action}: order is in status '${order.status}', expected one of [${rule.from.join(', ')}]`,
+      );
+    }
+
+    const previousStatus = order.status;
+    await this.orderRepository.update(orderId, { status: rule.to });
+
+    await this.auditService.logOrderStatusChange(
+      correlationId,
+      orderId,
+      previousStatus,
+      rule.to,
+      actorId,
+    );
+
+    return this.getOrderById(orderId, correlationId);
   }
 
   async cancelOrder(orderId: string, correlationId: string): Promise<OrderResponseDto> {

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { getProductById, Product } from '../../../lib/api';
@@ -20,7 +20,6 @@ export default function ProductDetailPage() {
     <div className="p-8 animate-pulse">
       <div className="h-8 bg-gray-200 w-1/2 mb-4" />
       <div className="h-6 bg-gray-200 w-1/4 mb-4" />
-      <div className="h-24 bg-gray-200 w-full mb-4" />
     </div>
   );
 
@@ -28,8 +27,8 @@ export default function ProductDetailPage() {
     <div className="p-8">
       <h1 className="text-3xl font-bold">{product.name}</h1>
       <p className="text-xl">${product.price}</p>
-      <p className="my-4">{product.description}</p>
-      <p>Stock: {product.stockCount}</p>
+      <p className="mt-2 text-sm text-gray-500">Vendor: {product.vendorName}</p>
+      <p className="mt-4">Stock: {product.stockCount}</p>
       <button
         disabled={product.stockCount === 0}
         onClick={() => addToCart({ productId: product.id, name: product.name, price: product.price, quantity: 1, maxStock: product.stockCount })}

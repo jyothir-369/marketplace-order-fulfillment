@@ -1,4 +1,4 @@
-﻿import { IsUUID, IsNumber, IsArray, ValidateNested, Min, ArrayMinSize, IsOptional, IsString } from 'class-validator';
+import { IsUUID, IsNumber, IsArray, ValidateNested, Min, ArrayMinSize, IsOptional, IsString, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
 import { OrderStatus } from '../../common/entities/order.entity';
 import { FulfillmentStatus } from '../../common/entities/order-line-item.entity';
@@ -32,6 +32,25 @@ export class CheckoutDto {
   shippingAddress?: string;
 }
 
+/**
+ * Order lifecycle actions exposed to vendors.
+ * CONFIRM: placed -> confirmed
+ * FULFILL: confirmed -> fulfilling
+ * SHIP:    fulfilling -> fulfilled
+ * CANCEL:  placed|confirmed|fulfilling -> cancelled (restores inventory)
+ */
+export const ORDER_TRANSITION_ACTIONS = ['CONFIRM', 'FULFILL', 'SHIP', 'CANCEL'] as const;
+export type OrderTransitionAction = (typeof ORDER_TRANSITION_ACTIONS)[number];
+
+export class TransitionOrderDto {
+  @IsIn(ORDER_TRANSITION_ACTIONS as readonly string[])
+  action: OrderTransitionAction;
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}
+
 export class OrderLineItemResponseDto {
   id: string;
   productId: string;
@@ -52,13 +71,13 @@ export class OrderResponseDto {
   status: OrderStatus;
   totalAmount: number;
   correlationId: string;
-  
+
   /**
    * Shipping address for the order.
    * Added as part of Phase 7 expand-and-contract migration.
    */
   shippingAddress?: string;
-  
+
   lineItems: OrderLineItemResponseDto[];
   createdAt: Date;
   updatedAt: Date;
