@@ -200,17 +200,34 @@ let FulfillmentService = FulfillmentService_1 = class FulfillmentService {
         await this.checkOrderFulfillment(lineItem.orderId, correlationId);
     }
     async checkOrderFulfillment(orderId, correlationId) {
-        const lineItems = await this.lineItemRepository.find({ where: { orderId } });
-        const allConfirmed = lineItems.every((item) => item.fulfillmentStatus === order_line_item_entity_1.FulfillmentStatus.CONFIRMED || item.fulfillmentStatus === order_line_item_entity_1.FulfillmentStatus.FAILED);
-        const anyDeadLetter = lineItems.some((item) => item.fulfillmentStatus === order_line_item_entity_1.FulfillmentStatus.DEAD_LETTER);
-        if (allConfirmed) {
-            const order = await this.orderRepository.findOne({ where: { id: orderId } });
-            if (order) {
-                const previousStatus = order.status;
-                const newStatus = anyDeadLetter ? order_entity_1.OrderStatus.FULFILLING : order_entity_1.OrderStatus.FULFILLED;
-                await this.orderRepository.update(orderId, { status: newStatus });
-                await this.auditService.logOrderStatusChange(correlationId, orderId, previousStatus, newStatus);
+        const order = await this.orderRepository.findOne({
+            where: { id: orderId },
+            relations: { lineItems: true },
+        });
+        if (!order)
+            return;
+        const lineItems = order.lineItems;
+        const anySyncing = lineItems.some((item) => item.fulfillmentStatus === order_line_item_entity_1.FulfillmentStatus.SYNCING || item.fulfillmentStatus === order_line_item_entity_1.FulfillmentStatus.PENDING);
+        const anyConfirmed = lineItems.some((item) => item.fulfillmentStatus === order_line_item_entity_1.FulfillmentStatus.CONFIRMED);
+        const anyFailed = lineItems.some((item) => item.fulfillmentStatus === order_line_item_entity_1.FulfillmentStatus.FAILED);
+        const allFinished = lineItems.every((item) => item.fulfillmentStatus === order_line_item_entity_1.FulfillmentStatus.CONFIRMED || item.fulfillmentStatus === order_line_item_entity_1.FulfillmentStatus.FAILED);
+        let newStatus = order.status;
+        if (order.status === order_entity_1.OrderStatus.PLACED || order.status === order_entity_1.OrderStatus.CONFIRMED) {
+            if (anySyncing || anyConfirmed || anyFailed) {
+                newStatus = order_entity_1.OrderStatus.FULFILLING;
             }
+        }
+        if (allFinished) {
+            if (anyConfirmed && !anyFailed) {
+                newStatus = order_entity_1.OrderStatus.FULFILLED;
+            }
+            else if (anyFailed && !anyConfirmed) {
+                newStatus = order_entity_1.OrderStatus.CANCELLED;
+            }
+        }
+        if (newStatus !== order.status) {
+            await this.orderRepository.update(orderId, { status: newStatus });
+            await this.auditService.logOrderStatusChange(correlationId, orderId, order.status, newStatus);
         }
     }
     async getDeadLetterJobs() {

@@ -195,12 +195,10 @@ export class OrdersService {
       throw new NotFoundException('Order ' + orderId + ' not found');
     }
 
-    if (order.status === OrderStatus.FULFILLED) {
-      throw new BadRequestException('Cannot cancel a fulfilled order');
-    }
-
-    if (order.status === OrderStatus.CANCELLED) {
-      throw new BadRequestException('Order is already cancelled');
+    // Strict State Transition Validation
+    const validCancelStatuses = [OrderStatus.PLACED, OrderStatus.CONFIRMED, OrderStatus.FULFILLING];
+    if (!validCancelStatuses.includes(order.status)) {
+      throw new BadRequestException('Cannot cancel order in status: ' + order.status);
     }
 
     const previousStatus = order.status;

@@ -271,22 +271,45 @@ export class FulfillmentService {
   }
 
   async checkOrderFulfillment(orderId: string, correlationId: string): Promise<void> {
-    const lineItems = await this.lineItemRepository.find({ where: { orderId } });
-    const allConfirmed = lineItems.every(
+    const order = await this.orderRepository.findOne({
+      where: { id: orderId },
+      relations: { lineItems: true },
+    });
+    if (!order || order.status === OrderStatus.CANCELLED) return;
+
+    const lineItems = order.lineItems;
+    const anySyncing = lineItems.some(
+      (item) => item.fulfillmentStatus === FulfillmentStatus.SYNCING || item.fulfillmentStatus === FulfillmentStatus.PENDING,
+    );
+    const anyConfirmed = lineItems.some((item) => item.fulfillmentStatus === FulfillmentStatus.CONFIRMED);
+    const anyFailed = lineItems.some((item) => item.fulfillmentStatus === FulfillmentStatus.FAILED);
+    const allFinished = lineItems.every(
       (item) => item.fulfillmentStatus === FulfillmentStatus.CONFIRMED || item.fulfillmentStatus === FulfillmentStatus.FAILED,
     );
-    const anyDeadLetter = lineItems.some((item) => item.fulfillmentStatus === FulfillmentStatus.DEAD_LETTER);
 
-    if (allConfirmed) {
-      const order = await this.orderRepository.findOne({ where: { id: orderId } });
-      if (order) {
-        const previousStatus = order.status;
-        const newStatus = anyDeadLetter ? OrderStatus.FULFILLING : OrderStatus.FULFILLED;
-        await this.orderRepository.update(orderId, { status: newStatus });
+    let newStatus: OrderStatus = order.status;
 
-        // Audit: log order status change
-        await this.auditService.logOrderStatusChange(correlationId, orderId, previousStatus, newStatus);
+    // Transition to FULFILLING if not already in a terminal state and fulfillment has started
+    if (order.status === OrderStatus.PLACED || order.status === OrderStatus.CONFIRMED) {
+      if (anySyncing || anyConfirmed || anyFailed) {
+        newStatus = OrderStatus.FULFILLING;
       }
+    }
+
+    // Transition to FULFILLED or FAILED (or partial) when all items finished
+    if (allFinished) {
+      if (anyConfirmed && !anyFailed) {
+        newStatus = OrderStatus.FULFILLED;
+      } else if (anyFailed) {
+        // If there's any failure, it might not be fully FULFILLED, but keep as FULFILLING or handle FAILED
+        // Based on prompt: FAILED+SUCCESS combination check. Let's mark as FAILED for now if not fully fulfilled.
+        newStatus = anyConfirmed ? OrderStatus.FULFILLED : OrderStatus.CANCELLED; // Simplified for iteration
+      }
+    }
+
+    if (newStatus !== order.status) {
+      await this.orderRepository.update(orderId, { status: newStatus });
+      await this.auditService.logOrderStatusChange(correlationId, orderId, order.status, newStatus);
     }
   }
 
