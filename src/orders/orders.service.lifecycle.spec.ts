@@ -13,17 +13,31 @@ describe('OrdersService - Lifecycle', () => {
   let service: OrdersService;
   let orderRepositoryMock: any;
   let lineItemRepositoryMock: any;
+  let auditMock: any;
+  let inventoryMock: any;
   let dataSourceMock: any;
 
   beforeEach(async () => {
     orderRepositoryMock = {
       findOne: jest.fn(),
       update: jest.fn(),
+      find: jest.fn(),
     };
     lineItemRepositoryMock = {
       update: jest.fn(),
+      createQueryBuilder: jest.fn().mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([]),
+      }),
     };
     dataSourceMock = {};
+    auditMock = {
+      logOrderStatusChange: jest.fn().mockResolvedValue(undefined),
+    };
+    inventoryMock = {
+      restoreStock: jest.fn().mockResolvedValue(undefined),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -32,8 +46,8 @@ describe('OrdersService - Lifecycle', () => {
         { provide: getRepositoryToken(OrderLineItem), useValue: lineItemRepositoryMock },
         { provide: getRepositoryToken(Product), useValue: {} },
         { provide: DataSource, useValue: dataSourceMock },
-        { provide: InventoryService, useValue: { restoreStock: jest.fn() } },
-        { provide: AuditService, useValue: { logOrderStatusChange: jest.fn() } },
+        { provide: InventoryService, useValue: inventoryMock },
+        { provide: AuditService, useValue: auditMock },
         { provide: VendorQueueService, useValue: {} },
       ],
     }).compile();
@@ -48,13 +62,125 @@ describe('OrdersService - Lifecycle', () => {
   });
 
   it('should allow cancellation of PLACED orders', async () => {
-    orderRepositoryMock.findOne.mockResolvedValue({ 
-      id: 'ord1', 
-      status: OrderStatus.PLACED, 
-      lineItems: [] 
+    orderRepositoryMock.findOne.mockResolvedValue({
+      id: 'ord1',
+      status: OrderStatus.PLACED,
+      lineItems: [],
     });
 
     await service.cancelOrder('ord1', 'c1');
     expect(orderRepositoryMock.update).toHaveBeenCalledWith('ord1', { status: OrderStatus.CANCELLED });
+  });
+
+  describe('transitionOrder', () => {
+    it('CONFIRM moves PLACED -> CONFIRMED and writes an audit entry', async () => {
+      orderRepositoryMock.findOne
+        .mockResolvedValueOnce({ id: 'ord1', status: OrderStatus.PLACED, lineItems: [] })
+        // second call is from getOrderById after the update
+        .mockResolvedValueOnce({ id: 'ord1', status: OrderStatus.CONFIRMED, lineItems: [] });
+
+      const result = await service.transitionOrder('ord1', { action: 'CONFIRM' }, 'c1', 'vendor-1');
+
+      expect(orderRepositoryMock.update).toHaveBeenCalledWith('ord1', { status: OrderStatus.CONFIRMED });
+      expect(auditMock.logOrderStatusChange).toHaveBeenCalledWith('c1', 'ord1', OrderStatus.PLACED, OrderStatus.CONFIRMED, 'vendor-1');
+      expect(result.status).toBe(OrderStatus.CONFIRMED);
+    });
+
+    it('FULFILL moves CONFIRMED -> FULFILLING', async () => {
+      orderRepositoryMock.findOne
+        .mockResolvedValueOnce({ id: 'ord1', status: OrderStatus.CONFIRMED, lineItems: [] })
+        .mockResolvedValueOnce({ id: 'ord1', status: OrderStatus.FULFILLING, lineItems: [] });
+
+      await service.transitionOrder('ord1', { action: 'FULFILL' }, 'c1');
+
+      expect(orderRepositoryMock.update).toHaveBeenCalledWith('ord1', { status: OrderStatus.FULFILLING });
+    });
+
+    it('SHIP moves FULFILLING -> FULFILLED', async () => {
+      orderRepositoryMock.findOne
+        .mockResolvedValueOnce({ id: 'ord1', status: OrderStatus.FULFILLING, lineItems: [] })
+        .mockResolvedValueOnce({ id: 'ord1', status: OrderStatus.FULFILLED, lineItems: [] });
+
+      await service.transitionOrder('ord1', { action: 'SHIP' }, 'c1');
+
+      expect(orderRepositoryMock.update).toHaveBeenCalledWith('ord1', { status: OrderStatus.FULFILLED });
+    });
+
+    it('rejects an illegal transition (CONFIRM from FULFILLED)', async () => {
+      orderRepositoryMock.findOne.mockResolvedValue({ id: 'ord1', status: OrderStatus.FULFILLED });
+
+      await expect(
+        service.transitionOrder('ord1', { action: 'CONFIRM' }, 'c1'),
+      ).rejects.toThrow(/Illegal transition CONFIRM/);
+
+      expect(orderRepositoryMock.update).not.toHaveBeenCalled();
+      expect(auditMock.logOrderStatusChange).not.toHaveBeenCalled();
+    });
+
+    it('CANCEL delegates to cancelOrder and restores inventory for pending items', async () => {
+      orderRepositoryMock.findOne.mockResolvedValue({
+        id: 'ord1',
+        status: OrderStatus.CONFIRMED,
+        lineItems: [
+          { id: 'li1', productId: 'p1', quantity: 2, fulfillmentStatus: FulfillmentStatus.PENDING },
+        ],
+      });
+
+      // Stub the second findOne from getOrderById (post-cancel).
+      orderRepositoryMock.findOne
+        .mockResolvedValueOnce({
+          id: 'ord1',
+          status: OrderStatus.CONFIRMED,
+          lineItems: [
+            { id: 'li1', productId: 'p1', quantity: 2, fulfillmentStatus: FulfillmentStatus.PENDING },
+          ],
+        })
+        .mockResolvedValueOnce({
+          id: 'ord1',
+          status: OrderStatus.CANCELLED,
+          lineItems: [
+            { id: 'li1', productId: 'p1', quantity: 2, fulfillmentStatus: FulfillmentStatus.FAILED, failureReason: 'Order cancelled' },
+          ],
+        });
+
+      await service.transitionOrder('ord1', { action: 'CANCEL', reason: 'buyer request' }, 'c1');
+
+      expect(inventoryMock.restoreStock).toHaveBeenCalledWith('p1', 2, 'c1', 'Order cancellation');
+      expect(orderRepositoryMock.update).toHaveBeenCalledWith('ord1', { status: OrderStatus.CANCELLED });
+    });
+
+    it('returns 404 for an unknown order id', async () => {
+      orderRepositoryMock.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.transitionOrder('missing', { action: 'CONFIRM' }, 'c1'),
+      ).rejects.toThrow('Order missing not found');
+    });
+  });
+
+  describe('getOrdersByVendor', () => {
+    it('returns an empty list when the vendor has no line items', async () => {
+      const result = await service.getOrdersByVendor('vendor-x');
+      expect(result).toEqual([]);
+      expect(orderRepositoryMock.find).not.toHaveBeenCalled();
+    });
+
+    it('returns distinct orders for a vendor with line items', async () => {
+      lineItemRepositoryMock.createQueryBuilder.mockReturnValueOnce({
+        select: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([{ orderId: 'o1' }, { orderId: 'o2' }]),
+      });
+      orderRepositoryMock.find.mockResolvedValue([
+        { id: 'o1', status: OrderStatus.PLACED, lineItems: [] },
+        { id: 'o2', status: OrderStatus.FULFILLING, lineItems: [] },
+      ]);
+
+      const result = await service.getOrdersByVendor('vendor-x');
+      expect(result).toHaveLength(2);
+      expect(orderRepositoryMock.find).toHaveBeenCalledWith(
+        expect.objectContaining({ where: [{ id: 'o1' }, { id: 'o2' }] }),
+      );
+    });
   });
 });
