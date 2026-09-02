@@ -166,11 +166,9 @@ let OrdersService = OrdersService_1 = class OrdersService {
         if (!order) {
             throw new common_1.NotFoundException('Order ' + orderId + ' not found');
         }
-        if (order.status === order_entity_1.OrderStatus.FULFILLED) {
-            throw new common_1.BadRequestException('Cannot cancel a fulfilled order');
-        }
-        if (order.status === order_entity_1.OrderStatus.CANCELLED) {
-            throw new common_1.BadRequestException('Order is already cancelled');
+        const validCancelStatuses = [order_entity_1.OrderStatus.PLACED, order_entity_1.OrderStatus.CONFIRMED, order_entity_1.OrderStatus.FULFILLING];
+        if (!validCancelStatuses.includes(order.status)) {
+            throw new common_1.BadRequestException('Cannot cancel order in status: ' + order.status);
         }
         const previousStatus = order.status;
         const itemsToRestore = order.lineItems.filter((item) => item.fulfillmentStatus === order_line_item_entity_1.FulfillmentStatus.PENDING || item.fulfillmentStatus === order_line_item_entity_1.FulfillmentStatus.SYNCING);

@@ -22,6 +22,7 @@ describe('FulfillmentService - Reconciliation', () => {
         };
         lineItemRepositoryMock = {
             update: jest.fn(),
+            findOne: jest.fn(),
         };
         vendorMockServiceMock = {
             queryFulfillmentStatus: jest.fn(),
@@ -67,6 +68,13 @@ describe('FulfillmentService - Reconciliation', () => {
         expect(result.stillAmbiguous).toBe(1);
         expect(syncJobRepositoryMock.update).toHaveBeenCalledWith('job1', expect.objectContaining({ status: vendor_sync_job_entity_1.SyncJobStatus.AMBIGUOUS }));
         expect(lineItemRepositoryMock.update).toHaveBeenCalledWith('li1', expect.objectContaining({ fulfillmentStatus: order_line_item_entity_1.FulfillmentStatus.AMBIGUOUS }));
+    });
+    it('should retry job when vendor reference is missing', async () => {
+        const job = { id: 'job1', orderLineItem: { id: 'li1', vendorReference: null } };
+        syncJobRepositoryMock.find.mockResolvedValue([job]);
+        const result = await service.reconcile(0);
+        expect(result.resolved).toBe(1);
+        expect(syncJobRepositoryMock.update).toHaveBeenCalledWith('job1', { status: vendor_sync_job_entity_1.SyncJobStatus.PENDING });
     });
     it('should resolve job via manual resolution', async () => {
         const lineItem = { id: 'li1', fulfillmentStatus: order_line_item_entity_1.FulfillmentStatus.AMBIGUOUS, orderId: 'ord1', syncJob: { id: 'job1' } };
