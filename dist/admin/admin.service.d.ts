@@ -2,7 +2,7 @@ import { Repository } from 'typeorm';
 import { Order } from '../common/entities/order.entity';
 import { OrderLineItem } from '../common/entities/order-line-item.entity';
 import { VendorSyncJob } from '../common/entities/vendor-sync-job.entity';
-import { AdminResolveDto, AdminDashboardDto, StuckOrdersResponseDto } from './dto/admin.dto';
+import { AdminResolveDto, AdminDashboardDto, AdminOrderFilterDto, AdminOrderResponseDto } from './dto/admin.dto';
 import { OrdersService } from '../orders/orders.service';
 import { FulfillmentService } from '../fulfillment/fulfillment.service';
 import { AuditService, AuditLogQuery } from '../common/audit';
@@ -17,7 +17,8 @@ export declare class AdminService {
     private readonly logger;
     constructor(orderRepository: Repository<Order>, lineItemRepository: Repository<OrderLineItem>, syncJobRepository: Repository<VendorSyncJob>, ordersService: OrdersService, fulfillmentService: FulfillmentService, auditService: AuditService);
     getDashboard(correlationId: string): Promise<AdminDashboardDto>;
-    getStuckOrders(correlationId: string): Promise<StuckOrdersResponseDto>;
+    getOrders(filter: AdminOrderFilterDto, correlationId: string): Promise<AdminOrderResponseDto>;
+    getStuckOrders(correlationId: string): Promise<AdminOrderResponseDto>;
     private determineStuckReason;
     resolveOrderLineItem(lineItemId: string, dto: AdminResolveDto, correlationId: string): Promise<void>;
     cancelOrder(orderId: string, correlationId: string): Promise<void>;

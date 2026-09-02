@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Param, Body, Query, ParseUUIDPipe } from '@nestjs/common';
 import { AdminService } from './admin.service';
-import { AdminResolveDto, AdminDashboardDto, StuckOrdersResponseDto, AdminAuditLogResponseDto } from './dto/admin.dto';
+import { AdminResolveDto, AdminDashboardDto, AdminOrderFilterDto, AdminOrderResponseDto, AdminAuditLogResponseDto } from './dto/admin.dto';
 import { VendorSyncJob } from '../common/entities/vendor-sync-job.entity';
 import { CorrelationId } from '../common/decorators/correlation-id.decorator';
 import { AuditEntityType, AuditAction } from '../common/audit';
@@ -16,16 +16,10 @@ export class AdminController {
 
   @Get('orders')
   async getOrders(
-    @Query('status') status: string,
+    @Query() filter: AdminOrderFilterDto,
     @CorrelationId() correlationId: string,
-  ): Promise<StuckOrdersResponseDto> {
-    // GET /admin/orders?status=stuck
-    // Returns orders with stuck fulfillment line items
-    if (status === 'stuck') {
-      return this.adminService.getStuckOrders(correlationId);
-    }
-    // Default: return empty result for non-stuck queries
-    return { total: 0, orders: [] };
+  ): Promise<AdminOrderResponseDto> {
+    return this.adminService.getOrders(filter, correlationId);
   }
 
   @Post('orders/:orderId/cancel')

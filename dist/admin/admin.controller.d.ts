@@ -1,12 +1,12 @@
 import { AdminService } from './admin.service';
-import { AdminResolveDto, AdminDashboardDto, StuckOrdersResponseDto, AdminAuditLogResponseDto } from './dto/admin.dto';
+import { AdminResolveDto, AdminDashboardDto, AdminOrderFilterDto, AdminOrderResponseDto, AdminAuditLogResponseDto } from './dto/admin.dto';
 import { VendorSyncJob } from '../common/entities/vendor-sync-job.entity';
 import { AuditEntityType, AuditAction } from '../common/audit';
 export declare class AdminController {
     private readonly adminService;
     constructor(adminService: AdminService);
     getDashboard(correlationId: string): Promise<AdminDashboardDto>;
-    getOrders(status: string, correlationId: string): Promise<StuckOrdersResponseDto>;
+    getOrders(filter: AdminOrderFilterDto, correlationId: string): Promise<AdminOrderResponseDto>;
     cancelOrder(orderId: string, correlationId: string): Promise<{
         message: string;
     }>;

@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString, IsArray, ValidateNested } from 'class-validator';
+import { IsEnum, IsOptional, IsString, IsArray, ValidateNested, IsInt, Min, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
 import { FulfillmentStatus, OrderStatus } from '../../common/entities';
 import { VendorSyncJob, SyncJobStatus } from '../../common/entities/vendor-sync-job.entity';
@@ -36,18 +36,44 @@ export class StuckOrderLineItemDto {
   lastAttemptedAt?: Date;
 }
 
-export class StuckOrderDto {
+export class AdminOrderFilterDto {
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @IsOptional()
+  @IsString()
+  vendorId?: string;
+
+  @IsOptional()
+  @IsIn(['stuck', 'all'])
+  type?: 'stuck' | 'all';
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  limit?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  offset?: number;
+}
+
+export class AdminOrderDto {
   orderId: string;
   buyerId: string;
   status: string;
   createdAt: Date;
-  stuckReason: string;
-  stuckLineItems: StuckOrderLineItemDto[];
+  lineItems: StuckOrderLineItemDto[];
+  stuckReason?: string;
 }
 
-export class StuckOrdersResponseDto {
+export class AdminOrderResponseDto {
   total: number;
-  orders: StuckOrderDto[];
+  orders: AdminOrderDto[];
 }
 
 export class AdminAuditLogDto {
