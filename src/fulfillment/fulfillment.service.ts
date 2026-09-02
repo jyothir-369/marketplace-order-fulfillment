@@ -5,7 +5,7 @@ import { OrderLineItem, FulfillmentStatus } from '../common/entities/order-line-
 import { VendorSyncJob, SyncJobStatus, MAX_RETRY_ATTEMPTS } from '../common/entities/vendor-sync-job.entity';
 import { Order, OrderStatus } from '../common/entities/order.entity';
 import { VendorMockService } from '../integrations/vendor-mock/vendor-mock.service';
-import { VendorFulfillmentRequestDto } from '../integrations/vendor-mock/dto/vendor-mock.dto';
+import { VendorFulfillmentRequestDto, VendorResponseType } from '../integrations/vendor-mock/dto/vendor-mock.dto';
 import { SyncJobDto, ReconciliationResultDto, ManualResolutionDto } from './dto/fulfillment.dto';
 import { AuditService } from '../common/audit';
 
@@ -206,6 +206,10 @@ export class FulfillmentService {
             await this.auditService.logReconciliationResolved(correlationId, job.id, 'Vendor confirmed fulfillment');
 
             result.resolved++;
+          } else if (statusResponse.responseType === VendorResponseType.FAILURE) {
+            await this.syncJobRepository.update(job.id, { status: SyncJobStatus.DEAD_LETTER, errorMessage: statusResponse.message });
+            await this.lineItemRepository.update(lineItem.id, { fulfillmentStatus: FulfillmentStatus.FAILED, failureReason: statusResponse.message });
+            result.resolved++; // Treated as resolved because we got a definitive answer
           } else {
             await this.syncJobRepository.update(job.id, { status: SyncJobStatus.AMBIGUOUS });
             await this.lineItemRepository.update(lineItem.id, { fulfillmentStatus: FulfillmentStatus.AMBIGUOUS });
@@ -231,6 +235,12 @@ export class FulfillmentService {
       throw new NotFoundException('Line item ' + lineItemId + ' not found');
     }
 
+    // Validate transition
+    const validFromStatuses = [FulfillmentStatus.PENDING, FulfillmentStatus.SYNCING, FulfillmentStatus.AMBIGUOUS];
+    if (!validFromStatuses.includes(lineItem.fulfillmentStatus)) {
+      throw new Error('Invalid state transition: Cannot resolve from ' + lineItem.fulfillmentStatus);
+    }
+
     const previousStatus = lineItem.fulfillmentStatus;
     const updateData: any = { fulfillmentStatus: dto.newStatus };
     if (dto.vendorReference) { updateData.vendorReference = dto.vendorReference; }
@@ -239,8 +249,11 @@ export class FulfillmentService {
     await this.lineItemRepository.update(lineItemId, updateData);
 
     if (lineItem.syncJob) {
+      const newJobStatus = dto.newStatus === FulfillmentStatus.CONFIRMED ? SyncJobStatus.COMPLETED : SyncJobStatus.DEAD_LETTER;
       await this.syncJobRepository.update(lineItem.syncJob.id, {
-        status: dto.newStatus === FulfillmentStatus.CONFIRMED ? SyncJobStatus.COMPLETED : SyncJobStatus.DEAD_LETTER,
+        status: newJobStatus,
+        errorMessage: dto.reason || null,
+        completedAt: new Date(),
       });
     }
 
