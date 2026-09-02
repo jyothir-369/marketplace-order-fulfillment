@@ -4,11 +4,13 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  var logger = new Logger('Bootstrap');
+  const logger = new Logger('Bootstrap');
 
-  var app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create(AppModule, {
     logger: ['error', 'warn', 'log', 'debug'],
   });
+
+  app.setGlobalPrefix('api');
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -27,7 +29,7 @@ async function bootstrap() {
     credentials: true,
   });
 
-  var port = process.env.PORT || 3000;
+  const port = process.env.PORT || 3000;
   await app.listen(port);
   
   logger.log('Marketplace Order & Fulfillment System running on port ' + port);

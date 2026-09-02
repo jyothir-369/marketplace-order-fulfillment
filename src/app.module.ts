@@ -47,6 +47,7 @@ import { VendorSyncJob } from './common/entities/vendor-sync-job.entity';
           connection: {
             host: configService.get('REDIS_HOST', 'localhost'),
             port: configService.get('REDIS_PORT', 6379),
+            password: configService.get('REDIS_PASSWORD') || undefined,
           },
         };
       },
