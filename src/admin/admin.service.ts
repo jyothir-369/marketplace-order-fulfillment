@@ -7,7 +7,7 @@ import { VendorSyncJob, SyncJobStatus } from '../common/entities/vendor-sync-job
 import { AdminResolveDto, AdminDashboardDto, AdminOrderFilterDto, AdminOrderResponseDto, AdminOrderDto, StuckOrderLineItemDto } from './dto/admin.dto';
 import { OrdersService } from '../orders/orders.service';
 import { FulfillmentService } from '../fulfillment/fulfillment.service';
-import { AuditService, AuditLogQuery } from '../common/audit';
+import { AuditService, AuditLogQuery } from '../common/audit/audit.service';
 import { AuditLog } from '../common/audit/audit-log.entity';
 
 @Injectable()

@@ -6,7 +6,7 @@ import { OrderLineItem, FulfillmentStatus } from '../common/entities/order-line-
 import { VendorSyncJob } from '../common/entities/vendor-sync-job.entity';
 import { OrdersService } from '../orders/orders.service';
 import { FulfillmentService } from '../fulfillment/fulfillment.service';
-import { AuditService } from '../common/audit';
+import { AuditService } from '../common/audit/audit.service';
 
 describe('AdminService', () => {
   let service: AdminService;

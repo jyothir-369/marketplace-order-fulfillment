@@ -8,9 +8,14 @@ import { OrdersModule } from './orders/orders.module';
 import { FulfillmentModule } from './fulfillment/fulfillment.module';
 import { AdminModule } from './admin/admin.module';
 import { VendorMockModule } from './integrations/vendor-mock/vendor-mock.module';
-import { AuditModule, AuditLog } from './common/audit';
+import { AuditModule } from './common/audit/audit.module';
+import { AuditLog } from './common/audit/audit-log.entity';
 import { HealthModule } from './health/health.module';
-import { Vendor, Product, Order, OrderLineItem, VendorSyncJob } from './common/entities';
+import { Vendor } from './common/entities/vendor.entity';
+import { Product } from './common/entities/product.entity';
+import { Order } from './common/entities/order.entity';
+import { OrderLineItem } from './common/entities/order-line-item.entity';
+import { VendorSyncJob } from './common/entities/vendor-sync-job.entity';
 
 @Module({
   imports: [
