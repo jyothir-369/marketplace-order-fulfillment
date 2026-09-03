@@ -1,22 +1,4 @@
-﻿/**
- * EmptyState — friendly placeholder when a list or resource has no data (§1.3).
- *
- * Slots:
- * - icon     : any ReactNode (emoji, SVG, or lucide Icon)
- * - title    : primary headline
- * - description : optional supporting paragraph
- * - action   : optional CTA button (pass the <button> element)
- *
- * Usage:
- *   <EmptyState
- *     icon={<Package size={40} />}
- *     title="No orders yet"
- *     description="Your placed orders will appear here."
- *     action={<Button onClick={handleShop}>Browse products</Button>}
- *   />
- */
-
-import { Inbox } from "lucide-react";
+﻿import { cn } from "@/lib/utils";
 
 interface EmptyStateProps {
   icon?: React.ReactNode;
@@ -31,23 +13,40 @@ export function EmptyState({
   title,
   description,
   action,
-  className = "",
+  className,
 }: EmptyStateProps) {
   return (
     <div
-      className={[
+      className={cn(
         "flex flex-col items-center justify-center gap-4 py-16 text-center",
-        className,
-      ].join(" ")}
+        className
+      )}
       role="status"
     >
-      <div className="text-zinc-300">
-        {icon ?? <Inbox size={48} aria-hidden />}
+      <div className="text-[var(--muted-foreground)] opacity-60">
+        {icon ?? (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width={48}
+            height={48}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.5}
+            aria-hidden
+          >
+            <rect x="3" y="6" width="18" height="13" rx="2" />
+            <path d="M3 10h18" />
+            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+          </svg>
+        )}
       </div>
       <div className="space-y-1">
-        <h2 className="text-lg font-semibold text-zinc-700">{title}</h2>
+        <h2 className="text-lg font-semibold text-[var(--foreground)]">{title}</h2>
         {description && (
-          <p className="text-sm text-zinc-500 max-w-sm">{description}</p>
+          <p className="text-sm text-[var(--muted-foreground)] max-w-sm">
+            {description}
+          </p>
         )}
       </div>
       {action && <div>{action}</div>}
