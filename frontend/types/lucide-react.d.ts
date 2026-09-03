@@ -1,11 +1,20 @@
-﻿/** Minimal type stub for lucide-react — installed at runtime via npm */
+﻿/**
+ * Minimal type stub for lucide-react — installed at runtime via npm.
+ * Add any icon name you need here; the runtime package provides all of them.
+ */
 declare module "lucide-react" {
   import type { ComponentType, SVGProps } from "react";
-  export type LucideIconType = ComponentType<SVGProps<SVGSVGElement> & { size?: number | string; strokeWidth?: number | string }>;
+
+  export type LucideIconType = ComponentType<
+    SVGProps<SVGSVGElement> & { size?: number | string; strokeWidth?: number | string }
+  >;
+
   export interface LucideIconProps extends SVGProps<SVGSVGElement> {
     size?: number | string;
     strokeWidth?: number | string;
   }
+
+  export const Activity: LucideIconType;
   export const AlertTriangle: LucideIconType;
   export const ArrowLeft: LucideIconType;
   export const ArrowRight: LucideIconType;
@@ -26,6 +35,7 @@ declare module "lucide-react" {
   export const CopyCheck: LucideIconType;
   export const DatabaseZap: LucideIconType;
   export const DollarSign: LucideIconType;
+  export const Gauge: LucideIconType;
   export const Hourglass: LucideIconType;
   export const Inbox: LucideIconType;
   export const Info: LucideIconType;
@@ -45,9 +55,17 @@ declare module "lucide-react" {
   export const ShoppingCart: LucideIconType;
   export const Store: LucideIconType;
   export const Sun: LucideIconType;
+  export const Timer: LucideIconType;
+  export const TrendingUp: LucideIconType;
   export const Truck: LucideIconType;
+  export const WifiOff: LucideIconType;
   export const X: LucideIconType;
   export const XCircle: LucideIconType;
+
   export type LucideIcon = LucideIconType;
-  export default function createIcon(path: string, viewBox?: string): LucideIconType;
+
+  export default function createIcon(
+    path: string,
+    viewBox?: string
+  ): LucideIconType;
 }

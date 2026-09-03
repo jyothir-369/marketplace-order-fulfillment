@@ -26,6 +26,7 @@ function VendorOrdersInner() {
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [statusFilter, setStatusFilter] = useState<"all" | "non-terminal">("all");
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -72,6 +73,12 @@ function VendorOrdersInner() {
       setActingId(null);
     }
   };
+
+  const filtered = useMemo(() => {
+    if (statusFilter === "non-terminal")
+      return orders.filter((o) => !TERMINAL_ORDER_STATUSES.has(o.status));
+    return orders;
+  }, [orders, statusFilter]);
 
   const nonTerminalCount = orders.filter(
     (o) => !TERMINAL_ORDER_STATUSES.has(o.status)
@@ -226,8 +233,19 @@ function VendorOrdersInner() {
               </tr>
             )}
 
+            {!loading && filtered.length === 0 && orders.length > 0 && (
+              <tr>
+                <td
+                  colSpan={6}
+                  className="p-6 text-center text-sm text-[var(--color-muted-foreground)]"
+                >
+                  No orders match this filter.
+                </td>
+              </tr>
+            )}
+
             {!loading &&
-              orders.map((order) => {
+              filtered.map((order) => {
                 const actions = actionsFor(order.status);
                 const isTerminal = TERMINAL_ORDER_STATUSES.has(order.status);
                 const vendorItems = order.lineItems.filter(
@@ -256,7 +274,7 @@ function VendorOrdersInner() {
                       </ul>
                     </td>
                     <td className="p-3 text-right tabular-nums text-[var(--color-foreground)]">
-                      {order.totalAmount.toFixed(2)}
+                      {(order.totalAmount / 100).toFixed(2)}
                     </td>
                     <td className="p-3 text-xs text-[var(--color-muted-foreground)]">
                       {new Date(order.createdAt).toLocaleString()}
