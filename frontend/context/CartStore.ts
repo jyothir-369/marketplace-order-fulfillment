@@ -39,6 +39,7 @@ export interface CartVendorGroup {
 interface CartState {
   cart: CartItem[];
   hydrated: boolean;
+  drawerOpen: boolean;
 
   // Actions
   addToCart: (item: CartItem) => void;
@@ -46,6 +47,9 @@ interface CartState {
   updateQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
   markHydrated: () => void;
+  openDrawer: () => void;
+  closeDrawer: () => void;
+  toggleDrawer: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -57,6 +61,7 @@ export const useCartStore = create<CartState>()(
     (set) => ({
       cart: [],
       hydrated: false,
+      drawerOpen: false,
 
       markHydrated: () => set({ hydrated: true }),
 
@@ -69,6 +74,7 @@ export const useCartStore = create<CartState>()(
               cart: state.cart.map((i) =>
                 i.productId === item.productId ? { ...i, quantity: newQty } : i
               ),
+              drawerOpen: true,
             };
           }
           return {
@@ -79,6 +85,7 @@ export const useCartStore = create<CartState>()(
                 quantity: Math.min(item.quantity, item.maxStock),
               },
             ],
+            drawerOpen: true,
           };
         }),
 
@@ -103,6 +110,10 @@ export const useCartStore = create<CartState>()(
         })),
 
       clearCart: () => set({ cart: [] }),
+
+      openDrawer: () => set({ drawerOpen: true }),
+      closeDrawer: () => set({ drawerOpen: false }),
+      toggleDrawer: () => set((state) => ({ drawerOpen: !state.drawerOpen })),
     }),
     {
       name: "marketplace_cart_store",
@@ -110,6 +121,7 @@ export const useCartStore = create<CartState>()(
         // Guard against SSR environments where `window` is undefined.
         typeof window !== "undefined" ? window.localStorage : (undefined as never)
       ),
+      // Drawer UI state should never be persisted; only the cart contents.
       partialize: (state) => ({ cart: state.cart }),
       onRehydrateStorage: () => (state) => {
         state?.markHydrated();
@@ -124,6 +136,7 @@ export const useCartStore = create<CartState>()(
 
 export const selectCart = (state: CartState) => state.cart;
 export const selectHydrated = (state: CartState) => state.hydrated;
+export const selectDrawerOpen = (state: CartState) => state.drawerOpen;
 
 export const selectTotalItems = (state: CartState): number =>
   state.cart.reduce((sum, item) => sum + item.quantity, 0);
