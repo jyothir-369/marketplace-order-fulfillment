@@ -78,6 +78,7 @@ export class AdminService {
       total,
       orders: orders.map((o) => ({
         orderId: o.id,
+        orderNumber: o.orderNumber,
         buyerId: o.buyerId,
         status: o.status,
         createdAt: o.createdAt,
@@ -138,6 +139,7 @@ export class AdminService {
         const stuckReason = this.determineStuckReason(item);
         orderMap.set(item.orderId, {
           orderId: item.orderId,
+          orderNumber: item.order.orderNumber,
           buyerId: item.order.buyerId,
           status: item.order.status,
           createdAt: item.order.createdAt,

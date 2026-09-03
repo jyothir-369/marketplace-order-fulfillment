@@ -1,4 +1,4 @@
-import { IsUUID, IsNumber, IsArray, ValidateNested, Min, ArrayMinSize, IsOptional, IsString, IsIn } from 'class-validator';
+import { IsUUID, IsNumber, IsArray, ValidateNested, Min, ArrayMinSize, IsOptional, IsString, IsIn, IsInt, Min as MinInt } from 'class-validator';
 import { Type } from 'class-transformer';
 import { OrderStatus } from '../../common/entities/order.entity';
 import { FulfillmentStatus } from '../../common/entities/order-line-item.entity';
@@ -49,6 +49,13 @@ export class TransitionOrderDto {
   @IsOptional()
   @IsString()
   reason?: string;
+
+  /**
+   * Optional actor (vendor/user) identifier for audit attribution.
+   */
+  @IsOptional()
+  @IsUUID()
+  actorId?: string;
 }
 
 export class OrderLineItemResponseDto {
@@ -66,6 +73,9 @@ export class OrderLineItemResponseDto {
 }
 
 export class OrderResponseDto {
+  /** Human-readable order number (e.g. ORD-20260902-A1B2). */
+  orderNumber: string;
+
   id: string;
   buyerId: string;
   status: OrderStatus;
@@ -88,4 +98,32 @@ export class CheckoutResponseDto {
   order?: OrderResponseDto;
   message: string;
   correlationId: string;
+}
+
+/**
+ * Paginated order list query params for GET /api/orders.
+ */
+export class PaginatedOrdersQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @MinInt(1)
+  page?: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @MinInt(1)
+  limit?: number = 20;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
+}
+
+export class PaginatedOrdersResponseDto {
+  total: number;
+  page: number;
+  limit: number;
+  orders: OrderResponseDto[];
 }

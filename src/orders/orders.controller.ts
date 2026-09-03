@@ -1,6 +1,13 @@
-import { Controller, Get, Post, Body, Param, ParseUUIDPipe, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, ParseUUIDPipe, HttpCode, HttpStatus, Query } from '@nestjs/common';
 import { OrdersService } from './orders.service';
-import { CheckoutDto, CheckoutResponseDto, OrderResponseDto, TransitionOrderDto } from './dto/orders.dto';
+import {
+  CheckoutDto,
+  CheckoutResponseDto,
+  OrderResponseDto,
+  TransitionOrderDto,
+  PaginatedOrdersQueryDto,
+  PaginatedOrdersResponseDto,
+} from './dto/orders.dto';
 import { CorrelationId } from '../common/decorators/correlation-id.decorator';
 import { AdminAuditLogResponseDto } from '../admin/dto/admin.dto';
 import { AuditService, AuditEntityType } from '../common/audit';
@@ -14,31 +21,52 @@ export class OrdersController {
 
   @Post('checkout')
   @HttpCode(HttpStatus.CREATED)
-  async checkout(@Body() dto: CheckoutDto, @CorrelationId() correlationId: string): Promise<CheckoutResponseDto> {
+  async checkout(
+    @Body() dto: CheckoutDto,
+    @CorrelationId() correlationId: string,
+  ): Promise<CheckoutResponseDto> {
     return this.ordersService.checkout(dto, correlationId);
   }
 
+  /**
+   * Global paginated orders listing (admin/buyer-dashboard use).
+   * Example: GET /api/orders?page=1&limit=20&status=placed
+   * Must be declared BEFORE the `:id` route so "orders" doesn't match the UUID param.
+   */
+  @Get()
+  async getOrdersPaginated(
+    @Query() query: PaginatedOrdersQueryDto,
+  ): Promise<PaginatedOrdersResponseDto> {
+    return this.ordersService.getOrdersPaginated(query);
+  }
+
   @Get(':id')
-  async getOrder(@Param('id', ParseUUIDPipe) id: string, @CorrelationId() correlationId: string): Promise<OrderResponseDto> {
+  async getOrder(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CorrelationId() correlationId: string,
+  ): Promise<OrderResponseDto> {
     return this.ordersService.getOrderById(id, correlationId);
   }
 
   @Get('buyer/:buyerId')
-  async getOrdersByBuyer(@Param('buyerId', ParseUUIDPipe) buyerId: string): Promise<OrderResponseDto[]> {
+  async getOrdersByBuyer(
+    @Param('buyerId', ParseUUIDPipe) buyerId: string,
+  ): Promise<OrderResponseDto[]> {
     return this.ordersService.getOrdersByBuyer(buyerId);
   }
 
   /**
-   * Vendor-scoped order listing. Returns any order that contains a line item
-   * for the given vendor.
+   * Vendor-scoped order listing.
    */
   @Get('vendor/:vendorId')
-  async getOrdersByVendor(@Param('vendorId', ParseUUIDPipe) vendorId: string): Promise<OrderResponseDto[]> {
+  async getOrdersByVendor(
+    @Param('vendorId', ParseUUIDPipe) vendorId: string,
+  ): Promise<OrderResponseDto[]> {
     return this.ordersService.getOrdersByVendor(vendorId);
   }
 
   /**
-   * Drive an order through its lifecycle via a single vendor-facing action.
+   * Drive an order through its lifecycle.
    */
   @Post(':id/transition')
   @HttpCode(HttpStatus.OK)
@@ -47,13 +75,9 @@ export class OrdersController {
     @Body() dto: TransitionOrderDto,
     @CorrelationId() correlationId: string,
   ): Promise<OrderResponseDto> {
-    return this.ordersService.transitionOrder(id, dto, correlationId);
+    return this.ordersService.transitionOrder(id, dto, correlationId, dto.actorId);
   }
 
-  /**
-   * Returns the audit log entries for a single order, scoped to ORDER entity
-   * type. Backed by the same query path used by /admin/audit-logs.
-   */
   @Get(':id/audit-logs')
   async getOrderAuditLogs(
     @Param('id', ParseUUIDPipe) id: string,

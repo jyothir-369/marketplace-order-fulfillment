@@ -5,6 +5,64 @@ import { Product } from '../common/entities/product.entity';
 import { Vendor } from '../common/entities/vendor.entity';
 import { CreateProductDto, UpdateProductDto, ProductResponseDto } from './dto/catalog.dto';
 
+interface VendorSeed {
+  name: string;
+  products: Array<{ name: string; price: number; stockCount: number }>;
+}
+
+const SAMPLE_CATALOG: VendorSeed[] = [
+  {
+    name: 'Electronics World',
+    products: [
+      { name: 'Wireless Headphones', price: 79.99, stockCount: 50 },
+      { name: 'Bluetooth Speaker', price: 49.99, stockCount: 100 },
+      { name: 'USB-C Hub', price: 39.99, stockCount: 75 },
+      { name: 'Mechanical Keyboard', price: 129.99, stockCount: 30 },
+      { name: 'Gaming Mouse', price: 59.99, stockCount: 60 },
+    ],
+  },
+  {
+    name: 'Home & Kitchen Co',
+    products: [
+      { name: 'Coffee Maker', price: 89.99, stockCount: 40 },
+      { name: 'Air Fryer', price: 149.99, stockCount: 25 },
+      { name: 'Blender Pro', price: 69.99, stockCount: 55 },
+      { name: 'Instant Pot', price: 99.99, stockCount: 35 },
+      { name: 'Knife Set', price: 79.99, stockCount: 45 },
+    ],
+  },
+  {
+    name: 'Sports Gear Inc',
+    products: [
+      { name: 'Yoga Mat Premium', price: 34.99, stockCount: 120 },
+      { name: 'Resistance Bands', price: 19.99, stockCount: 200 },
+      { name: 'Dumbbell Set 20lb', price: 49.99, stockCount: 80 },
+      { name: 'Running Shoes', price: 119.99, stockCount: 40 },
+      { name: 'Water Bottle', price: 24.99, stockCount: 150 },
+    ],
+  },
+  {
+    name: 'Fashion Forward',
+    products: [
+      { name: 'Cotton T-Shirt', price: 24.99, stockCount: 500 },
+      { name: 'Denim Jeans', price: 59.99, stockCount: 200 },
+      { name: 'Leather Belt', price: 34.99, stockCount: 150 },
+      { name: 'Sneakers Classic', price: 79.99, stockCount: 100 },
+      { name: 'Wool Sweater', price: 89.99, stockCount: 75 },
+    ],
+  },
+  {
+    name: 'Books & Media',
+    products: [
+      { name: 'Bestseller Novel', price: 14.99, stockCount: 300 },
+      { name: 'Cookbook Collection', price: 29.99, stockCount: 100 },
+      { name: 'Programming Guide', price: 49.99, stockCount: 80 },
+      { name: 'Art Print A4', price: 19.99, stockCount: 200 },
+      { name: 'Board Game', price: 39.99, stockCount: 60 },
+    ],
+  },
+];
+
 @Injectable()
 export class CatalogService {
   private readonly logger = new Logger(CatalogService.name);
@@ -99,6 +157,53 @@ export class CatalogService {
     this.logger.log('Product updated: ' + id, CatalogService.name, correlationId);
 
     return this.toResponseDto(saved, saved.vendor ? saved.vendor.name : 'Unknown');
+  }
+
+  /**
+   * Seeds the database with 25 sample products across 5 vendors.
+   * Clears existing catalog data first so the operation is idempotent.
+   * Used by the storefront when the catalog is empty AND by the 
+pm run seed script.
+   */
+  async seedSampleProducts(
+    correlationId: string,
+  ): Promise<{ message: string; productsCreated: number; vendorsCreated: number }> {
+    this.logger.log('Seeding sample catalog', CatalogService.name, correlationId);
+
+    await this.productRepository.delete({});
+    await this.vendorRepository.delete({});
+
+    let productsCreated = 0;
+    let vendorsCreated = 0;
+    for (const vendorSeed of SAMPLE_CATALOG) {
+      const vendor = this.vendorRepository.create({ name: vendorSeed.name });
+      const savedVendor = await this.vendorRepository.save(vendor);
+      vendorsCreated++;
+
+      for (const productSeed of vendorSeed.products) {
+        const product = this.productRepository.create({
+          vendorId: savedVendor.id,
+          name: productSeed.name,
+          price: productSeed.price,
+          stockCount: productSeed.stockCount,
+          isActive: true,
+        });
+        await this.productRepository.save(product);
+        productsCreated++;
+      }
+    }
+
+    this.logger.log(
+      'Sample catalog seeded: ' + vendorsCreated + ' vendors, ' + productsCreated + ' products',
+      CatalogService.name,
+      correlationId,
+    );
+
+    return {
+      message: 'Sample catalog seeded',
+      productsCreated,
+      vendorsCreated,
+    };
   }
 
   private toResponseDto(product: Product, vendorName: string): ProductResponseDto {
