@@ -1,169 +1,247 @@
+﻿/**
+ * app/(operational)/admin/audit-logs/page.tsx — Audit Log Timeline (§4.5).
+ *
+ * Features:
+ *   - Filter by entity type, action, or correlation ID
+ *   - Trace by correlation ID to see the full lifecycle
+ *   - AuditLogTimeline with collapsible JSON metadata inspectors
+ */
+
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowRight, CheckCircle, Clock, RefreshCw, Search, XCircle } from "lucide-react";
+import { Search } from "lucide-react";
 import { getAuditLogs, getCorrelationTrace } from "@/lib/api";
-import { ToastProvider, useToast } from "@/components/ui/toast";
+import { AuditLogTimeline } from "@/components/operational/AuditLogTimeline";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { AdminAuditLogDto, AuditLogEntryDto } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import type { AuditLogEntryDto } from "@/lib/types";
 
-const TRACE_ICON_MAP: Record<string, React.ComponentType<Record<string, unknown>>> = {
-  FULFILL: CheckCircle,
-  CONFIRM: CheckCircle,
-  CANCEL: XCircle,
-  SHIP: CheckCircle,
-};
+const ENTITY_TYPES = ["Order", "LineItem", "SyncJob", "Product"];
 
 function AuditLogsInner() {
-  const { push: toast } = useToast();
-  const [searchId, setSearchId] = useState("");
-  const [logs, setLogs] = useState<AdminAuditLogDto[]>([]);
-  const [trace, setTrace] = useState<AuditLogEntryDto[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [traceLoading, setTraceLoading] = useState(false);
+  const [logs, setLogs] = useState<AuditLogEntryDto[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-  const loadLogs = async () => {
+  // Filters
+  const [entityType, setEntityType] = useState("");
+  const [action, setAction] = useState("");
+  const [correlationId, setCorrelationId] = useState("");
+
+  // Trace mode
+  const [traceCorrId, setTraceCorrId] = useState("");
+  const [traceMode, setTraceMode] = useState(false);
+
+  const load = async () => {
     setLoading(true);
-    try { const data = await getAuditLogs({ limit: 100 }); setLogs(data.logs ?? []); }
-    catch (err) { toast(err instanceof Error ? err.message : "Failed to load audit logs", "error"); }
-    finally { setLoading(false); }
+    try {
+      if (traceMode && traceCorrId) {
+        const res = await getCorrelationTrace(traceCorrId);
+        // Trace returns AdminAuditLogDto (no previous/new state); normalise
+        // to AuditLogEntryDto shape so AuditLogTimeline can render it.
+        const traceLogs: AuditLogEntryDto[] = (res.logs ?? []).map((l) => ({
+          id: l.id,
+          correlationId: l.correlationId,
+          action: l.action,
+          entityType: l.entityType,
+          entityId: l.entityId,
+          message: l.message,
+          userId: l.userId,
+          metadata: l.metadata,
+          previousState: undefined,
+          newState: undefined,
+          createdAt: l.createdAt,
+        }));
+        setLogs(traceLogs);
+        setTotal(res.total ?? traceLogs.length);
+      } else {
+        const res = await getAuditLogs({
+          entityType: entityType || undefined,
+          action: action || undefined,
+          correlationId: correlationId || undefined,
+          limit: 100,
+        });
+        setLogs(res.logs ?? []);
+        setTotal(res.total ?? 0);
+      }
+    } catch {
+      setLogs([]);
+      setTotal(0);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { void loadLogs(); }, []);
-
-  const handleTrace = async (correlationId: string) => {
-    setTraceLoading(true); setTrace([]);
-    try { const data = await getCorrelationTrace(correlationId); setTrace(data.logs ?? []); }
-    catch (err) { toast(err instanceof Error ? err.message : "Failed to load trace", "error"); }
-    finally { setTraceLoading(false); }
-  };
-
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchId.trim()) return;
-    await handleTrace(searchId.trim());
-  };
+  useEffect(() => {
+    void load();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entityType, action, correlationId, traceMode, traceCorrId]);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-text-primary">Audit Logs</h1>
-        <button onClick={() => void loadLogs()} className="flex items-center gap-1.5 rounded border border-border px-3 py-1.5 text-sm hover:bg-surface-base">
-          <RefreshCw className="h-4 w-4" aria-hidden />
-          Refresh
+      <div>
+        <h1 className="text-2xl font-bold text-[var(--color-foreground)]">Audit Logs</h1>
+        <p className="mt-0.5 text-sm text-[var(--color-muted-foreground)]">
+          {total > 0 ? `${total} entries` : "Browse the operational event stream."}
+        </p>
+      </div>
+
+      {/* Filters */}
+      <div
+        className={cn(
+          "flex flex-wrap items-end gap-3 rounded-xl border px-4 py-3",
+          "border-[var(--color-border)] bg-[var(--color-card)]"
+        )}
+      >
+        {/* Trace by correlation ID */}
+        <div className="flex items-center gap-2 border-r border-[var(--color-border)] pr-3">
+          <label
+            htmlFor="traceCorrId"
+            className="text-xs font-medium text-[var(--color-muted-foreground)] whitespace-nowrap"
+          >
+            Trace corr ID
+          </label>
+          <input
+            id="traceCorrId"
+            type="text"
+            value={traceCorrId}
+            onChange={(e) => {
+              setTraceCorrId(e.target.value);
+              setTraceMode(Boolean(e.target.value));
+            }}
+            placeholder="e.g. abc-123-def"
+            className={cn(
+              "h-8 w-48 rounded-md border px-2 text-xs",
+              "border-[var(--color-border)] bg-[var(--color-background)]",
+              "text-[var(--color-foreground)]",
+              "focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)]"
+            )}
+          />
+          {traceMode && (
+            <button
+              type="button"
+              onClick={() => { setTraceCorrId(""); setTraceMode(false); }}
+              className="text-xs text-[var(--color-destructive)] hover:underline"
+            >
+              Clear trace
+            </button>
+          )}
+        </div>
+
+        {/* Entity type filter */}
+        <div className="flex items-center gap-2">
+          <label
+            htmlFor="entityType"
+            className="text-xs font-medium text-[var(--color-muted-foreground)] whitespace-nowrap"
+          >
+            Entity
+          </label>
+          <select
+            id="entityType"
+            value={entityType}
+            onChange={(e) => setEntityType(e.target.value)}
+            className={cn(
+              "h-8 rounded-md border px-2 text-xs",
+              "border-[var(--color-border)] bg-[var(--color-background)]",
+              "text-[var(--color-foreground)]",
+              "focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)]"
+            )}
+          >
+            <option value="">All</option>
+            {ENTITY_TYPES.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Action filter */}
+        <div className="flex items-center gap-2">
+          <label
+            htmlFor="actionFilter"
+            className="text-xs font-medium text-[var(--color-muted-foreground)] whitespace-nowrap"
+          >
+            Action
+          </label>
+          <input
+            id="actionFilter"
+            type="text"
+            value={action}
+            onChange={(e) => setAction(e.target.value)}
+            placeholder="e.g. ORDER_PLACED"
+            className={cn(
+              "h-8 w-40 rounded-md border px-2 text-xs",
+              "border-[var(--color-border)] bg-[var(--color-background)]",
+              "text-[var(--color-foreground)]",
+              "focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)]"
+            )}
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={() => void load()}
+          disabled={loading}
+          className={cn(
+            "inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-xs",
+            "border-[var(--color-border)] bg-[var(--color-background)]",
+            "text-[var(--color-foreground)]",
+            "hover:bg-[var(--color-accent)]",
+            "disabled:opacity-50",
+            "focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)]"
+          )}
+        >
+          <Search className="h-3.5 w-3.5" aria-hidden />
+          Search
         </button>
       </div>
 
-      <form onSubmit={handleSearch} className="flex gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" aria-hidden />
-          <input
-            type="text"
-            value={searchId}
-            onChange={e => setSearchId(e.target.value)}
-            placeholder="Search by Correlation ID..."
-            className="w-full rounded-lg border border-border bg-surface-elevated py-2 pl-10 pr-4 text-sm placeholder:text-text-muted focus:border-accent-primary focus:outline-none"
-          />
-        </div>
-        <button type="submit" className="rounded-lg bg-accent-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90">
-          Trace
-        </button>
-      </form>
-
-      {traceLoading && <Skeleton className="h-24 rounded-lg" />}
-      {trace.length > 0 && (
-        <div className="rounded-lg border border-border bg-surface-elevated p-4 shadow-sm">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-text-muted">
-            Full Lifecycle Trace
-            <span className="ml-2 font-mono text-xs text-accent-primary">
-              {trace[0]?.correlationId}
-            </span>
-          </h2>
-          <div className="overflow-x-auto">
-            <div className="flex items-center gap-0 min-w-max">
-              {trace.map((entry, i) => {
-                const Icon = TRACE_ICON_MAP[entry.action] ?? Clock;
-                const isLast = i === trace.length - 1;
-                return (
-                  <div key={entry.id} className="flex items-center">
-                    <div className="flex flex-col items-center">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-accent-primary bg-surface-elevated">
-                        <Icon className="h-4 w-4 text-accent-primary" aria-hidden />
-                      </div>
-                      <div className="mt-2 max-w-[120px] text-center">
-                        <p className="text-xs font-semibold text-text-primary">{entry.action}</p>
-                        <p className="mt-0.5 text-[10px] text-text-muted">{entry.entityType}</p>
-                        <p className="text-[10px] text-text-muted">{new Date(entry.createdAt).toLocaleTimeString()}</p>
-                      </div>
-                    </div>
-                    {!isLast && <ArrowRight className="mx-2 h-4 w-4 shrink-0 text-border" aria-hidden /> }
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+      {/* Trace mode banner */}
+      {traceMode && traceCorrId && (
+        <div
+          className={cn(
+            "rounded-lg border border-[var(--color-info)]/30 bg-[var(--color-info)]/10 px-4 py-2",
+            "text-xs text-[var(--color-info)]"
+          )}
+          role="status"
+          aria-live="polite"
+        >
+          Showing lifecycle trace for correlation ID:{" "}
+          <strong className="font-mono">{traceCorrId}</strong>
         </div>
       )}
 
-      <div className="rounded-lg border border-border bg-surface-elevated shadow-sm">
-        <div className="border-b border-border px-4 py-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-text-muted">Recent Events</h2>
+      {/* Timeline */}
+      {loading ? (
+        <div className="space-y-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="flex gap-4">
+              <Skeleton width="2rem" height="2rem" className="rounded-full shrink-0" />
+              <div className="flex-1 space-y-2">
+                <Skeleton height="0.75rem" width="60%" />
+                <Skeleton height="0.75rem" width="40%" />
+              </div>
+            </div>
+          ))}
         </div>
-        {loading ? (
-          <div className="p-4 space-y-2">
-            {[1,2,3].map(i => <Skeleton key={i} className="h-12 rounded" />)}
-          </div>
-        ) : logs.length === 0 ? (
-          <div className="flex h-48 flex-col items-center justify-center">
-            <p className="text-sm text-text-muted">No audit logs found.</p>
-          </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-surface-base text-xs text-text-muted">
-              <tr>
-                <th className="px-4 py-2 text-left font-medium">Time</th>
-                <th className="px-4 py-2 text-left font-medium">Action</th>
-                <th className="px-4 py-2 text-left font-medium">Entity</th>
-                <th className="px-4 py-2 text-left font-medium">Correlation ID</th>
-                <th className="px-4 py-2 text-left font-medium">Message</th>
-                <th className="px-4 py-2" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {logs.map(log => (
-                <tr key={log.id} className="hover:bg-surface-base">
-                  <td className="px-4 py-2 text-xs text-text-muted">{new Date(log.createdAt).toLocaleString()}</td>
-                  <td className="px-4 py-2">
-                    <span className="rounded border border-accent-primary/30 bg-accent-primary/5 px-1.5 py-0.5 text-xs font-medium text-accent-primary">
-                      {log.action}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2 text-xs">
-                    <span className="text-text-muted">{log.entityType}</span>
-                    <span className="mx-1 font-mono text-[10px]">{log.entityId.slice(0, 8)}...</span>
-                  </td>
-                  <td className="px-4 py-2 font-mono text-xs text-text-muted">{log.correlationId?.slice(0, 8) ?? "—"}...</td>
-                  <td className="px-4 py-2 text-xs text-text-primary">{log.message}</td>
-                  <td className="px-4 py-2 text-right">
-                    {log.correlationId && (
-                      <button
-                        onClick={() => void handleTrace(log.correlationId!)}
-                        className="rounded px-2 py-0.5 text-xs text-accent-primary hover:bg-accent-primary/10"
-                      >
-                        Trace
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      ) : (
+        <AuditLogTimeline
+          logs={logs}
+          getAction={(e) => e.action}
+          getEntityType={(e) => e.entityType}
+          getEntityId={(e) => e.entityId}
+          getMessage={(e) => e.message}
+          getCorrelationId={(e) => e.correlationId}
+          getCreatedAt={(e) => e.createdAt}
+          getMetadata={(e) => e.metadata}
+          getPreviousState={(e) => e.previousState}
+          getNewState={(e) => e.newState}
+        />
+      )}
     </div>
   );
 }
 
 export default function AdminAuditLogsPage() {
-  return (<ToastProvider><AuditLogsInner /></ToastProvider>);
+  return <AuditLogsInner />;
 }

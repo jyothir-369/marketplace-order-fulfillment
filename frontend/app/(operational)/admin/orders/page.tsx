@@ -1,15 +1,31 @@
+﻿/**
+ * app/(operational)/admin/orders/page.tsx — Admin Fulfillment Data Table (§4.3).
+ *
+ * Renders FulfillmentDataTable with columns for:
+ *   Order ID, Status, Line Items count, Created, Stuck indicator
+ * Plus: expand row for per-line-item detail + ResolveLineItemDialog.
+ */
+
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, ChevronDown, ChevronUp, RefreshCw, X } from "lucide-react";
 import { getAdminOrders } from "@/lib/api";
-import { ToastProvider, useToast } from "@/components/ui/toast";
-import { Skeleton } from "@/components/ui/skeleton";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { useToast } from "@/components/ui/toast";
+import { FulfillmentDataTable, type FulfillmentColumnDef } from "@/components/operational/FulfillmentDataTable";
 import { ResolveLineItemDialog } from "@/components/admin/resolve-line-item-dialog";
 import type { AdminOrderDto, AdminOrderLineItemDto } from "@/lib/types";
+import { formatRelativeTime, cn } from "@/lib/utils";
+import { AlertTriangle } from "lucide-react";
 
-const STATUS_FILTERS = ["all", "PLACED", "CONFIRMED", "FULFILLING", "FULFILLED", "CANCELLED", "FAILED"];
+const STATUS_FILTERS = [
+  { value: "all", label: "All" },
+  { value: "PLACED", label: "Placed" },
+  { value: "CONFIRMED", label: "Confirmed" },
+  { value: "FULFILLING", label: "Fulfilling" },
+  { value: "FULFILLED", label: "Fulfilled" },
+  { value: "CANCELLED", label: "Cancelled" },
+  { value: "FAILED", label: "Failed" },
+];
 
 function AdminOrdersInner() {
   const { push: toast } = useToast();
@@ -18,16 +34,19 @@ function AdminOrdersInner() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
   const [stuckFilter, setStuckFilter] = useState(false);
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
   const [resolveTarget, setResolveTarget] = useState<{ lineItemId: string; orderId: string } | null>(null);
 
-  const load = async () => {
+  const PAGE_SIZE = 20;
+
+  const load = async (pageNum: number) => {
     setLoading(true);
     try {
       const data = await getAdminOrders({
         status: statusFilter === "all" ? undefined : statusFilter,
         type: stuckFilter ? "stuck" : "all",
-        limit: 50,
+        limit: PAGE_SIZE,
+        offset: (pageNum - 1) * PAGE_SIZE,
       });
       setOrders(data.orders ?? []);
       setTotal(data.total ?? 0);
@@ -38,148 +57,131 @@ function AdminOrdersInner() {
     }
   };
 
-  useEffect(() => { void load(); }, [statusFilter, stuckFilter]);
+  useEffect(() => {
+    void load(1);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter, stuckFilter]);
+
+  useEffect(() => {
+    void load(page);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
+
+  const columns: FulfillmentColumnDef<AdminOrderDto>[] = [
+    {
+      id: "orderId",
+      header: "Order ID",
+      accessorKey: "orderId",
+      mono: true,
+    },
+    {
+      id: "status",
+      header: "Status",
+      statusKey: "status",
+    },
+    {
+      id: "lineItems",
+      header: "Items",
+      accessorKey: "lineItems",
+      cell: (row) => (
+        <span className="tabular-nums">{row.lineItems.length}</span>
+      ),
+      align: "right",
+    },
+    {
+      id: "stuckReason",
+      header: "Flag",
+      accessorKey: "stuckReason",
+      cell: (row) =>
+        row.stuckReason ? (
+          <span className="inline-flex items-center gap-1 text-xs text-[var(--color-warning)]">
+            <AlertTriangle className="h-3 w-3" aria-hidden />
+            {row.stuckReason}
+          </span>
+        ) : (
+          <span className="text-[var(--color-muted-foreground)]">—</span>
+        ),
+    },
+    {
+      id: "createdAt",
+      header: "Created",
+      accessorKey: "createdAt",
+      cell: (row) => (
+        <span className="text-xs text-[var(--color-muted-foreground)]">
+          {formatRelativeTime(row.createdAt)}
+        </span>
+      ),
+    },
+    {
+      id: "actions",
+      header: "",
+      disableSort: true,
+      cell: () => null,
+    },
+  ];
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-text-primary">All Orders</h1>
-        <p className="text-sm text-text-muted">{total} total</p>
+        <h1 className="text-2xl font-bold text-[var(--color-foreground)]">All Orders</h1>
+        <p className="text-sm text-[var(--color-muted-foreground)] tabular-nums">
+          {total} total
+        </p>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface-elevated p-3">
-        <div className="flex flex-wrap gap-2">
-          {STATUS_FILTERS.map(s => (
+      <div
+        className={cn(
+          "flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3",
+          "border-[var(--color-border)] bg-[var(--color-card)]"
+        )}
+      >
+        <div className="flex flex-wrap gap-1.5">
+          {STATUS_FILTERS.map((f) => (
             <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              className={["rounded px-3 py-1 text-xs font-medium transition-colors",
-                statusFilter === s
-                  ? "bg-accent-primary text-white"
-                  : "bg-surface-base border border-border text-text-muted hover:bg-surface-hover"
-              ].join(" ")}
+              key={f.value}
+              type="button"
+              onClick={() => {
+                setStatusFilter(f.value);
+                setPage(1);
+              }}
+              className={cn(
+                "rounded-md px-3 py-1 text-xs font-medium transition-colors",
+                statusFilter === f.value
+                  ? "bg-[var(--color-primary)] text-[var(--color-primary-foreground)]"
+                  : "border border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-muted-foreground)] hover:bg-[var(--color-accent)]"
+              )}
             >
-              {s === "all" ? "All" : s}
+              {f.label}
             </button>
           ))}
         </div>
-        <label className="ml-auto flex items-center gap-2 text-xs text-text-muted">
+        <label className="ml-auto flex items-center gap-2 text-xs text-[var(--color-muted-foreground)]">
           <input
             type="checkbox"
             checked={stuckFilter}
-            onChange={e => setStuckFilter(e.target.checked)}
-            className="accent-accent-primary"
+            onChange={(e) => {
+              setStuckFilter(e.target.checked);
+              setPage(1);
+            }}
+            className="accent-[var(--color-primary)]"
           />
           Stuck only
         </label>
-        <button
-          onClick={() => void load()}
-          className="flex items-center gap-1 rounded border border-border px-3 py-1 text-xs hover:bg-surface-base"
-        >
-          <RefreshCw className="h-3 w-3" aria-hidden />
-          Refresh
-        </button>
       </div>
 
       {/* Table */}
-      <div className="rounded-lg border border-border bg-surface-elevated shadow-sm overflow-hidden">
-        {loading ? (
-          <div className="p-4 space-y-3">
-            {[1,2,3].map(i => <Skeleton key={i} className="h-10 rounded" />)}
-          </div>
-        ) : orders.length === 0 ? (
-          <div className="flex h-48 flex-col items-center justify-center gap-2">
-            <AlertTriangle className="h-6 w-6 text-text-muted" aria-hidden />
-            <p className="text-sm text-text-muted">No orders match the current filters.</p>
-          </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-surface-base text-xs text-text-muted">
-              <tr>
-                <th className="px-4 py-2 text-left font-medium">Order ID</th>
-                <th className="px-4 py-2 text-left font-medium">Status</th>
-                <th className="px-4 py-2 text-left font-medium">Items</th>
-                <th className="px-4 py-2 text-left font-medium">Created</th>
-                <th className="px-4 py-2 text-left font-medium">Stuck</th>
-                <th className="px-4 py-2" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {orders.map(order => (
-                <>
-                  <tr key={order.orderId} className="hover:bg-surface-base transition-colors">
-                    <td className="px-4 py-2 font-mono text-xs">{order.orderId}</td>
-                    <td className="px-4 py-2"><StatusBadge status={order.status} size="sm" /></td>
-                    <td className="px-4 py-2">{order.lineItems.length}</td>
-                    <td className="px-4 py-2 text-text-muted">{new Date(order.createdAt).toLocaleString()}</td>
-                    <td className="px-4 py-2">
-                      {order.stuckReason ? (
-                        <span className="inline-flex items-center gap-1 text-xs text-alert-warning">
-                          <AlertTriangle className="h-3 w-3" aria-hidden />
-                          {order.stuckReason}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-text-muted">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      <button
-                        onClick={() => setExpanded(expanded === order.orderId ? null : order.orderId)}
-                        className="rounded p-1 hover:bg-surface-hover"
-                        aria-label={expanded === order.orderId ? "Collapse" : "Expand"}
-                      >
-                        {expanded === order.orderId
-                          ? <ChevronUp className="h-4 w-4" aria-hidden />
-                          : <ChevronDown className="h-4 w-4" aria-hidden />
-                        }
-                      </button>
-                    </td>
-                  </tr>
-                  {expanded === order.orderId && (
-                    <tr>
-                      <td colSpan={6} className="bg-surface-base px-6 py-3">
-                        <div className="space-y-2">
-                          <p className="text-xs font-semibold text-text-muted uppercase tracking-wide">Line Items</p>
-                          <table className="w-full text-xs">
-                            <thead>
-                              <tr className="text-text-muted">
-                                <th className="pb-1 text-left font-medium">Item ID</th>
-                                <th className="pb-1 text-left font-medium">Status</th>
-                                <th className="pb-1 text-left font-medium">Attempts</th>
-                                <th className="pb-1 text-left font-medium">Failure Reason</th>
-                                <th className="pb-1 text-right font-medium">Action</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                              {order.lineItems.map((li: AdminOrderLineItemDto) => (
-                                <tr key={li.lineItemId} className="hover:bg-surface-elevated">
-                                  <td className="py-1 font-mono">{li.lineItemId}</td>
-                                  <td className="py-1"><StatusBadge status={li.fulfillmentStatus} size="sm" /></td>
-                                  <td className="py-1 text-text-muted">{li.attempts}</td>
-                                  <td className="py-1 text-alert-error">{li.failureReason ?? <span className="text-text-muted">—</span>}</td>
-                                  <td className="py-1 text-right">
-                                    <button
-                                      onClick={() => setResolveTarget({ lineItemId: li.lineItemId, orderId: order.orderId })}
-                                      className="rounded border border-accent-primary px-2 py-0.5 text-xs text-accent-primary hover:bg-accent-primary/10"
-                                    >
-                                      Resolve
-                                    </button>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      <FulfillmentDataTable
+        data={orders}
+        columns={columns}
+        total={total}
+        page={page}
+        pageSize={PAGE_SIZE}
+        onPageChange={(p) => setPage(p)}
+        loading={loading}
+        emptyState="No orders match the current filters."
+        getRowId={(row) => row.orderId}
+      />
 
       {resolveTarget && (
         <ResolveLineItemDialog
@@ -188,7 +190,7 @@ function AdminOrdersInner() {
           onClose={() => setResolveTarget(null)}
           onResolved={() => {
             setResolveTarget(null);
-            void load();
+            void load(page);
           }}
         />
       )}
@@ -197,9 +199,5 @@ function AdminOrdersInner() {
 }
 
 export default function AdminOrdersPage() {
-  return (
-    <ToastProvider>
-      <AdminOrdersInner />
-    </ToastProvider>
-  );
+  return <AdminOrdersInner />;
 }
