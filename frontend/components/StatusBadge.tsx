@@ -1,11 +1,12 @@
-import type { OrderStatus } from '@/lib/api';
+﻿import type { OrderStatus } from '@/lib/api';
 
 const styles: Record<OrderStatus, string> = {
-  placed: 'bg-gray-200 text-gray-800',
-  confirmed: 'bg-blue-100 text-blue-800',
-  fulfilling: 'bg-amber-100 text-amber-800',
-  fulfilled: 'bg-green-100 text-green-800',
-  cancelled: 'bg-red-100 text-red-800',
+  PLACED: 'bg-gray-200 text-gray-800',
+  CONFIRMED: 'bg-blue-100 text-blue-800',
+  FULFILLING: 'bg-amber-100 text-amber-800',
+  FULFILLED: 'bg-green-100 text-green-800',
+  CANCELLED: 'bg-red-100 text-red-800',
+  FAILED: 'bg-red-100 text-red-800',
 };
 
 export function StatusBadge({ status }: { status: OrderStatus }) {

@@ -64,6 +64,7 @@ export class AdminOrderFilterDto {
 
 export class AdminOrderDto {
   orderId: string;
+  orderNumber?: string;
   buyerId: string;
   status: string;
   createdAt: Date;

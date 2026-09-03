@@ -1,19 +1,21 @@
-import 'reflect-metadata';
+﻿import 'reflect-metadata';
+require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 import { DataSource } from 'typeorm';
-import { Vendor, Product } from '../common/entities';
+import * as entities from '../common/entities';
+import { Vendor } from '../common/entities/vendor.entity';
+import { Product } from '../common/entities/product.entity';
 
 const AppDataSource = new DataSource({
   type: 'postgres',
   host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
+  port: parseInt(process.env.DB_PORT || '5433'),
   username: process.env.DB_USERNAME || 'postgres',
   password: process.env.DB_PASSWORD || 'postgres',
   database: process.env.DB_DATABASE || 'marketplace',
-  entities: [Vendor, Product],
+  entities: Object.values(entities) as Function[],
   synchronize: true,
-  logging: true,
+  logging: false,
 });
-
 interface VendorSeed {
   name: string;
   products: Array<{
@@ -89,8 +91,8 @@ async function seedDatabase(): Promise<void> {
     console.log('');
 
     console.log('Clearing existing data...');
-    await AppDataSource.getRepository(Product).delete({});
-    await AppDataSource.getRepository(Vendor).delete({});
+    await AppDataSource.createQueryBuilder().delete().from(Product).execute();
+    await AppDataSource.createQueryBuilder().delete().from(Vendor).execute();
     console.log('Existing data cleared');
     console.log('');
 

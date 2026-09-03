@@ -55,4 +55,19 @@ export class CatalogController {
   ): Promise<ProductResponseDto> {
     return this.catalogService.updateProduct(id, dto, correlationId);
   }
+
+  /**
+   * POST /api/catalog/seed
+   * Seeds the database with 25 sample products across 5 vendors.
+   * Safe to call multiple times — always clears and re-seeds.
+   * Used by the storefront when the catalog is empty.
+   */
+  @Post('seed')
+  @HttpCode(HttpStatus.OK)
+  async seedCatalog(
+    @CorrelationId() correlationId: string,
+  ): Promise<{ message: string; productsCreated: number }> {
+    const result = await this.catalogService.seedSampleProducts(correlationId);
+    return result;
+  }
 }
