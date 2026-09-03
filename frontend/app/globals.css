@@ -1,96 +1,357 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 
-@layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
-    --radius: 0.5rem;
-  }
+/* ----------------------------------------------------------------
+ * Design tokens for marketplace-order-fulfillment
+ *
+ * Tailwind v4 CSS-first configuration. All component code MUST
+ * reference tokens (CSS variables, var(--color-*), or HSL helpers)
+ * — never raw hex values.
+ * ---------------------------------------------------------------- */
 
-  .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
-  }
+@theme {
+  /* Neutral surfaces & ink */
+  --color-background: 0 0% 100%;
+  --color-foreground: 240 10% 3.9%;
+
+  --color-card: 0 0% 100%;
+  --color-card-foreground: 240 10% 3.9%;
+
+  --color-popover: 0 0% 100%;
+  --color-popover-foreground: 240 10% 3.9%;
+
+  --color-primary: 240 5.9% 10%;
+  --color-primary-foreground: 0 0% 98%;
+
+  --color-secondary: 240 4.8% 95.9%;
+  --color-secondary-foreground: 240 5.9% 10%;
+
+  --color-muted: 240 4.8% 95.9%;
+  --color-muted-foreground: 240 3.8% 46.1%;
+
+  --color-accent: 240 4.8% 95.9%;
+  --color-accent-foreground: 240 5.9% 10%;
+
+  --color-destructive: 0 84.2% 60.2%;
+  --color-destructive-foreground: 0 0% 98%;
+
+  --color-success: 142 71% 45%;
+  --color-success-foreground: 0 0% 98%;
+
+  --color-warning: 38 92% 50%;
+  --color-warning-foreground: 240 10% 3.9%;
+
+  --color-info: 199 89% 48%;
+  --color-info-foreground: 0 0% 98%;
+
+  --color-border: 240 5.9% 90%;
+  --color-input: 240 5.9% 90%;
+  --color-ring: 240 5.9% 10%;
+
+  /* ----- Status colors (mirror backend Order/LineItem/SyncJob) ----- */
+  --color-status-placed: 199 89% 48%;
+  --color-status-confirmed: 217 91% 60%;
+  --color-status-fulfilling: 38 92% 50%;
+  --color-status-fulfilled: 142 71% 45%;
+  --color-status-cancelled: 240 4% 46%;
+  --color-status-failed: 0 84% 60%;
+  --color-status-dead-letter: 0 72% 51%;
+  --color-status-ambiguous: 48 96% 53%;
+
+  --color-status-pending: 240 5% 65%;
+  --color-status-in-progress: 38 92% 50%;
+  --color-status-shipped: 239 84% 67%;
+  --color-status-manual-intervention: 24 95% 53%;
+  --color-status-retry: 263 70% 60%;
+
+  /* Radius scale */
+  --radius: 0.5rem;
 }
 
+/* ----------------------------------------------------------------
+ * Operational Dark Mode
+ * ---------------------------------------------------------------- */
+:root[data-theme="dark"] {
+  --color-background: 240 10% 3.9%;
+  --color-foreground: 0 0% 98%;
+  --color-card: 240 10% 3.9%;
+  --color-card-foreground: 0 0% 98%;
+  --color-popover: 240 10% 3.9%;
+  --color-popover-foreground: 0 0% 98%;
+  --color-primary: 0 0% 98%;
+  --color-primary-foreground: 240 5.9% 10%;
+  --color-secondary: 240 3.7% 15.9%;
+  --color-secondary-foreground: 0 0% 98%;
+  --color-muted: 240 3.7% 15.9%;
+  --color-muted-foreground: 240 5% 64.9%;
+  --color-accent: 240 3.7% 15.9%;
+  --color-accent-foreground: 0 0% 98%;
+  --color-destructive: 0 62.8% 30.6%;
+  --color-destructive-foreground: 0 0% 98%;
+  --color-success: 142 71% 35%;
+  --color-success-foreground: 0 0% 98%;
+  --color-warning: 38 92% 50%;
+  --color-warning-foreground: 240 10% 3.9%;
+  --color-info: 199 89% 48%;
+  --color-info-foreground: 0 0% 98%;
+  --color-border: 240 3.7% 15.9%;
+  --color-input: 240 3.7% 15.9%;
+  --color-ring: 240 4.9% 83.9%;
+
+  --color-status-placed: 199 89% 58%;
+  --color-status-confirmed: 217 91% 70%;
+  --color-status-fulfilling: 38 92% 60%;
+  --color-status-fulfilled: 142 71% 55%;
+  --color-status-cancelled: 240 4% 65%;
+  --color-status-failed: 0 84% 70%;
+  --color-status-dead-letter: 0 72% 61%;
+  --color-status-ambiguous: 48 96% 63%;
+
+  --color-status-pending: 240 5% 75%;
+  --color-status-in-progress: 38 92% 60%;
+  --color-status-shipped: 239 84% 77%;
+  --color-status-manual-intervention: 24 95% 63%;
+  --color-status-retry: 263 70% 70%;
+}
+
+/* ----------------------------------------------------------------
+ * Base
+ * ---------------------------------------------------------------- */
 @layer base {
   * {
-    border-color: hsl(var(--border));
+    border-color: hsl(var(--color-border));
   }
   body {
-    background-color: hsl(var(--background));
-    color: hsl(var(--foreground));
+    background-color: hsl(var(--color-background));
+    color: hsl(var(--color-foreground));
+    font-family:
+      ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+      "Helvetica Neue", Arial, "Noto Sans", sans-serif;
   }
 }
 
-/* --- Custom design tokens for marketplace-order-fulfillment --- */
-/* Surface / background */
-.bg-surface-base       { background-color: hsl(var(--background)); }
-.bg-surface-elevated { background-color: hsl(var(--card)); }
-.bg-surface-hover     { background-color: hsl(var(--muted) / 0.5); }
+/* ----------------------------------------------------------------
+ * Density modifiers
+ *
+ * Apply data-density to <html> or any subtree to flip between
+ * the comfortable (storefront) and compact (operational) grammars.
+ * ---------------------------------------------------------------- */
+:root,
+:root[data-density="comfortable"] {
+  --density-row-h: 3rem;
+  --density-font: 0.9375rem; /* 15px */
+  --density-row-h-table: 2.75rem;
+}
 
-/* Border */
-.border-border { border-color: hsl(var(--border)); }
-.border-input  { border-color: hsl(var(--input)); }
+:root[data-density="compact"] {
+  --density-row-h: 2.25rem;
+  --density-font: 0.8125rem; /* 13px */
+  --density-row-h-table: 2rem;
+}
 
-/* Text */
-.text-text-primary { color: hsl(var(--foreground)); }
-.text-text-muted  { color: hsl(var(--muted-foreground)); }
+[data-density] {
+  font-size: var(--density-font);
+}
 
-/* Accent / primary */
-.bg-accent-primary { background-color: hsl(var(--primary)); }
-.text-accent-primary { color: hsl(var(--primary)); }
-.border-accent-primary { border-color: hsl(var(--primary)); }
-.text-accent-success  { color: hsl(142 71% 45%); }
-.bg-accent-success    { background-color: hsl(142 71% 45%); }
+[data-density] .data-table-row {
+  min-height: var(--density-row-h);
+}
 
-/* Alert tokens */
-.text-alert-error   { color: hsl(var(--destructive)); }
-.text-alert-warning { color: hsl(38 92% 50%); }
-.bg-alert-error     { background-color: hsl(var(--destructive)); }
-.bg-alert-warning   { background-color: hsl(38 92% 50%); }
-.border-alert-error { border-color: hsl(var(--destructive)); }
-.border-alert-warning { border-color: hsl(38 92% 50%); }
+/* ----------------------------------------------------------------
+ * Glassmorphism
+ * ---------------------------------------------------------------- */
+.glass-panel {
+  background-color: hsl(var(--color-card) / 0.6);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border: 1px solid hsl(var(--color-border) / 0.5);
+  box-shadow: 0 8px 32px hsl(var(--color-foreground) / 0.08);
+}
 
-/* Utility: animate-pulse wrapper */
+.glass-panel-strong {
+  background-color: hsl(var(--color-card) / 0.85);
+  backdrop-filter: saturate(200%) blur(28px);
+  -webkit-backdrop-filter: saturate(200%) blur(28px);
+  border: 1px solid hsl(var(--color-border) / 0.6);
+  box-shadow: 0 12px 40px hsl(var(--color-foreground) / 0.12);
+}
+
+/* ----------------------------------------------------------------
+ * Animations
+ * ---------------------------------------------------------------- */
 @keyframes pulse-dot {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.4; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }
 .animate-pulse {
   animation: pulse-dot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse-strong {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(0.95);
+  }
+}
+.animate-pulse-strong {
+  animation: pulse-strong 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+.animate-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    hsl(var(--color-muted)) 0%,
+    hsl(var(--color-muted-foreground) / 0.1) 50%,
+    hsl(var(--color-muted)) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+/* Status indicator dot - reuse animate-pulse but expose semantic class */
+.status-dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
+
+.status-dot-live {
+  composes: animate-pulse;
+}
+
+/* ----------------------------------------------------------------
+ * Convenience surface / border / text aliases
+ * ---------------------------------------------------------------- */
+.bg-surface-base {
+  background-color: hsl(var(--color-background));
+}
+.bg-surface-elevated {
+  background-color: hsl(var(--color-card));
+}
+.bg-surface-hover {
+  background-color: hsl(var(--color-muted) / 0.5);
+}
+
+.border-default {
+  border-color: hsl(var(--color-border));
+}
+.border-input {
+  border-color: hsl(var(--color-input));
+}
+
+.text-primary {
+  color: hsl(var(--color-foreground));
+}
+.text-muted {
+  color: hsl(var(--color-muted-foreground));
+}
+
+.bg-accent-primary {
+  background-color: hsl(var(--color-primary));
+}
+.text-accent-primary {
+  color: hsl(var(--color-primary));
+}
+.border-accent-primary {
+  border-color: hsl(var(--color-primary));
+}
+
+.text-success {
+  color: hsl(var(--color-success));
+}
+.bg-success {
+  background-color: hsl(var(--color-success));
+}
+.text-warning {
+  color: hsl(var(--color-warning));
+}
+.bg-warning {
+  background-color: hsl(var(--color-warning));
+}
+.text-info {
+  color: hsl(var(--color-info));
+}
+.bg-info {
+  background-color: hsl(var(--color-info));
+}
+
+.text-alert-error {
+  color: hsl(var(--color-destructive));
+}
+.bg-alert-error {
+  background-color: hsl(var(--color-destructive));
+}
+.border-alert-error {
+  border-color: hsl(var(--color-destructive));
+}
+
+.text-alert-warning {
+  color: hsl(var(--color-warning));
+}
+.bg-alert-warning {
+  background-color: hsl(var(--color-warning));
+}
+.border-alert-warning {
+  border-color: hsl(var(--color-warning));
+}
+
+/* ----------------------------------------------------------------
+ * Status-color utility helpers (HSL by var)
+ * ---------------------------------------------------------------- */
+.bg-status-placed { background-color: hsl(var(--color-status-placed)); }
+.bg-status-confirmed { background-color: hsl(var(--color-status-confirmed)); }
+.bg-status-fulfilling { background-color: hsl(var(--color-status-fulfilling)); }
+.bg-status-fulfilled { background-color: hsl(var(--color-status-fulfilled)); }
+.bg-status-cancelled { background-color: hsl(var(--color-status-cancelled)); }
+.bg-status-failed { background-color: hsl(var(--color-status-failed)); }
+.bg-status-dead-letter { background-color: hsl(var(--color-status-dead-letter)); }
+.bg-status-ambiguous { background-color: hsl(var(--color-status-ambiguous)); }
+.bg-status-pending { background-color: hsl(var(--color-status-pending)); }
+.bg-status-in-progress { background-color: hsl(var(--color-status-in-progress)); }
+.bg-status-shipped { background-color: hsl(var(--color-status-shipped)); }
+.bg-status-manual-intervention { background-color: hsl(var(--color-status-manual-intervention)); }
+.bg-status-retry { background-color: hsl(var(--color-status-retry)); }
+
+.text-status-placed { color: hsl(var(--color-status-placed)); }
+.text-status-confirmed { color: hsl(var(--color-status-confirmed)); }
+.text-status-fulfilling { color: hsl(var(--color-status-fulfilling)); }
+.text-status-fulfilled { color: hsl(var(--color-status-fulfilled)); }
+.text-status-cancelled { color: hsl(var(--color-status-cancelled)); }
+.text-status-failed { color: hsl(var(--color-status-failed)); }
+.text-status-dead-letter { color: hsl(var(--color-status-dead-letter)); }
+.text-status-ambiguous { color: hsl(var(--color-status-ambiguous)); }
+.text-status-pending { color: hsl(var(--color-status-pending)); }
+.text-status-in-progress { color: hsl(var(--color-status-in-progress)); }
+.text-status-shipped { color: hsl(var(--color-status-shipped)); }
+.text-status-manual-intervention { color: hsl(var(--color-status-manual-intervention)); }
+.text-status-retry { color: hsl(var(--color-status-retry)); }
+
+/* ----------------------------------------------------------------
+ * Reduced-motion
+ * ---------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse,
+  .animate-pulse-strong,
+  .animate-shimmer {
+    animation: none !important;
+  }
 }
