@@ -1,11 +1,11 @@
-﻿@import "tailwindcss";
+@import "tailwindcss";
 
 /* ----------------------------------------------------------------
  * Design tokens for marketplace-order-fulfillment
  *
  * Tailwind v4 CSS-first configuration. All component code MUST
  * reference tokens (CSS variables, var(--color-*), or HSL helpers)
- * — never raw hex values.
+ * � never raw hex values.
  * ---------------------------------------------------------------- */
 
 @theme {
@@ -345,6 +345,30 @@
 .text-status-manual-intervention { color: hsl(var(--color-status-manual-intervention)); }
 .text-status-retry { color: hsl(var(--color-status-retry)); }
 
+
+/* ----------------------------------------------------------------
+ * Radix Dialog / Sheet slide transitions
+ * ---------------------------------------------------------------- */
+@keyframes slide-in-from-right {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+@keyframes slide-out-to-right {
+  from { transform: translateX(0); }
+  to   { transform: translateX(100%); }
+}
+
+@starting-style {
+  @keyframes slide-in-from-right {
+    from { transform: translateX(100%); opacity: 0; }
+    to   { transform: translateX(0); opacity: 1; }
+  }
+  @keyframes slide-out-to-right {
+    from { transform: translateX(0); opacity: 1; }
+    to   { transform: translateX(100%); opacity: 0; }
+  }
+}
+
 /* ----------------------------------------------------------------
  * Reduced-motion
  * ---------------------------------------------------------------- */
@@ -355,3 +379,4 @@
     animation: none !important;
   }
 }
+
