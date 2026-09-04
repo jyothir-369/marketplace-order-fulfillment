@@ -1,4 +1,5 @@
-﻿import { Module, Logger } from '@nestjs/common';
+import * as path from 'path';
+import { Module, Logger } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bullmq';
@@ -23,7 +24,7 @@ const logger = new Logger('BullModule');
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env',
+      envFilePath: [path.resolve(__dirname, '../../../.env'), '.env'],
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
