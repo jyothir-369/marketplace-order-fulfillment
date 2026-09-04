@@ -1,0 +1,28 @@
+{
+  "name": "marketplace-order-fulfillment",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Multi-vendor marketplace — Turborepo monorepo",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "test:e2e": "turbo run test:e2e",
+    "type-check": "turbo run type-check",
+    "clean": "turbo run clean",
+    "seed": "npm run build --workspace=apps/backend && npm run seed --workspace=apps/backend"
+  },
+  "devDependencies": {
+    "turbo": "^2.4.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
+  "packageManager": "npm@11.11.0"
+}
