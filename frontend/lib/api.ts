@@ -1,4 +1,4 @@
-﻿/**
+/**
  * lib/api.ts — typed fetch client (§3.3)
  *
  * All HTTP calls go through this module. Types come from lib/types.ts.
@@ -31,7 +31,7 @@ import type {
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ??
   process.env.NEXT_PUBLIC_API_URL ??
-  'http://localhost:3000/api';
+  'http://localhost:3001/api';
 
 export const VENDOR_ID = "11111111-1111-1111-1111-111111111111";
 

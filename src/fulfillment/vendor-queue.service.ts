@@ -1,7 +1,8 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+﻿import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue, QueueEvents } from 'bullmq';
 import Redis from 'ioredis';
+import { throttledLog } from '../common/log-throttle';
 
 export interface VendorQueueJobData {
   jobId: string;
@@ -35,6 +36,22 @@ export class VendorQueueService implements OnModuleInit, OnModuleDestroy {
       port: parseInt(process.env.REDIS_PORT || '6379', 10),
       password: process.env.REDIS_PASSWORD || undefined,
       lazyConnect: true,
+      maxRetriesPerRequest: null,
+      enableOfflineQueue: false,
+      connectTimeout: 5000,
+      retryStrategy: (times: number) => {
+        if (times > 2) return null;
+        return Math.min(times * 200, 1000);
+      },
+    });
+    this.redis.on('error', (err) => {
+      throttledLog(
+        'VendorQueueService:redis:error',
+        'warn',
+        'Redis client error event: ' + (err instanceof Error ? err.message : String(err)),
+        30_000,
+        this.logger,
+      );
     });
   }
 
@@ -69,16 +86,11 @@ export class VendorQueueService implements OnModuleInit, OnModuleDestroy {
     return `${VENDOR_CONFIG_PREFIX}${vendorId}:concurrency`;
   }
 
-  /**
-   * Load any previously persisted vendor concurrency configurations from Redis
-   * during module initialization. This ensures configs survive service restarts.
-   */
   private async loadPersistedVendorConfigs(): Promise<void> {
     try {
       const keys = await this.redis.keys(`${VENDOR_CONFIG_PREFIX}*`);
       const loaded: string[] = [];
       for (const key of keys) {
-        // Only load keys that end with :concurrency to avoid picking up future config fields
         if (key.endsWith(':concurrency')) {
           const raw = await this.redis.get(key);
           if (raw !== null) {
@@ -119,6 +131,22 @@ export class VendorQueueService implements OnModuleInit, OnModuleDestroy {
     return 'vendor-sync-' + vendorId + '-events';
   }
 
+  private getRedisOpts(): object {
+    return {
+      host: process.env.REDIS_HOST || 'localhost',
+      port: parseInt(process.env.REDIS_PORT || '6379', 10),
+      password: process.env.REDIS_PASSWORD || undefined,
+      maxRetriesPerRequest: null,
+      enableOfflineQueue: false,
+      lazyConnect: true,
+      connectTimeout: 5000,
+      retryStrategy: (times: number) => {
+        if (times > 2) return null;
+        return Math.min(times * 200, 1000);
+      },
+    };
+  }
+
   async getOrCreateVendorQueue(vendorId: string, concurrency?: number): Promise<Queue<VendorQueueJobData>> {
     if (this.vendorQueues.has(vendorId)) {
       return this.vendorQueues.get(vendorId)!;
@@ -134,14 +162,8 @@ export class VendorQueueService implements OnModuleInit, OnModuleDestroy {
       'Creating queue for vendor: ' + vendorId + ' with concurrency: ' + effectiveConcurrency,
     );
 
-    const redisOpts = {
-      host: process.env.REDIS_HOST || 'localhost',
-      port: parseInt(process.env.REDIS_PORT || '6379', 10),
-      password: process.env.REDIS_PASSWORD || undefined,
-    };
-
     const queue = new Queue<VendorQueueJobData>(queueName, {
-      connection: redisOpts,
+      connection: this.getRedisOpts(),
       defaultJobOptions: {
         attempts: 5,
         backoff: { type: 'exponential', delay: 1000 },
@@ -150,7 +172,27 @@ export class VendorQueueService implements OnModuleInit, OnModuleDestroy {
       },
     });
 
-    const queueEvents = new QueueEvents(queueName, { connection: redisOpts });
+    queue.on('error', (err) => {
+      throttledLog(
+        'VendorQueueService:queue:error:' + vendorId,
+        'warn',
+        'Queue error event: ' + (err instanceof Error ? err.message : String(err)),
+        30_000,
+        this.logger,
+      );
+    });
+
+    const queueEvents = new QueueEvents(queueName, { connection: this.getRedisOpts() });
+
+    queueEvents.on('error', (err) => {
+      throttledLog(
+        'VendorQueueService:queueEvents:error:' + vendorId,
+        'warn',
+        'QueueEvents error event: ' + (err instanceof Error ? err.message : String(err)),
+        30_000,
+        this.logger,
+      );
+    });
 
     this.vendorQueues.set(vendorId, queue);
     this.vendorQueueEvents.set(vendorId, queueEvents);
@@ -219,9 +261,6 @@ export class VendorQueueService implements OnModuleInit, OnModuleDestroy {
     return this.vendorQueues;
   }
 
-  /**
-   * Persists vendor concurrency to Redis so it survives service restarts.
-   */
   async configureVendorConcurrency(vendorId: string, concurrency: number): Promise<void> {
     const effective = Math.min(concurrency, this.maxConcurrencyPerVendor);
 

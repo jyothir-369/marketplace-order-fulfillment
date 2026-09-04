@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+﻿import { Module, Logger } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bullmq';
@@ -16,6 +16,8 @@ import { Product } from './common/entities/product.entity';
 import { Order } from './common/entities/order.entity';
 import { OrderLineItem } from './common/entities/order-line-item.entity';
 import { VendorSyncJob } from './common/entities/vendor-sync-job.entity';
+
+const logger = new Logger('BullModule');
 
 @Module({
   imports: [
@@ -44,10 +46,23 @@ import { VendorSyncJob } from './common/entities/vendor-sync-job.entity';
       imports: [ConfigModule],
       useFactory: function(configService) {
         return {
+          // maxRetriesPerRequest: null — required for graceful degradation when Redis
+          // is unavailable. With this setting, BullMQ stops retrying on connection
+          // failure and the NestJS app starts normally; queue operations will fail
+          // at runtime instead of crashing the bootstrap.
+          // enableOfflineQueue: false — prevents BullMQ from silently buffering
+          // jobs in memory when Redis is unreachable.
           connection: {
             host: configService.get('REDIS_HOST', 'localhost'),
             port: configService.get('REDIS_PORT', 6379),
             password: configService.get('REDIS_PASSWORD') || undefined,
+            maxRetriesPerRequest: null,
+            enableOfflineQueue: false,
+            lazyConnect: true,
+            retryStrategy: (times: number) => {
+              if (times > 3) return null;
+              return Math.min(times * 200, 1000);
+            },
           },
         };
       },
