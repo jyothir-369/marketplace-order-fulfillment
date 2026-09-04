@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsUUID, IsOptional, Min } from 'class-validator';
+﻿import { IsString, IsNumber, IsUUID, IsOptional, Min } from 'class-validator';
 
 export class CreateProductDto {
   @IsUUID()
@@ -14,6 +14,10 @@ export class CreateProductDto {
   @IsNumber()
   @Min(0)
   stockCount: number;
+
+  @IsString()
+  @IsOptional()
+  category?: string;
 }
 
 export class UpdateProductDto {
@@ -33,6 +37,10 @@ export class UpdateProductDto {
 
   @IsOptional()
   isActive?: boolean;
+
+  @IsString()
+  @IsOptional()
+  category?: string;
 }
 
 export class ProductResponseDto {
@@ -42,7 +50,16 @@ export class ProductResponseDto {
   name: string;
   price: number;
   stockCount: number;
+  category: string | null;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export class VendorResponseDto {
+  id: string;
+  name: string;
+  productCount: number;
+  activeProductCount: number;
+  createdAt: Date;
 }

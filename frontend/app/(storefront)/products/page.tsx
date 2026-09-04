@@ -1,12 +1,13 @@
 ﻿/**
- * app/(storefront)/products/page.tsx — Buyer product catalog (§2.2).
+ * app/(storefront)/products/page.tsx —
  *
  * Features:
- *   - URL-driven filters: ?q=search&vendor=id&maxPrice=100
+ *   - URL-driven filters: ?q=search&vendor=id&maxPrice=100&category=slug
+ *   - Category navigation tabs (All + each seeded category)
  *   - CatalogGrid (glassmorphic ProductCards) while loading → CatalogGridSkeleton
+ *   - Explicit error banner when fetch fails
+ *   - "0 products found" only shown after a *successful* empty-API response
  *   - Quick-add to cart with quantity stepper
- *   - EmptyState via CatalogGrid when no products match
- *   - "Added to cart" hint on each card; CartDrawer slides open automatically
  */
 
 "use client";
@@ -18,8 +19,18 @@ import { getCatalog, type Product } from "@/lib/api";
 import { useCartStore } from "@/context/CartStore";
 import { CatalogGrid } from "@/components/storefront/CatalogGrid";
 import { useToast, ToastProvider } from "@/components/ui/toast";
+import { cn } from "@/lib/utils";
 
 const BUYER_ID = "00000000-0000-0000-0000-000000000001";
+
+// Stable category tab definitions — derived from Phase 1 seed data.
+export const CATEGORY_TABS = [
+  { value: "",             label: "All" },
+  { value: "Electronics", label: "Electronics" },
+  { value: "Apparel",     label: "Apparel" },
+  { value: "Home & Living", label: "Home & Living" },
+  { value: "Industrial",   label: "Industrial" },
+] as const;
 
 // ---------------------------------------------------------------------------
 // Inner catalog (needs useToast)
@@ -33,6 +44,9 @@ function ProductsPageInner() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  /** True once the first fetch has completed successfully.
+   *  Only when hasLoaded is true do we know the empty state is real. */
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
@@ -40,8 +54,14 @@ function ProductsPageInner() {
   // Read filters from URL
   const q = searchParams.get("q") ?? "";
   const vendor = searchParams.get("vendor") ?? "";
+  const category = searchParams.get("category") ?? "";
   const maxPriceParam = searchParams.get("maxPrice");
   const maxPrice = maxPriceParam ? Number(maxPriceParam) : undefined;
+
+  // Client-side category list from loaded products (deduplicated).
+  const categories = Array.from(
+    new Set(products.map((p) => p.category).filter((c): c is string => Boolean(c)))
+  ).sort();
 
   // Unique vendors for filter dropdown
   const vendors = Array.from(
@@ -52,17 +72,19 @@ function ProductsPageInner() {
     setLoading(true);
     setError(null);
     try {
-      const data = await getCatalog();
+      const data = await getCatalog({ category: category || undefined });
       setProducts(data.filter((p) => p.isActive));
       const init: Record<string, number> = {};
       data.forEach((p) => { init[p.id] = 1; });
       setQuantities(init);
+      setHasLoaded(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load catalog");
+      // hasLoaded stays false so empty state is never shown on error.
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [category]);
 
   useEffect(() => { void loadProducts(); }, [loadProducts]);
 
@@ -70,7 +92,7 @@ function ProductsPageInner() {
     try {
       const { seedCatalog } = await import("@/lib/api");
       const result = await seedCatalog();
-      toast(`Seeded ${result.productsCreated} products.`, "success");
+      toast(`Seeded ${result.productsCreated} products (${result.vendorsCreated} vendors).`, "success");
       void loadProducts();
     } catch {
       toast("Failed to seed catalog.", "error");
@@ -81,6 +103,7 @@ function ProductsPageInner() {
   const filtered = products.filter((p) => {
     if (q && !p.name.toLowerCase().includes(q.toLowerCase())) return false;
     if (vendor && p.vendorId !== vendor) return false;
+    if (category && p.category !== category) return false;
     if (maxPrice !== undefined && p.price > maxPrice) return false;
     return true;
   });
@@ -119,12 +142,12 @@ function ProductsPageInner() {
 
   const clearFilters = () => router.push("/products", { scroll: false });
 
-  const hasFilters = Boolean(q || vendor || maxPrice !== undefined);
+  const hasFilters = Boolean(q || vendor || category || maxPrice !== undefined);
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8">
       {/* Header row */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-2xl font-bold text-[var(--color-foreground)]">
             Catalog
@@ -132,8 +155,10 @@ function ProductsPageInner() {
           <p className="text-sm text-[var(--color-muted-foreground)] mt-0.5">
             {loading
               ? "Loading\u2026"
-              : `${filtered.length} product${filtered.length !== 1 ? "s" : ""}` +
-                (hasFilters ? " matching filters" : " available")}
+              : hasLoaded && filtered.length === 0
+                ? "No products found"
+                : `${filtered.length} product${filtered.length !== 1 ? "s" : ""}` +
+                  (hasFilters ? " matching filters" : " available")}
           </p>
         </div>
         <button
@@ -146,7 +171,38 @@ function ProductsPageInner() {
         </button>
       </div>
 
-      {/* Filters */}
+      {/* Category tabs — bound to ?category= URL param */}
+      <div
+        className="mb-5 flex items-center gap-1 overflow-x-auto pb-0.5"
+        role="tablist"
+        aria-label="Filter by category"
+      >
+        {CATEGORY_TABS.map((tab) => {
+          const isActive = category === tab.value;
+          return (
+            <button
+              key={tab.value}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              aria-controls="catalog-panel"
+              onClick={() => updateFilter("category", tab.value)}
+              className={cn(
+                "shrink-0 px-4 py-1.5 rounded-full text-sm font-medium",
+                "border transition-colors duration-150",
+                "focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)] focus:ring-offset-1",
+                isActive
+                  ? "bg-[var(--color-primary)] text-[var(--color-primary-foreground)] border-transparent"
+                  : "bg-[var(--color-card)] text-[var(--color-muted-foreground)] border-[var(--color-border)] hover:border-[var(--color-foreground)] hover:text-[var(--color-foreground)]"
+              )}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Search + vendor + maxPrice filters */}
       <div className="mb-6 flex flex-wrap items-center gap-3">
         <div className="flex-1 min-w-48">
           <label htmlFor="search" className="sr-only">
@@ -157,10 +213,11 @@ function ProductsPageInner() {
             type="search"
             value={q}
             onChange={(e) => updateFilter("q", e.target.value)}
-            placeholder="Search products…"
+            placeholder="Search products\u2026"
             className="w-full h-10 px-3 rounded-md border border-[var(--color-border)] bg-[var(--color-card)] text-sm text-[var(--color-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)]"
           />
         </div>
+
         <select
           value={vendor}
           onChange={(e) => updateFilter("vendor", e.target.value)}
@@ -172,6 +229,7 @@ function ProductsPageInner() {
             <option key={v.id} value={v.id}>{v.name}</option>
           ))}
         </select>
+
         <input
           type="number"
           min={0}
@@ -181,6 +239,7 @@ function ProductsPageInner() {
           className="h-10 w-32 px-3 rounded-md border border-[var(--color-border)] bg-[var(--color-card)] text-sm text-[var(--color-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)]"
           aria-label="Maximum price"
         />
+
         {hasFilters && (
           <button
             type="button"
@@ -192,10 +251,15 @@ function ProductsPageInner() {
         )}
       </div>
 
+      {/*
+        Explicit error banner.
+        Only shown when hasLoaded is false AND an error is present —
+        this guarantees "0 products found" is never shown on a failed fetch.
+      */}
       {error && (
         <div
           role="alert"
-          className="mb-4 rounded-md border border-[var(--color-destructive)] bg-[var(--color-destructive)]/10 text-[var(--color-destructive)] p-3 text-sm"
+          className="mb-4 rounded-md border border-[var(--color-destructive)] bg-[var(--color-destructive)]/10 text-[var(--color-destructive)] p-4 text-sm font-medium"
         >
           {error}
         </div>

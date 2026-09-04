@@ -1,18 +1,25 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+﻿import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, FindOptionsRelations } from 'typeorm';
 import { Product } from '../common/entities/product.entity';
 import { Vendor } from '../common/entities/vendor.entity';
-import { CreateProductDto, UpdateProductDto, ProductResponseDto } from './dto/catalog.dto';
+import {
+  CreateProductDto,
+  UpdateProductDto,
+  ProductResponseDto,
+  VendorResponseDto,
+} from './dto/catalog.dto';
 
 interface VendorSeed {
   name: string;
+  category: string;
   products: Array<{ name: string; price: number; stockCount: number }>;
 }
 
 const SAMPLE_CATALOG: VendorSeed[] = [
   {
     name: 'Electronics World',
+    category: 'Electronics',
     products: [
       { name: 'Wireless Headphones', price: 79.99, stockCount: 50 },
       { name: 'Bluetooth Speaker', price: 49.99, stockCount: 100 },
@@ -23,6 +30,7 @@ const SAMPLE_CATALOG: VendorSeed[] = [
   },
   {
     name: 'Home & Kitchen Co',
+    category: 'Home & Living',
     products: [
       { name: 'Coffee Maker', price: 89.99, stockCount: 40 },
       { name: 'Air Fryer', price: 149.99, stockCount: 25 },
@@ -33,6 +41,7 @@ const SAMPLE_CATALOG: VendorSeed[] = [
   },
   {
     name: 'Sports Gear Inc',
+    category: 'Apparel',
     products: [
       { name: 'Yoga Mat Premium', price: 34.99, stockCount: 120 },
       { name: 'Resistance Bands', price: 19.99, stockCount: 200 },
@@ -43,6 +52,7 @@ const SAMPLE_CATALOG: VendorSeed[] = [
   },
   {
     name: 'Fashion Forward',
+    category: 'Apparel',
     products: [
       { name: 'Cotton T-Shirt', price: 24.99, stockCount: 500 },
       { name: 'Denim Jeans', price: 59.99, stockCount: 200 },
@@ -52,13 +62,14 @@ const SAMPLE_CATALOG: VendorSeed[] = [
     ],
   },
   {
-    name: 'Books & Media',
+    name: 'BuildMaster Tools',
+    category: 'Industrial',
     products: [
-      { name: 'Bestseller Novel', price: 14.99, stockCount: 300 },
-      { name: 'Cookbook Collection', price: 29.99, stockCount: 100 },
-      { name: 'Programming Guide', price: 49.99, stockCount: 80 },
-      { name: 'Art Print A4', price: 19.99, stockCount: 200 },
-      { name: 'Board Game', price: 39.99, stockCount: 60 },
+      { name: 'Cordless Drill', price: 129.99, stockCount: 40 },
+      { name: 'Circular Saw', price: 89.99, stockCount: 30 },
+      { name: 'Workbench', price: 199.99, stockCount: 20 },
+      { name: 'Tool Set 100pc', price: 79.99, stockCount: 60 },
+      { name: 'Safety Goggles', price: 14.99, stockCount: 150 },
     ],
   },
 ];
@@ -87,6 +98,7 @@ export class CatalogService {
       name: dto.name,
       price: dto.price,
       stockCount: dto.stockCount,
+      category: dto.category ?? null,
       isActive: true,
     });
 
@@ -96,8 +108,11 @@ export class CatalogService {
     return this.toResponseDto(saved, vendor.name);
   }
 
-  async findAll(activeOnly = true): Promise<ProductResponseDto[]> {
-    const where = activeOnly ? { isActive: true } : {};
+  async findAll(activeOnly = true, category?: string): Promise<ProductResponseDto[]> {
+    const where: any = activeOnly ? { isActive: true } : {};
+    if (category) {
+      where.category = category;
+    }
     const relations: FindOptionsRelations<Product> = { vendor: true };
     const products = await this.productRepository.find({
       where: where,
@@ -135,6 +150,29 @@ export class CatalogService {
     return products.map((p) => this.toResponseDto(p, p.vendor ? p.vendor.name : 'Unknown'));
   }
 
+  /**
+   * List all vendors with a per-vendor product summary.
+   * Returns vendors that have at least one product (active or not),
+   * sorted by name.
+   */
+  async findAllVendors(): Promise<VendorResponseDto[]> {
+    const relations: FindOptionsRelations<Vendor> = { products: true };
+    const vendors = await this.vendorRepository.find({
+      relations: relations,
+      order: { name: 'ASC' },
+    });
+
+    return vendors
+      .filter((v) => v.products && v.products.length > 0)
+      .map((v) => ({
+        id: v.id,
+        name: v.name,
+        productCount: v.products.length,
+        activeProductCount: v.products.filter((p) => p.isActive).length,
+        createdAt: v.createdAt,
+      }));
+  }
+
   async updateProduct(id: string, dto: UpdateProductDto, correlationId: string): Promise<ProductResponseDto> {
     this.logger.log('Updating product: ' + id, CatalogService.name, correlationId);
 
@@ -152,6 +190,7 @@ export class CatalogService {
     if (dto.price !== undefined) { product.price = dto.price; }
     if (dto.stockCount !== undefined) { product.stockCount = dto.stockCount; }
     if (dto.isActive !== undefined) { product.isActive = dto.isActive; }
+    if (dto.category !== undefined) { product.category = dto.category ?? null; }
 
     const saved = await this.productRepository.save(product);
     this.logger.log('Product updated: ' + id, CatalogService.name, correlationId);
@@ -160,18 +199,17 @@ export class CatalogService {
   }
 
   /**
-   * Seeds the database with 25 sample products across 5 vendors.
+   * Seeds the database with 25 sample products across 5 vendors and 4 categories.
    * Clears existing catalog data first so the operation is idempotent.
-   * Used by the storefront when the catalog is empty AND by the 
-pm run seed script.
    */
   async seedSampleProducts(
     correlationId: string,
   ): Promise<{ message: string; productsCreated: number; vendorsCreated: number }> {
     this.logger.log('Seeding sample catalog', CatalogService.name, correlationId);
 
-    await this.productRepository.delete({});
-    await this.vendorRepository.delete({});
+    // Use QueryBuilder to bypass TypeORM 0.3 restriction on empty-criteria delete.
+    await this.productRepository.createQueryBuilder().delete().execute();
+    await this.vendorRepository.createQueryBuilder().delete().execute();
 
     let productsCreated = 0;
     let vendorsCreated = 0;
@@ -186,6 +224,7 @@ pm run seed script.
           name: productSeed.name,
           price: productSeed.price,
           stockCount: productSeed.stockCount,
+          category: vendorSeed.category,
           isActive: true,
         });
         await this.productRepository.save(product);
@@ -214,6 +253,7 @@ pm run seed script.
       name: product.name,
       price: Number(product.price),
       stockCount: product.stockCount,
+      category: product.category ?? null,
       isActive: product.isActive,
       createdAt: product.createdAt,
       updatedAt: product.updatedAt,
