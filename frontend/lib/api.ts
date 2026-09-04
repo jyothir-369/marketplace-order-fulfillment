@@ -19,6 +19,9 @@ import type {
   DeadLetterJobDto,
   AdminAuditLogResponseDto,
   HealthStatusDto,
+  VendorDashboardDto,
+  CategorySummaryDto,
+  VendorDetailDto,
   VendorResponseDto,
 } from "@/lib/types";
 
@@ -254,7 +257,56 @@ export async function getVendorDeadLetterJobs(): Promise<DeadLetterJobDto[]> {
   return apiFetch<DeadLetterJobDto[]>("/fulfillment/dead-letter");
 }
 
+
 // ---------------------------------------------------------------------------
+// Vendor dashboard (Phase 3)
+// ---------------------------------------------------------------------------
+
+/** GET /api/catalog/vendor/:vendorId/dashboard */
+export async function getVendorDashboard(
+  vendorId: string = VENDOR_ID
+): Promise<VendorDashboardDto> {
+  return apiFetch<VendorDashboardDto>(`/catalog/vendor/${vendorId}/dashboard`);
+}
+
+// ---------------------------------------------------------------------------
+// Admin: categories
+// ---------------------------------------------------------------------------
+
+/** GET /api/catalog/categories */
+export async function getAdminCategories(): Promise<CategorySummaryDto[]> {
+  return apiFetch<CategorySummaryDto[]>("/catalog/categories");
+}
+
+/** POST /api/catalog/categories */
+export async function createCategory(payload: { name: string }): Promise<CategorySummaryDto> {
+  return apiFetch<CategorySummaryDto>("/catalog/categories", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Admin: vendors
+// ---------------------------------------------------------------------------
+
+/** GET /api/catalog/vendors/admin */
+export async function getAdminVendors(): Promise<VendorDetailDto[]> {
+  return apiFetch<VendorDetailDto[]>("/catalog/vendors/admin");
+}
+
+/** POST /api/catalog/vendors */
+export async function createVendor(payload: { name: string }): Promise<VendorDetailDto> {
+  return apiFetch<VendorDetailDto>("/catalog/vendors", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+/** GET /api/catalog/vendor/:vendorId/detail */
+export async function getVendorDetail(vendorId: string): Promise<VendorDetailDto> {
+  return apiFetch<VendorDetailDto>(`/catalog/vendor/${vendorId}/detail`);
+}// ---------------------------------------------------------------------------
 // Admin
 // ---------------------------------------------------------------------------
 

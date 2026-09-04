@@ -1,4 +1,4 @@
-﻿import {
+import {
   Controller,
   Get,
   Post,
@@ -16,6 +16,11 @@ import {
   UpdateProductDto,
   ProductResponseDto,
   VendorResponseDto,
+  VendorDetailDto,
+  CategorySummaryDto,
+  CreateVendorDto,
+  CreateCategoryDto,
+  VendorDashboardDto,
 } from './dto/catalog.dto';
 import { CorrelationId } from '../common/decorators/correlation-id.decorator';
 
@@ -28,7 +33,7 @@ export class CatalogController {
    *
    * Query params:
    *   - includeInactive=true|false (default: false)
-   *   - category=<name>            (optional)
+   *   - category=<name>              (optional)
    */
   @Get()
   async getCatalog(
@@ -42,13 +47,36 @@ export class CatalogController {
   /**
    * GET /api/catalog/vendors
    *
-   * Lists all vendors with their product counts.
-   * NOTE: defined BEFORE the `:id` route so Nest doesn't parse
-   * "vendors" as a UUID parameter.
+   * Public buyer-facing vendor directory (only vendors with products).
    */
   @Get('vendors')
   async getVendors(): Promise<VendorResponseDto[]> {
     return this.catalogService.findAllVendors();
+  }
+
+  /**
+   * GET /api/catalog/vendors/admin
+   *
+   * Admin-only: returns every vendor including those with zero products.
+   * NOTE: declared BEFORE the :id route so "admin" is not parsed as UUID.
+   */
+  @Get('vendors/admin')
+  async getVendorsAdmin(): Promise<VendorDetailDto[]> {
+    return this.catalogService.findAllVendorsAdmin();
+  }
+
+  /**
+   * POST /api/catalog/vendors
+   *
+   * Admin-only: vendor onboarding.
+   */
+  @Post('vendors')
+  @HttpCode(HttpStatus.CREATED)
+  async createVendor(
+    @Body() dto: CreateVendorDto,
+    @CorrelationId() correlationId: string,
+  ): Promise<VendorDetailDto> {
+    return this.catalogService.createVendor(dto, correlationId);
   }
 
   @Get(':id')
@@ -56,6 +84,11 @@ export class CatalogController {
     return this.catalogService.findById(id);
   }
 
+  /**
+   * GET /api/catalog/vendor/:vendorId
+   *
+   * Products belonging to a specific vendor.
+   */
   @Get('vendor/:vendorId')
   async getProductsByVendor(
     @Param('vendorId', ParseUUIDPipe) vendorId: string,
@@ -63,6 +96,51 @@ export class CatalogController {
   ): Promise<ProductResponseDto[]> {
     const activeOnly = includeInactive !== 'true';
     return this.catalogService.findByVendor(vendorId, activeOnly);
+  }
+
+  /**
+   * GET /api/catalog/vendor/:vendorId/detail
+   *
+   * Admin-facing single vendor with operational metrics.
+   */
+  @Get('vendor/:vendorId/detail')
+  async getVendorDetail(
+    @Param('vendorId', ParseUUIDPipe) vendorId: string,
+  ): Promise<VendorDetailDto> {
+    return this.catalogService.findVendorDetail(vendorId);
+  }
+
+  /**
+   * GET /api/catalog/vendor/:vendorId/dashboard
+   *
+   * Vendor portal dashboard: product counts, stock levels, sync job queues.
+   */
+  @Get('vendor/:vendorId/dashboard')
+  async getVendorDashboard(
+    @Param('vendorId', ParseUUIDPipe) vendorId: string,
+  ): Promise<VendorDashboardDto> {
+    return this.catalogService.getVendorDashboard(vendorId);
+  }
+
+  /**
+   * GET /api/catalog/categories
+   *
+   * Returns a summary of every category present on at least one product.
+   */
+  @Get('categories')
+  async getCategories(): Promise<CategorySummaryDto[]> {
+    return this.catalogService.findAllCategories();
+  }
+
+  /**
+   * POST /api/catalog/categories
+   *
+   * Admin-only: registers a new category name (idempotent).
+   */
+  @Post('categories')
+  @HttpCode(HttpStatus.CREATED)
+  async createCategory(@Body() dto: CreateCategoryDto): Promise<CategorySummaryDto> {
+    return this.catalogService.createCategory(dto);
   }
 
   @Post()

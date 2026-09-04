@@ -23,6 +23,9 @@ import {
   BarChart3,
   ClipboardList,
   DatabaseZap,
+  LayoutDashboard,
+  FolderTree,
+  Building2,
 } from "lucide-react";
 
 type Role = "vendor" | "admin";
@@ -46,6 +49,7 @@ const ROLE_LABELS: Record<Role, string> = {
 };
 
 const VENDOR_NAV: NavItem[] = [
+  { href: "/vendor/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/vendor/inventory", label: "Inventory", icon: LayoutGrid },
   { href: "/vendor/orders", label: "Orders", icon: ShoppingCart },
   { href: "/vendor/dead-letter", label: "Dead-Letter", icon: AlertTriangle },
@@ -54,6 +58,8 @@ const VENDOR_NAV: NavItem[] = [
 const ADMIN_NAV: NavItem[] = [
   { href: "/admin", label: "Dashboard", icon: BarChart3 },
   { href: "/admin/orders", label: "All Orders", icon: ClipboardList },
+  { href: "/admin/categories", label: "Categories", icon: FolderTree },
+  { href: "/admin/vendors", label: "Vendors", icon: Building2 },
   { href: "/admin/dead-letter", label: "Dead-Letter", icon: AlertTriangle },
   { href: "/admin/audit-logs", label: "Audit Logs", icon: DatabaseZap },
 ];

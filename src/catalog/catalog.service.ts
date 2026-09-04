@@ -1,13 +1,23 @@
-ï»¿import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, FindOptionsRelations } from 'typeorm';
+import { Repository, FindOptionsRelations, In } from 'typeorm';
 import { Product } from '../common/entities/product.entity';
 import { Vendor } from '../common/entities/vendor.entity';
+import {
+  SyncJobStatus,
+  VendorSyncJob,
+} from '../common/entities/vendor-sync-job.entity';
+import { OrderLineItem, FulfillmentStatus } from '../common/entities/order-line-item.entity';
 import {
   CreateProductDto,
   UpdateProductDto,
   ProductResponseDto,
   VendorResponseDto,
+  VendorDetailDto,
+  CategorySummaryDto,
+  CreateVendorDto,
+  CreateCategoryDto,
+  VendorDashboardDto,
 } from './dto/catalog.dto';
 
 interface VendorSeed {
@@ -83,7 +93,15 @@ export class CatalogService {
     private readonly productRepository: Repository<Product>,
     @InjectRepository(Vendor)
     private readonly vendorRepository: Repository<Vendor>,
+    @InjectRepository(VendorSyncJob)
+    private readonly syncJobRepository: Repository<VendorSyncJob>,
+    @InjectRepository(OrderLineItem)
+    private readonly lineItemRepository: Repository<OrderLineItem>,
   ) {}
+
+  // -----------------------------------------------------------------------
+  // Products
+  // -----------------------------------------------------------------------
 
   async createProduct(dto: CreateProductDto, correlationId: string): Promise<ProductResponseDto> {
     this.logger.log('Creating product: ' + dto.name, CatalogService.name, correlationId);
@@ -119,8 +137,7 @@ export class CatalogService {
       relations: relations,
       order: { createdAt: 'DESC' },
     });
-
-    return products.map((p) => this.toResponseDto(p, p.vendor ? p.vendor.name : 'Unknown'));
+    return products.map((p) => this.toResponseDto(p, p.vendor?.name ?? 'Unknown'));
   }
 
   async findById(id: string): Promise<ProductResponseDto> {
@@ -129,32 +146,53 @@ export class CatalogService {
       where: { id },
       relations: relations,
     });
-
     if (!product) {
-      throw new NotFoundException('Product with ID ' + id + ' not found');
+      throw new NotFoundException('Product ' + id + ' not found');
     }
-
-    return this.toResponseDto(product, product.vendor ? product.vendor.name : 'Unknown');
+    return this.toResponseDto(product, product.vendor?.name ?? 'Unknown');
   }
 
   async findByVendor(vendorId: string, activeOnly = true): Promise<ProductResponseDto[]> {
     const where: any = { vendorId };
-    if (activeOnly) { where.isActive = true; }
+    if (activeOnly) {
+      where.isActive = true;
+    }
     const relations: FindOptionsRelations<Product> = { vendor: true };
     const products = await this.productRepository.find({
       where: where,
       relations: relations,
       order: { createdAt: 'DESC' },
     });
-
-    return products.map((p) => this.toResponseDto(p, p.vendor ? p.vendor.name : 'Unknown'));
+    return products.map((p) => this.toResponseDto(p, p.vendor?.name ?? 'Unknown'));
   }
 
-  /**
-   * List all vendors with a per-vendor product summary.
-   * Returns vendors that have at least one product (active or not),
-   * sorted by name.
-   */
+  async updateProduct(
+    id: string,
+    dto: UpdateProductDto,
+    correlationId: string,
+  ): Promise<ProductResponseDto> {
+    const existing = await this.productRepository.findOne({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException('Product ' + id + ' not found');
+    }
+
+    if (dto.name !== undefined) existing.name = dto.name;
+    if (dto.price !== undefined) existing.price = dto.price;
+    if (dto.stockCount !== undefined) existing.stockCount = dto.stockCount;
+    if (dto.isActive !== undefined) existing.isActive = dto.isActive;
+    if (dto.category !== undefined) existing.category = dto.category ?? null;
+
+    const saved = await this.productRepository.save(existing);
+    this.logger.log('Updated product: ' + id, CatalogService.name, correlationId);
+
+    const vendor = await this.vendorRepository.findOne({ where: { id: saved.vendorId } });
+    return this.toResponseDto(saved, vendor?.name ?? 'Unknown');
+  }
+
+  // -----------------------------------------------------------------------
+  // Vendors (directory + admin onboarding)
+  // -----------------------------------------------------------------------
+
   async findAllVendors(): Promise<VendorResponseDto[]> {
     const relations: FindOptionsRelations<Vendor> = { products: true };
     const vendors = await this.vendorRepository.find({
@@ -173,41 +211,162 @@ export class CatalogService {
       }));
   }
 
-  async updateProduct(id: string, dto: UpdateProductDto, correlationId: string): Promise<ProductResponseDto> {
-    this.logger.log('Updating product: ' + id, CatalogService.name, correlationId);
-
-    const relations: FindOptionsRelations<Product> = { vendor: true };
-    const product = await this.productRepository.findOne({
-      where: { id },
+  /**
+   * Admin-facing: returns *every* vendor including those with zero products.
+   * Ordered most-recently-created first.
+   */
+  async findAllVendorsAdmin(): Promise<VendorDetailDto[]> {
+    const relations: FindOptionsRelations<Vendor> = { products: true };
+    const vendors = await this.vendorRepository.find({
       relations: relations,
+      order: { createdAt: 'DESC' },
     });
 
-    if (!product) {
-      throw new NotFoundException('Product with ID ' + id + ' not found');
+    return vendors.map((v) => this.toVendorDetail(v));
+  }
+
+  async findVendorDetail(vendorId: string): Promise<VendorDetailDto> {
+    const relations: FindOptionsRelations<Vendor> = { products: true };
+    const vendor = await this.vendorRepository.findOne({
+      where: { id: vendorId },
+      relations: relations,
+    });
+    if (!vendor) {
+      throw new NotFoundException('Vendor ' + vendorId + ' not found');
     }
-
-    if (dto.name) { product.name = dto.name; }
-    if (dto.price !== undefined) { product.price = dto.price; }
-    if (dto.stockCount !== undefined) { product.stockCount = dto.stockCount; }
-    if (dto.isActive !== undefined) { product.isActive = dto.isActive; }
-    if (dto.category !== undefined) { product.category = dto.category ?? null; }
-
-    const saved = await this.productRepository.save(product);
-    this.logger.log('Product updated: ' + id, CatalogService.name, correlationId);
-
-    return this.toResponseDto(saved, saved.vendor ? saved.vendor.name : 'Unknown');
+    return this.toVendorDetail(vendor);
   }
 
   /**
-   * Seeds the database with 25 sample products across 5 vendors and 4 categories.
-   * Clears existing catalog data first so the operation is idempotent.
+   * Admin-facing vendor creation. Enforces uniqueness on vendor name (case-insensitive).
    */
+  async createVendor(dto: CreateVendorDto, correlationId: string): Promise<VendorDetailDto> {
+    this.logger.log('Creating vendor: ' + dto.name, CatalogService.name, correlationId);
+
+    const trimmed = dto.name.trim();
+    const existing = await this.vendorRepository
+      .createQueryBuilder('vendor')
+      .where('LOWER(vendor.name) = LOWER(:name)', { name: trimmed })
+      .getOne();
+
+    if (existing) {
+      throw new ConflictException('Vendor "' + trimmed + '" already exists');
+    }
+
+    const vendor = this.vendorRepository.create({ name: trimmed });
+    const saved = await this.vendorRepository.save(vendor);
+    this.logger.log('Vendor created: ' + saved.id, CatalogService.name, correlationId);
+
+    return this.toVendorDetail(saved);
+  }
+
+  // -----------------------------------------------------------------------
+  // Category analytics (Phase 3 — admin surface)
+  // -----------------------------------------------------------------------
+
+  async findAllCategories(): Promise<CategorySummaryDto[]> {
+    const products = await this.productRepository.find();
+
+    const map = new Map<string, CategorySummaryDto>();
+    for (const p of products) {
+      if (!p.category) continue;
+      const cat = p.category;
+      const existing = map.get(cat);
+      if (existing) {
+        existing.productCount += 1;
+        if (p.isActive) existing.activeProductCount += 1;
+        existing.totalStock += p.stockCount;
+      } else {
+        map.set(cat, {
+          name: cat,
+          productCount: 1,
+          activeProductCount: p.isActive ? 1 : 0,
+          totalStock: p.stockCount,
+        });
+      }
+    }
+
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  async createCategory(dto: CreateCategoryDto): Promise<CategorySummaryDto> {
+    const name = dto.name.trim();
+    const products = await this.productRepository.find({ where: { category: name } });
+
+    return {
+      name,
+      productCount: products.length,
+      activeProductCount: products.filter((p) => p.isActive).length,
+      totalStock: products.reduce((sum, p) => sum + p.stockCount, 0),
+    };
+  }
+
+  // -----------------------------------------------------------------------
+  // Vendor dashboard metrics (Phase 3)
+  // -----------------------------------------------------------------------
+
+  async getVendorDashboard(vendorId: string): Promise<VendorDashboardDto> {
+    const vendor = await this.vendorRepository.findOne({ where: { id: vendorId } });
+    if (!vendor) {
+      throw new NotFoundException('Vendor ' + vendorId + ' not found');
+    }
+
+    const products = await this.productRepository.find({ where: { vendorId } });
+    const activeProducts = products.filter((p) => p.isActive);
+    const totalStock = products.reduce((sum, p) => sum + p.stockCount, 0);
+    const lowStockCount = products.filter((p) => p.stockCount > 0 && p.stockCount <= 5).length;
+    const outOfStockCount = products.filter((p) => p.stockCount === 0).length;
+
+    const openStatuses = [
+      FulfillmentStatus.PENDING,
+      FulfillmentStatus.SYNCING,
+      FulfillmentStatus.CONFIRMED,
+      FulfillmentStatus.AMBIGUOUS,
+    ];
+    const openOrders = await this.lineItemRepository.count({
+      where: { vendorId, fulfillmentStatus: In(openStatuses) },
+    });
+
+    const pendingStatuses = [SyncJobStatus.PENDING, SyncJobStatus.IN_PROGRESS];
+    const deadLetterStatuses = [SyncJobStatus.DEAD_LETTER];
+    const ambiguousStatuses = [SyncJobStatus.AMBIGUOUS];
+
+    const [pendingSyncJobs, deadLetterJobs, ambiguousJobs] = await Promise.all([
+      this.syncJobRepository.count({
+        where: { status: In(pendingStatuses) as any },
+      }),
+      this.syncJobRepository.count({
+        where: { status: In(deadLetterStatuses) as any },
+      }),
+      this.syncJobRepository.count({
+        where: { status: In(ambiguousStatuses) as any },
+      }),
+    ]);
+
+    return {
+      vendorId,
+      vendorName: vendor.name,
+      productCount: products.length,
+      activeProductCount: activeProducts.length,
+      totalStock,
+      lowStockCount,
+      outOfStockCount,
+      pendingSyncJobs,
+      deadLetterJobs,
+      ambiguousJobs,
+      openOrders,
+    };
+  }
+
+  // -----------------------------------------------------------------------
+  // Seeding (idempotent — clears then reseeds)
+  // -----------------------------------------------------------------------
+
   async seedSampleProducts(
     correlationId: string,
   ): Promise<{ message: string; productsCreated: number; vendorsCreated: number }> {
     this.logger.log('Seeding sample catalog', CatalogService.name, correlationId);
 
-    // Use QueryBuilder to bypass TypeORM 0.3 restriction on empty-criteria delete.
     await this.productRepository.createQueryBuilder().delete().execute();
     await this.vendorRepository.createQueryBuilder().delete().execute();
 
@@ -245,6 +404,10 @@ export class CatalogService {
     };
   }
 
+  // -----------------------------------------------------------------------
+  // Helpers
+  // -----------------------------------------------------------------------
+
   private toResponseDto(product: Product, vendorName: string): ProductResponseDto {
     return {
       id: product.id,
@@ -257,6 +420,23 @@ export class CatalogService {
       isActive: product.isActive,
       createdAt: product.createdAt,
       updatedAt: product.updatedAt,
+    };
+  }
+
+  private toVendorDetail(v: Vendor): VendorDetailDto {
+    const products = v.products || [];
+    const totalStock = products.reduce((sum, p) => sum + p.stockCount, 0);
+    const outOfStock = products.filter((p) => p.stockCount === 0).length;
+    const lowStock = products.filter((p) => p.stockCount > 0 && p.stockCount <= 5).length;
+    return {
+      id: v.id,
+      name: v.name,
+      productCount: products.length,
+      activeProductCount: products.filter((p) => p.isActive).length,
+      totalStock,
+      lowStockCount: lowStock,
+      outOfStockCount: outOfStock,
+      createdAt: v.createdAt,
     };
   }
 }
