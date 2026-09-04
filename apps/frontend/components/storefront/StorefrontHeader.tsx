@@ -1,5 +1,15 @@
-﻿/**
- * StorefrontHeader — sticky top bar for the buyer storefront.
+/**
+ * StorefrontHeader — V2 Premium sticky top bar for the buyer storefront.
+ *
+ * Visual treatment:
+ *   - White ivory-cream surface, warm hairline border (#e7e0d2)
+ *   - Playfair Display "Marketplace" wordmark with brass dot glyph
+ *   - Active nav: gold rule under the label (V2 cover pattern)
+ *   - Cart count pill: brass background
+ *   - Search input: ivory fill, warm border, brass focus ring
+ *
+ * Scope: header shell only. Catalog/PDP item cards and support
+ * screens land in Phases 3 & 4.
  */
 
 "use client";
@@ -7,7 +17,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { ShoppingCart, Store, Package, ShoppingBag, Search, type LucideIcon } from "lucide-react";
+import { ShoppingCart, Package, ShoppingBag, Store, Search } from "lucide-react";
 import {
   useCartStore,
   selectTotalItems,
@@ -18,12 +28,21 @@ import { cn } from "@/lib/utils";
 const NAV_LINKS: Array<{
   href: string;
   label: string;
-  Icon: LucideIcon;
+  Icon: typeof Package;
 }> = [
-  { href: "/products", label: "Catalog", Icon: Package },
+  { href: "/products", label: "Shop",     Icon: Package },
   { href: "/vendors",  label: "Vendors",  Icon: Store },
   { href: "/orders",   label: "Orders",   Icon: ShoppingBag },
 ];
+
+const PRIMARY = "var(--color-primary)";      /* ink navy */
+const PRIMARY_FG = "var(--color-primary-foreground)"; /* ivory */
+const ACCENT = "var(--color-accent)";       /* brass */
+const BORDER = "var(--color-border)";       /* warm border */
+const FG = "var(--color-foreground)";
+const MUTED = "var(--color-muted-foreground)";
+const RING = "var(--color-ring)";
+const CARD = "var(--color-card)";
 
 export function StorefrontHeader() {
   const pathname = usePathname();
@@ -40,22 +59,37 @@ export function StorefrontHeader() {
   const openDrawer = useCartStore((s) => s.openDrawer);
 
   return (
-    <header className="sticky top-0 z-40 glass-panel-strong border-b border-[var(--color-border)]">
-      <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between gap-4">
-        {/* Left: logo + nav */}
-        <div className="flex items-center gap-6 shrink-0">
+    <header
+      className={cn(
+        "sticky top-0 z-40",
+        "bg-[var(--color-card)]",
+        "border-b border-[var(--color-border)]",
+        "shadow-v2"
+      )}
+    >
+      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between gap-4">
+        {/* Left: brand wordmark + nav */}
+        <div className="flex items-center gap-8 shrink-0">
           <Link
             href="/products"
             className={cn(
-              "flex items-center gap-2 font-bold text-[var(--color-foreground)]",
-              "hover:opacity-80 transition-opacity"
+              "group inline-flex items-baseline gap-1.5",
+              "text-[var(--color-foreground)]",
+              "transition-opacity hover:opacity-80"
             )}
           >
-            <Store className="h-5 w-5 text-[var(--color-primary)]" aria-hidden />
-            <span className="hidden sm:inline">Marketplace</span>
+            <span
+              aria-hidden
+              className="font-display italic font-bold text-[var(--color-accent)] text-lg leading-none translate-y-[1px]"
+            >
+              M
+            </span>
+            <span className="font-display text-xl font-bold tracking-tight">
+              Marketplace
+            </span>
           </Link>
 
-          <nav aria-label="Primary" className="hidden sm:flex items-center gap-1">
+          <nav aria-label="Primary" className="hidden sm:flex items-center gap-7">
             {NAV_LINKS.map(({ href, label, Icon }) => {
               const isActive = pathname.startsWith(href);
               return (
@@ -63,16 +97,27 @@ export function StorefrontHeader() {
                   key={href}
                   href={href}
                   className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium",
+                    "group relative inline-flex items-center gap-1.5",
+                    "text-sm font-medium",
                     "transition-colors duration-150",
                     isActive
-                      ? "bg-[var(--color-primary)] text-[var(--color-primary-foreground)]"
-                      : "text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-accent)]"
+                      ? "text-[var(--color-foreground)]"
+                      : "text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
                   )}
                   aria-current={isActive ? "page" : undefined}
                 >
-                  <Icon className="h-4 w-4" aria-hidden />
+                  <Icon className="h-3.5 w-3.5" aria-hidden />
                   {label}
+                  {/* Active indicator: brass underline rule */}
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "absolute -bottom-[18px] left-0 right-0",
+                      "h-[1.5px] bg-[var(--color-accent)]",
+                      "transition-opacity duration-150",
+                      isActive ? "opacity-100" : "opacity-0 group-hover:opacity-40"
+                    )}
+                  />
                 </Link>
               );
             })}
@@ -86,8 +131,8 @@ export function StorefrontHeader() {
           className={cn(
             "flex-1 max-w-md hidden md:flex relative",
             "rounded-md border border-[var(--color-border)]",
-            "bg-[var(--color-card)] overflow-hidden",
-            "focus-within:ring-2 focus-within:ring-[var(--color-ring)]"
+            "bg-[var(--color-background)] overflow-hidden",
+            "focus-within:ring-2 focus-within:ring-[var(--color-ring)] focus-within:border-transparent"
           )}
         >
           <Search
@@ -98,11 +143,11 @@ export function StorefrontHeader() {
             type="search"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search products..."
+            placeholder="Search products, vendors..."
             aria-label="Search products"
             className={cn(
-              "w-full bg-transparent pl-9 pr-3 py-1.5 text-sm",
-              "text-[var(--color-foreground)] placeholder-[var(--color-muted-foreground)]",
+              "w-full bg-transparent pl-9 pr-3 py-2 text-sm",
+              "text-[var(--color-foreground)] placeholder:text-[var(--color-muted-foreground)]",
               "focus:outline-none"
             )}
           />
@@ -134,16 +179,16 @@ export function StorefrontHeader() {
             })}
           </nav>
 
-          {/* Checkout link */}
+          {/* Account link */}
           <Link
-            href="/checkout"
+            href="/orders"
             className={cn(
-              "hidden sm:inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium",
-              "border border-[var(--color-border)] text-[var(--color-foreground)]",
-              "hover:bg-[var(--color-accent)] transition-colors"
+              "hidden sm:inline-flex items-center text-sm font-medium",
+              "text-[var(--color-foreground)] hover:text-[var(--color-accent)]",
+              "transition-colors"
             )}
           >
-            Checkout
+            Account
           </Link>
 
           {/* Cart drawer trigger */}
@@ -151,7 +196,7 @@ export function StorefrontHeader() {
             type="button"
             onClick={openDrawer}
             className={cn(
-              "relative inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium",
+              "relative inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium",
               "bg-[var(--color-primary)] text-[var(--color-primary-foreground)]",
               "hover:opacity-90 transition-opacity",
               "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--color-ring)]"
@@ -169,7 +214,7 @@ export function StorefrontHeader() {
                 className={cn(
                   "ml-1 inline-flex items-center justify-center",
                   "min-w-[1.25rem] h-5 px-1 rounded-full",
-                  "bg-[var(--color-info)] text-[var(--color-info-foreground)] text-xs font-bold tabular-nums"
+                  "bg-[var(--color-accent)] text-[var(--color-primary-foreground)] text-xs font-bold tabular-nums"
                 )}
                 data-testid="cart-counter"
                 aria-live="polite"
@@ -178,6 +223,18 @@ export function StorefrontHeader() {
               </span>
             )}
           </button>
+        </div>
+      </div>
+
+      {/* Soft announcement bar — editorial tone */}
+      <div
+        className={cn(
+          "bg-[var(--color-cream)]",
+          "border-t border-[var(--color-warm-border)]"
+        )}
+      >
+        <div className="max-w-7xl mx-auto px-6 py-1.5 text-center text-xs text-[var(--color-warm-muted)]">
+          Free shipping on orders over $50&nbsp; ·&nbsp; from vendors you can trust
         </div>
       </div>
     </header>

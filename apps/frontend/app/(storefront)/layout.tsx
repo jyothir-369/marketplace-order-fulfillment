@@ -1,14 +1,19 @@
-﻿/**
- * app/(storefront)/layout.tsx — Storefront route group layout (§2.2).
+/**
+ * app/(storefront)/layout.tsx — Storefront route group layout.
  *
- * Applies the low-density, high-contrast buyer mode layout:
- *   - <StorefrontHeader> sticky at top (glassmorphic)
- *   - CartDrawer (slide-over sheet, Radix + framer-motion)
- *   - Generous whitespace layout
+ * V2 Premium shell:
+ *   - <StorefrontHeader> sticky at top with editorial announcement bar
+ *   - <CartDrawer> slide-over sheet
+ *   - <StorefrontFooter> editorial 4-column footer
+ *   - Generous whitespace layout on warm ivory surface
+ *
+ * Layout only — no catalog/PDP item cards (Phase 3) or support screens
+ * (Phase 4).
  */
 
 import type { Metadata } from "next";
 import { StorefrontHeader } from "@/components/storefront/StorefrontHeader";
+import { StorefrontFooter } from "@/components/storefront/StorefrontFooter";
 import { CartDrawer } from "@/components/storefront/CartDrawer";
 
 export const metadata: Metadata = {
@@ -29,11 +34,12 @@ export default function StorefrontLayout({
       <StorefrontHeader />
       <CartDrawer />
       <main
-        className="min-h-screen bg-[var(--color-background)]"
+        className="min-h-screen bg-background"
         data-density="comfortable"
       >
         {children}
       </main>
+      <StorefrontFooter />
     </>
   );
 }
