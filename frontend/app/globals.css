@@ -1,4 +1,4 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 
 /* ----------------------------------------------------------------
  * Design tokens for marketplace-order-fulfillment
@@ -65,6 +65,20 @@
 
   /* Radius scale */
   --radius: 0.5rem;
+  /* Dark sidebar (operational portal surfaces) */
+  --color-sidebar-bg: 240 10% 3.9%;
+  --color-sidebar-border: 240 3.7% 15.9%;
+  --color-sidebar-text: 0 0% 98%;
+  --color-sidebar-text-muted: 240 5% 64.9%;
+  --color-sidebar-active: 239 84% 67%;
+  --color-sidebar-active-bg: 239 84% 67%;
+  --color-sidebar-badge: 0 62.8% 30.6%;
+  --color-sidebar-badge-text: 0 0% 98%;
+  --color-sidebar-hover: 240 3.7% 15.9%;
+  --color-sidebar-tag-vendor-bg: 239 84% 67%;
+  --color-sidebar-tag-vendor-text: 239 84% 97%;
+  --color-sidebar-tag-admin-bg: 0 62.8% 30.6%;
+  --color-sidebar-tag-admin-text: 0 0% 98%;
 }
 
 /* ----------------------------------------------------------------
