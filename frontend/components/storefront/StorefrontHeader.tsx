@@ -5,8 +5,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { ShoppingCart, Store, Package, ShoppingBag, type LucideIcon } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { useState, type FormEvent } from "react";
+import { ShoppingCart, Store, Package, ShoppingBag, Search, type LucideIcon } from "lucide-react";
 import {
   useCartStore,
   selectTotalItems,
@@ -26,6 +27,14 @@ const NAV_LINKS: Array<{
 
 export function StorefrontHeader() {
   const pathname = usePathname();
+  const router = useRouter();
+  const [searchTerm, setSearchTerm] = useState("");
+  const handleSearch = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const q = searchTerm.trim();
+    if (!q) return;
+    router.push("/products?q=" + encodeURIComponent(q));
+  };
   const hydrated = useCartHydration();
   const totalItems = useCartStore(selectTotalItems);
   const openDrawer = useCartStore((s) => s.openDrawer);
@@ -69,6 +78,35 @@ export function StorefrontHeader() {
             })}
           </nav>
         </div>
+
+        {/* Center: global search */}
+        <form
+          role="search"
+          onSubmit={handleSearch}
+          className={cn(
+            "flex-1 max-w-md hidden md:flex relative",
+            "rounded-md border border-[var(--color-border)]",
+            "bg-[var(--color-card)] overflow-hidden",
+            "focus-within:ring-2 focus-within:ring-[var(--color-ring)]"
+          )}
+        >
+          <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--color-muted-foreground)] pointer-events-none"
+            aria-hidden
+          />
+          <input
+            type="search"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search products..."
+            aria-label="Search products"
+            className={cn(
+              "w-full bg-transparent pl-9 pr-3 py-1.5 text-sm",
+              "text-[var(--color-foreground)] placeholder-[var(--color-muted-foreground)]",
+              "focus:outline-none"
+            )}
+          />
+        </form>
 
         {/* Right: cart trigger */}
         <div className="flex items-center gap-2">
@@ -131,7 +169,7 @@ export function StorefrontHeader() {
                 className={cn(
                   "ml-1 inline-flex items-center justify-center",
                   "min-w-[1.25rem] h-5 px-1 rounded-full",
-                  "bg-[var(--color-info)] text-white text-xs font-bold tabular-nums"
+                  "bg-[var(--color-info)] text-[var(--color-info-foreground)] text-xs font-bold tabular-nums"
                 )}
                 data-testid="cart-counter"
                 aria-live="polite"

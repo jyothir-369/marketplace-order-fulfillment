@@ -69,19 +69,19 @@ export function OperationalSidebar({ role, footer }: OperationalSidebarProps) {
   const navItems = role === "vendor" ? VENDOR_NAV : ADMIN_NAV;
 
   return (
-    <aside className="w-52 shrink-0 bg-zinc-900 text-white flex flex-col h-screen sticky top-0">
+    <aside className="w-52 shrink-0 bg-[hsl(var(--color-sidebar-bg))] text-[hsl(var(--color-sidebar-text))] flex flex-col h-screen sticky top-0">
       {/* Header */}
-      <div className="px-4 py-4 border-b border-zinc-700">
+      <div className="px-4 py-4 border-b border-[hsl(var(--color-sidebar-border))]">
         <div className="flex items-center gap-2 mb-1">
-          <Package className="h-5 w-5 text-indigo-400" aria-hidden />
+          <Package className="h-5 w-5 text-[hsl(var(--color-sidebar-tag-vendor-text))]" aria-hidden />
           <span className="font-bold text-sm">{ROLE_LABELS[role]}</span>
         </div>
         <span
           className={[
             "inline-block text-xs px-1.5 py-0.5 rounded font-medium uppercase tracking-wide",
             role === "vendor"
-              ? "bg-indigo-900 text-indigo-300"
-              : "bg-red-900 text-red-300",
+              ? "bg-[hsl(var(--color-sidebar-tag-vendor-bg))] text-[hsl(var(--color-sidebar-tag-vendor-text))]"
+              : "bg-[hsl(var(--color-sidebar-tag-admin-bg))] text-[hsl(var(--color-sidebar-tag-admin-text))]",
           ].join(" ")}
         >
           {role}
@@ -100,8 +100,8 @@ export function OperationalSidebar({ role, footer }: OperationalSidebarProps) {
               className={[
                 "flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors",
                 isActive
-                  ? "bg-indigo-600 text-white"
-                  : "text-zinc-300 hover:bg-zinc-800 hover:text-white",
+                  ? "bg-[hsl(var(--color-sidebar-active-bg))] text-[hsl(var(--color-sidebar-text))]"
+                  : "text-[hsl(var(--color-sidebar-text-muted))] hover:bg-[hsl(var(--color-sidebar-hover))] hover:text-[hsl(var(--color-sidebar-text))]",
               ].join(" ")}
               aria-current={isActive ? "page" : undefined}
             >
@@ -111,7 +111,7 @@ export function OperationalSidebar({ role, footer }: OperationalSidebarProps) {
               />
               <span className="flex-1">{item.label}</span>
               {item.badge !== undefined && (
-                <span className="bg-red-600 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
+                <span className="bg-[hsl(var(--color-sidebar-badge))] text-[hsl(var(--color-sidebar-text))] text-xs font-bold px-1.5 py-0.5 rounded-full">
                   {item.badge}
                 </span>
               )}
@@ -122,7 +122,7 @@ export function OperationalSidebar({ role, footer }: OperationalSidebarProps) {
 
       {/* Footer */}
       {footer && (
-        <div className="border-t border-zinc-700 px-4 py-3 text-xs text-zinc-500">
+        <div className="border-t border-[hsl(var(--color-sidebar-border))] px-4 py-3 text-xs text-[hsl(var(--color-sidebar-text-muted))]">
           {footer}
         </div>
       )}
