@@ -5,7 +5,7 @@
  *
  * Tailwind v4 CSS-first configuration. All component code MUST
  * reference tokens (CSS variables, var(--color-*), or HSL helpers)
- * — never raw hex values.
+ * - never raw hex values.
  * ---------------------------------------------------------------- */
 
 @theme {

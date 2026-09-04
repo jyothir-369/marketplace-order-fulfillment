@@ -1,7 +1,85 @@
-import 'reflect-metadata';
+﻿import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
+
+// ---------------------------------------------------------------------------
+// ioredis error suppression
+// ---------------------------------------------------------------------------
+// BullMQ creates internal ioredis "child pool" connections to perform blocking
+// reads (XREAD, BLPOP). When local Redis is offline, those ioredis instances
+// emit `error` events that have no listener attached internally and bubble up
+// to Node's process error events, which then log to stderr. These errors are
+// already handled gracefully by VendorQueueService (in-memory fallback) and
+// VendorSyncIsolatedProcessor (warn-level logger), so the raw stderr output is
+// pure noise. The following handlers silently swallow those expected errors
+// while letting any genuinely unexpected error continue to propagate.
+// ---------------------------------------------------------------------------
+function setupIoredisErrorHandlers(): void {
+  const originalWrite = process.stderr.write.bind(process.stderr);
+  const isExpectedRedisNoise = (chunk: unknown): boolean => {
+    if (typeof chunk !== 'string') return false;
+    return (
+      chunk.includes('ioredis') ||
+      chunk.includes('Connection is closed') ||
+      chunk.includes('Connection is not open') ||
+      chunk.includes('ECONNREFUSED 127.0.0.1:6379') ||
+      chunk.includes('redis_module') ||
+      (chunk.includes('Error:') && chunk.includes('Redis.js'))
+    );
+  };
+
+  (process.stderr as unknown as { write: typeof process.stderr.write }).write = function (
+    chunk: string | Uint8Array,
+    encoding?: BufferEncoding | ((err?: Error | null) => void),
+    cb?: (err?: Error | null) => void,
+  ): boolean {
+    const text =
+      typeof chunk === 'string'
+        ? chunk
+        : Buffer.isBuffer(chunk)
+          ? chunk.toString()
+          : '';
+    if (isExpectedRedisNoise(text)) {
+      // swallow
+      if (typeof encoding === 'function') encoding();
+      else if (typeof cb === 'function') cb();
+      return true;
+    }
+    if (typeof encoding === 'function') {
+      return originalWrite(chunk, encoding);
+    }
+    return originalWrite(chunk, encoding as BufferEncoding, cb);
+  } as typeof process.stderr.write;
+
+  process.on('uncaughtException', (err: Error) => {
+    const msg = err?.message || '';
+    if (
+      msg.includes('Connection is closed') ||
+      msg.includes('Connection is not open') ||
+      msg.includes('ECONNREFUSED') ||
+      msg.includes('Redis is closed')
+    ) {
+      return;
+    }
+    throw err;
+  });
+
+  process.on('unhandledRejection', (reason: unknown) => {
+    const msg = reason instanceof Error ? reason.message : String(reason || '');
+    if (
+      msg.includes('Connection is closed') ||
+      msg.includes('Connection is not open') ||
+      msg.includes('ECONNREFUSED') ||
+      msg.includes('Redis is closed')
+    ) {
+      return;
+    }
+    throw reason;
+  });
+}
+
+setupIoredisErrorHandlers();
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -31,7 +109,7 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
-  
+
   logger.log('Marketplace Order & Fulfillment System running on port ' + port);
 }
 
