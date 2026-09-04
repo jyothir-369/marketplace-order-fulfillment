@@ -287,3 +287,15 @@ export interface AdminAuditLogFilterDto {
   limit?: number;
   offset?: number;
 }
+
+// ---------------------------------------------------------------------------
+// Vendor (buyer-side directory)
+// ---------------------------------------------------------------------------
+
+export interface VendorResponseDto {
+  id: Uuid;
+  name: string;
+  productCount: number;
+  activeProductCount: number;
+  createdAt: IsoDateTime;
+}

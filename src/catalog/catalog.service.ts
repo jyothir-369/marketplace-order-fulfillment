@@ -3,7 +3,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, FindOptionsRelations } from 'typeorm';
 import { Product } from '../common/entities/product.entity';
 import { Vendor } from '../common/entities/vendor.entity';
-import { CreateProductDto, UpdateProductDto, ProductResponseDto } from './dto/catalog.dto';
+import {
+  CreateProductDto,
+  UpdateProductDto,
+  ProductResponseDto,
+  VendorResponseDto,
+} from './dto/catalog.dto';
 
 interface VendorSeed {
   name: string;
@@ -143,6 +148,29 @@ export class CatalogService {
     });
 
     return products.map((p) => this.toResponseDto(p, p.vendor ? p.vendor.name : 'Unknown'));
+  }
+
+  /**
+   * List all vendors with a per-vendor product summary.
+   * Returns vendors that have at least one product (active or not),
+   * sorted by name.
+   */
+  async findAllVendors(): Promise<VendorResponseDto[]> {
+    const relations: FindOptionsRelations<Vendor> = { products: true };
+    const vendors = await this.vendorRepository.find({
+      relations: relations,
+      order: { name: 'ASC' },
+    });
+
+    return vendors
+      .filter((v) => v.products && v.products.length > 0)
+      .map((v) => ({
+        id: v.id,
+        name: v.name,
+        productCount: v.products.length,
+        activeProductCount: v.products.filter((p) => p.isActive).length,
+        createdAt: v.createdAt,
+      }));
   }
 
   async updateProduct(id: string, dto: UpdateProductDto, correlationId: string): Promise<ProductResponseDto> {

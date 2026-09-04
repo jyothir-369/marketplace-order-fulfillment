@@ -55,3 +55,11 @@ export class ProductResponseDto {
   createdAt: Date;
   updatedAt: Date;
 }
+
+export class VendorResponseDto {
+  id: string;
+  name: string;
+  productCount: number;
+  activeProductCount: number;
+  createdAt: Date;
+}

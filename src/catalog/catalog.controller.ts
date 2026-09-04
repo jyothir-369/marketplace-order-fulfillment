@@ -11,7 +11,12 @@
   HttpStatus,
 } from '@nestjs/common';
 import { CatalogService } from './catalog.service';
-import { CreateProductDto, UpdateProductDto, ProductResponseDto } from './dto/catalog.dto';
+import {
+  CreateProductDto,
+  UpdateProductDto,
+  ProductResponseDto,
+  VendorResponseDto,
+} from './dto/catalog.dto';
 import { CorrelationId } from '../common/decorators/correlation-id.decorator';
 
 @Controller('catalog')
@@ -32,6 +37,18 @@ export class CatalogController {
   ): Promise<ProductResponseDto[]> {
     const activeOnly = includeInactive !== 'true';
     return this.catalogService.findAll(activeOnly, category);
+  }
+
+  /**
+   * GET /api/catalog/vendors
+   *
+   * Lists all vendors with their product counts.
+   * NOTE: defined BEFORE the `:id` route so Nest doesn't parse
+   * "vendors" as a UUID parameter.
+   */
+  @Get('vendors')
+  async getVendors(): Promise<VendorResponseDto[]> {
+    return this.catalogService.findAllVendors();
   }
 
   @Get(':id')

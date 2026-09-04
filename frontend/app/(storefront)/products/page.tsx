@@ -1,13 +1,13 @@
 ﻿/**
- * app/(storefront)/products/page.tsx â€”
+ * app/(storefront)/products/page.tsx —
  *
  * Features:
- *   - URL-driven filters: ?q=search&vendor=id&maxPrice=100
- *   - CatalogGrid (glassmorphic ProductCards) while loading â†’ CatalogGridSkeleton
+ *   - URL-driven filters: ?q=search&vendor=id&maxPrice=100&category=slug
+ *   - Category navigation tabs (All + each seeded category)
+ *   - CatalogGrid (glassmorphic ProductCards) while loading → CatalogGridSkeleton
  *   - Explicit error banner when fetch fails
  *   - "0 products found" only shown after a *successful* empty-API response
  *   - Quick-add to cart with quantity stepper
- *   - Category filter via dropdown (populated from seed data)
  */
 
 "use client";
@@ -19,8 +19,18 @@ import { getCatalog, type Product } from "@/lib/api";
 import { useCartStore } from "@/context/CartStore";
 import { CatalogGrid } from "@/components/storefront/CatalogGrid";
 import { useToast, ToastProvider } from "@/components/ui/toast";
+import { cn } from "@/lib/utils";
 
 const BUYER_ID = "00000000-0000-0000-0000-000000000001";
+
+// Stable category tab definitions — derived from Phase 1 seed data.
+export const CATEGORY_TABS = [
+  { value: "",             label: "All" },
+  { value: "Electronics", label: "Electronics" },
+  { value: "Apparel",     label: "Apparel" },
+  { value: "Home & Living", label: "Home & Living" },
+  { value: "Industrial",   label: "Industrial" },
+] as const;
 
 // ---------------------------------------------------------------------------
 // Inner catalog (needs useToast)
@@ -137,7 +147,7 @@ function ProductsPageInner() {
   return (
     <div className="max-w-7xl mx-auto px-6 py-8">
       {/* Header row */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-2xl font-bold text-[var(--color-foreground)]">
             Catalog
@@ -161,7 +171,38 @@ function ProductsPageInner() {
         </button>
       </div>
 
-      {/* Filters */}
+      {/* Category tabs — bound to ?category= URL param */}
+      <div
+        className="mb-5 flex items-center gap-1 overflow-x-auto pb-0.5"
+        role="tablist"
+        aria-label="Filter by category"
+      >
+        {CATEGORY_TABS.map((tab) => {
+          const isActive = category === tab.value;
+          return (
+            <button
+              key={tab.value}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              aria-controls="catalog-panel"
+              onClick={() => updateFilter("category", tab.value)}
+              className={cn(
+                "shrink-0 px-4 py-1.5 rounded-full text-sm font-medium",
+                "border transition-colors duration-150",
+                "focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)] focus:ring-offset-1",
+                isActive
+                  ? "bg-[var(--color-primary)] text-[var(--color-primary-foreground)] border-transparent"
+                  : "bg-[var(--color-card)] text-[var(--color-muted-foreground)] border-[var(--color-border)] hover:border-[var(--color-foreground)] hover:text-[var(--color-foreground)]"
+              )}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Search + vendor + maxPrice filters */}
       <div className="mb-6 flex flex-wrap items-center gap-3">
         <div className="flex-1 min-w-48">
           <label htmlFor="search" className="sr-only">
@@ -176,18 +217,6 @@ function ProductsPageInner() {
             className="w-full h-10 px-3 rounded-md border border-[var(--color-border)] bg-[var(--color-card)] text-sm text-[var(--color-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)]"
           />
         </div>
-
-        <select
-          value={category}
-          onChange={(e) => updateFilter("category", e.target.value)}
-          className="h-10 px-3 rounded-md border border-[var(--color-border)] bg-[var(--color-card)] text-sm text-[var(--color-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)]"
-          aria-label="Filter by category"
-        >
-          <option value="">All categories</option>
-          {categories.map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </select>
 
         <select
           value={vendor}
@@ -223,8 +252,7 @@ function ProductsPageInner() {
       </div>
 
       {/*
-        GAP (Phase 1): Explicit error banner.
-        Rendered AFTER filters so it is visually prominent.
+        Explicit error banner.
         Only shown when hasLoaded is false AND an error is present —
         this guarantees "0 products found" is never shown on a failed fetch.
       */}
@@ -251,7 +279,7 @@ function ProductsPageInner() {
 }
 
 // ---------------------------------------------------------------------------
-// Wrapper â€”, provides ToastProvider context
+// Wrapper — provides ToastProvider context
 // ---------------------------------------------------------------------------
 
 export default function ProductsPage() {
