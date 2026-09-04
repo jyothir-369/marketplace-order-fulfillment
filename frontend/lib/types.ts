@@ -292,6 +292,51 @@ export interface AdminAuditLogFilterDto {
 // Vendor (buyer-side directory)
 // ---------------------------------------------------------------------------
 
+
+// ---------------------------------------------------------------------------
+// Vendor (admin-facing): operational detail metrics
+// ---------------------------------------------------------------------------
+
+export interface VendorDetailDto {
+  id: Uuid;
+  name: string;
+  productCount: number;
+  activeProductCount: number;
+  totalStock: number;
+  lowStockCount: number;
+  outOfStockCount: number;
+  createdAt: IsoDateTime;
+}
+
+// ---------------------------------------------------------------------------
+// Vendor dashboard (Phase 3 - vendor portal)
+// ---------------------------------------------------------------------------
+
+export interface VendorDashboardDto {
+  vendorId: Uuid;
+  vendorName: string;
+  productCount: number;
+  activeProductCount: number;
+  totalStock: number;
+  lowStockCount: number;
+  outOfStockCount: number;
+  pendingSyncJobs: number;
+  deadLetterJobs: number;
+  ambiguousJobs: number;
+  openOrders: number;
+}
+
+// ---------------------------------------------------------------------------
+// Category management (Phase 3 - admin)
+// ---------------------------------------------------------------------------
+
+export interface CategorySummaryDto {
+  name: string;
+  productCount: number;
+  activeProductCount: number;
+  totalStock: number;
+}
+
 export interface VendorResponseDto {
   id: Uuid;
   name: string;

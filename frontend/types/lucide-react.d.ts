@@ -16,6 +16,9 @@ declare module "lucide-react" {
 
   export const Activity: LucideIconType;
   export const AlertTriangle: LucideIconType;
+  export const Building2: LucideIconType;
+  export const FolderTree: LucideIconType;
+  export const LayoutDashboard: LucideIconType;
   export const ArrowLeft: LucideIconType;
   export const ArrowRight: LucideIconType;
   export const BarChart3: LucideIconType;
