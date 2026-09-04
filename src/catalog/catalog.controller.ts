@@ -1,4 +1,4 @@
-import {
+﻿import {
   Controller,
   Get,
   Post,
@@ -18,10 +18,20 @@ import { CorrelationId } from '../common/decorators/correlation-id.decorator';
 export class CatalogController {
   constructor(private readonly catalogService: CatalogService) {}
 
+  /**
+   * GET /api/catalog
+   *
+   * Query params:
+   *   - includeInactive=true|false (default: false)
+   *   - category=<name>            (optional)
+   */
   @Get()
-  async getCatalog(@Query('includeInactive') includeInactive: string): Promise<ProductResponseDto[]> {
+  async getCatalog(
+    @Query('includeInactive') includeInactive: string,
+    @Query('category') category: string,
+  ): Promise<ProductResponseDto[]> {
     const activeOnly = includeInactive !== 'true';
-    return this.catalogService.findAll(activeOnly);
+    return this.catalogService.findAll(activeOnly, category);
   }
 
   @Get(':id')
@@ -58,15 +68,14 @@ export class CatalogController {
 
   /**
    * POST /api/catalog/seed
-   * Seeds the database with 25 sample products across 5 vendors.
-   * Safe to call multiple times — always clears and re-seeds.
-   * Used by the storefront when the catalog is empty.
+   * Seeds the database with sample products across 5 vendors and 4 categories.
+   * Returns HTTP 201 Created.
    */
   @Post('seed')
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(HttpStatus.CREATED)
   async seedCatalog(
     @CorrelationId() correlationId: string,
-  ): Promise<{ message: string; productsCreated: number }> {
+  ): Promise<{ message: string; productsCreated: number; vendorsCreated: number }> {
     const result = await this.catalogService.seedSampleProducts(correlationId);
     return result;
   }

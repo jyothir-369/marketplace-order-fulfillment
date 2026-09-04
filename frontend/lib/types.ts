@@ -1,8 +1,8 @@
 ﻿/**
- * lib/types.ts — DTO mirrors for the NestJS backend (§3.3).
+ * lib/types.ts â€” DTO mirrors for the NestJS backend (Â§3.3).
  *
  * The frontend never speaks to the backend through untyped objects.
- * These interfaces MUST stay 1:1 with the backend DTOs — if a backend
+ * These interfaces MUST stay 1:1 with the backend DTOs â€” if a backend
  * field changes, the change must surface here as a compile error, not
  * as a runtime 500 (GAP-B10).
  */
@@ -26,6 +26,8 @@ export interface ProductDto {
   stockCount: number;
   vendorId: Uuid;
   vendorName: string;
+  /** Optional product category (e.g. Electronics, Apparel, Home & Living, Industrial). */
+  category: string | null;
   isActive: boolean;
 }
 
@@ -34,6 +36,7 @@ export interface CreateProductDto {
   name: string;
   price: number;
   stockCount: number;
+  category?: string;
 }
 
 export interface UpdateStockDto {
@@ -256,7 +259,7 @@ export interface ApiErrorBody {
 }
 
 // ---------------------------------------------------------------------------
-// Audit (admin) — moved out from admin-specific section above for re-export
+// Audit (admin) â€” moved out from admin-specific section above for re-export
 // ---------------------------------------------------------------------------
 
 export interface AdminAuditLogDto {

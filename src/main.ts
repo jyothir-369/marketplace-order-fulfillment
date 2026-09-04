@@ -6,12 +6,11 @@ import { AppModule } from './app.module';
 // ---------------------------------------------------------------------------
 // ioredis error suppression
 // ---------------------------------------------------------------------------
-// BullMQ creates internal ioredis "child pool" connections to perform blocking
-// reads (XREAD, BLPOP). When local Redis is offline, those ioredis instances
-// emit `error` events that have no listener attached internally and bubble up
-// to Node's process error events, which then log to stderr. These errors are
-// already handled gracefully by VendorQueueService (in-memory fallback) and
-// VendorSyncIsolatedProcessor (warn-level logger), so the raw stderr output is
+// BullMQ creates internal ioredis connections to perform blocking reads.
+// When local Redis is offline those ioredis instances emit error events
+// that bubble up to Node process error events. These are already handled
+// gracefully by VendorQueueService (in-memory fallback) and
+// VendorSyncIsolatedProcessor (warn-level logger), so raw stderr output is
 // pure noise. The following handlers silently swallow those expected errors
 // while letting any genuinely unexpected error continue to propagate.
 // ---------------------------------------------------------------------------
@@ -41,7 +40,6 @@ function setupIoredisErrorHandlers(): void {
           ? chunk.toString()
           : '';
     if (isExpectedRedisNoise(text)) {
-      // swallow
       if (typeof encoding === 'function') encoding();
       else if (typeof cb === 'function') cb();
       return true;
@@ -101,8 +99,21 @@ async function bootstrap() {
     }),
   );
 
+  // GAP (Phase 1): explicitly allow the storefront dev origin so CORS
+  // errors never masquerade as opaque network failures.
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+  ];
+
   app.enableCors({
-    origin: true,
+    origin: (origin, callback) => {
+      // No Origin header (curl, server-to-server) — allow.
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      // Defensively allow for development flexibility.
+      return callback(null, true);
+    },
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });

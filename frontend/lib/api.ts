@@ -1,5 +1,5 @@
-/**
- * lib/api.ts — typed fetch client (§3.3)
+﻿/**
+ * lib/api.ts â€” typed fetch client (Â§3.3)
  *
  * All HTTP calls go through this module. Types come from lib/types.ts.
  * GAP-B1 fix: checkoutOrder() targets POST /api/orders/checkout.
@@ -84,7 +84,7 @@ async function apiFetch<T>(
 }
 
 // ---------------------------------------------------------------------------
-// Type guard — defensive parse of order responses (§6.2)
+// Type guard â€” defensive parse of order responses (Â§6.2)
 // ---------------------------------------------------------------------------
 
 function parseOrder(order: unknown): OrderResponseDto {
@@ -103,9 +103,15 @@ function parseOrder(order: unknown): OrderResponseDto {
 // Catalog / products
 // ---------------------------------------------------------------------------
 
-/** GET /api/catalog */
-export async function getProducts(): Promise<ProductDto[]> {
-  return apiFetch<ProductDto[]>("/catalog");
+/**
+ * GET /api/catalog
+ *
+ * Optionally filter by category, e.g. ?category=Electronics.
+ */
+export async function getProducts(filter: { category?: string } = {}): Promise<ProductDto[]> {
+  return apiFetch<ProductDto[]>("/catalog", {
+    params: { category: filter.category },
+  });
 }
 
 /** GET /api/catalog/:id */
@@ -113,14 +119,20 @@ export async function getProductById(id: string): Promise<ProductDto> {
   return apiFetch<ProductDto>(`/catalog/${id}`);
 }
 
-/** POST /api/catalog/seed */
+/**
+ * POST /api/catalog/seed
+ *
+ * Seeds the catalog. Returns HTTP 201 Created on success.
+ */
 export async function seedCatalog(): Promise<{
   message: string;
   productsCreated: number;
+  vendorsCreated: number;
 }> {
-  return apiFetch<{ message: string; productsCreated: number }>("/catalog/seed", {
-    method: "POST",
-  });
+  return apiFetch<{ message: string; productsCreated: number; vendorsCreated: number }>(
+    "/catalog/seed",
+    { method: "POST" }
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -145,7 +157,7 @@ export async function checkoutOrder(payload: CheckoutDto): Promise<CheckoutRespo
 }
 
 /**
- * @deprecated Use checkoutOrder() — kept for backwards compat only.
+ * @deprecated Use checkoutOrder() â€” kept for backwards compat only.
  */
 export const createOrder = checkoutOrder;
 
@@ -173,58 +185,21 @@ export async function transitionOrder(
 export async function cancelOrder(
   orderId: string,
   payload: CancelOrderDto = {}
-): Promise<{ message: string }> {
-  return apiFetch<{ message: string }>(`/orders/${orderId}/cancel`, {
+): Promise<OrderResponseDto> {
+  return apiFetch<OrderResponseDto>(`/orders/${orderId}/cancel`, {
     method: "POST",
     body: JSON.stringify(payload),
-  });
+  }).then(parseOrder);
 }
 
-/** GET /api/orders/:id/audit-logs */
-export async function getOrderAuditLogs(
-  orderId: string
-): Promise<AuditLogResponseDto> {
-  return apiFetch<AuditLogResponseDto>(`/orders/${orderId}/audit-logs`);
+/** GET /api/orders */
+export async function getOrdersForBuyer(
+  buyerId: string = "00000000-0000-0000-0000-000000000001"
+): Promise<OrderResponseDto[]> {
+  return apiFetch<OrderResponseDto[]>(`/orders/buyer/${buyerId}`).then((orders) =>
+    orders.map(parseOrder)
+  );
 }
-
-// ---------------------------------------------------------------------------
-// Vendor catalog
-// ---------------------------------------------------------------------------
-
-/** GET /api/catalog/vendor/:vendorId */
-export async function getVendorProducts(
-  vendorId: string = VENDOR_ID,
-  includeInactive = true
-): Promise<ProductDto[]> {
-  return apiFetch<ProductDto[]>(`/catalog/vendor/${vendorId}`, {
-    params: includeInactive ? { includeInactive: "true" } : undefined,
-  });
-}
-
-/** PATCH /api/catalog/:productId */
-export async function updateStock(
-  productId: string,
-  payload: UpdateStockDto
-): Promise<ProductDto> {
-  return apiFetch<ProductDto>(`/catalog/${productId}`, {
-    method: "PATCH",
-    body: JSON.stringify(payload),
-  });
-}
-
-/** POST /api/catalog */
-export async function createProduct(
-  payload: CreateProductDto
-): Promise<ProductDto> {
-  return apiFetch<ProductDto>("/catalog", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Vendor orders
-// ---------------------------------------------------------------------------
 
 /** GET /api/orders/vendor/:vendorId */
 export async function getVendorOrders(
@@ -361,3 +336,49 @@ export type HealthStatus = HealthStatusDto;
 // ---------------------------------------------------------------------------
 
 export const getCatalog = getProducts;
+
+// ---------------------------------------------------------------------------
+// Inventory / vendor product management (operational surface)
+// ---------------------------------------------------------------------------
+
+/** GET /api/catalog/vendor/:vendorId */
+export async function getVendorProducts(
+  vendorId: string = VENDOR_ID,
+  includeInactive: boolean = false
+): Promise<ProductDto[]> {
+  return apiFetch<ProductDto[]>(`/catalog/vendor/${vendorId}`, {
+    params: { includeInactive: includeInactive ? 'true' : 'false' },
+  });
+}
+
+/** PATCH /api/catalog/:id (stock only) */
+export async function updateStock(
+  productId: string,
+  payload: UpdateStockDto
+): Promise<ProductDto> {
+  return apiFetch<ProductDto>(`/catalog/${productId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+/** POST /api/catalog */
+export async function createProduct(payload: CreateProductDto): Promise<ProductDto> {
+  return apiFetch<ProductDto>('/catalog', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Order audit logs (operational modal)
+// ---------------------------------------------------------------------------
+
+/**
+ * GET /api/orders/:orderId/audit
+ *
+ * Returns audit log entries scoped to a single order.
+ */
+export async function getOrderAuditLogs(orderId: string): Promise<AuditLogResponseDto> {
+  return apiFetch<AuditLogResponseDto>(`/orders/${orderId}/audit`);
+}
