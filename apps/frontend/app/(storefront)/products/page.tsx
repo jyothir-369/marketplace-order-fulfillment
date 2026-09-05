@@ -1,13 +1,13 @@
-﻿/**
- * app/(storefront)/products/page.tsx —
+/**
+ * app/(storefront)/products/page.tsx — Catalog page.
  *
- * Features:
- *   - URL-driven filters: ?q=search&vendor=id&maxPrice=100&category=slug
- *   - Category navigation tabs (All + each seeded category)
- *   - CatalogGrid (glassmorphic ProductCards) while loading → CatalogGridSkeleton
- *   - Explicit error banner when fetch fails
- *   - "0 products found" only shown after a *successful* empty-API response
- *   - Quick-add to cart with quantity stepper
+ * V2 Premium treatment:
+ *   - Editorial section eyebrow ("SHOP THE FULL CATALOG") in brass uppercase
+ *   - Serif H1 "All products" (Playfair Display via font-display)
+ *   - Inter meta line ("N products across M vendors")
+ *   - Category pills: V2 style (navy active, ivory inactive, warm border)
+ *   - Warm-toned search, vendor select, and max-price inputs
+ *   - Warm ivory grid background, V2 shadows on header
  */
 
 "use client";
@@ -19,16 +19,15 @@ import { getCatalog, type Product } from "@/lib/api";
 import { useCartStore } from "@/context/CartStore";
 import { CatalogGrid } from "@/components/storefront/CatalogGrid";
 import { useToast, ToastProvider } from "@/components/ui/toast";
+import { editorialEyebrows } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
-const BUYER_ID = "00000000-0000-0000-0000-000000000001";
-
-// Stable category tab definitions — derived from Phase 1 seed data.
+// Stable category tab definitions.
 export const CATEGORY_TABS = [
-  { value: "",             label: "All" },
-  { value: "Electronics", label: "Electronics" },
-  { value: "Apparel",     label: "Apparel" },
-  { value: "Home & Living", label: "Home & Living" },
+  { value: "",              label: "All" },
+  { value: "Electronics",  label: "Electronics" },
+  { value: "Apparel",      label: "Apparel" },
+  { value: "Home & Living",label: "Home & Living" },
   { value: "Industrial",   label: "Industrial" },
 ] as const;
 
@@ -44,26 +43,19 @@ function ProductsPageInner() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  /** True once the first fetch has completed successfully.
-   *  Only when hasLoaded is true do we know the empty state is real. */
+  /** True once the first fetch has completed successfully. */
   const [hasLoaded, setHasLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
 
-  // Read filters from URL
+  // URL-driven filters
   const q = searchParams.get("q") ?? "";
   const vendor = searchParams.get("vendor") ?? "";
   const category = searchParams.get("category") ?? "";
   const maxPriceParam = searchParams.get("maxPrice");
   const maxPrice = maxPriceParam ? Number(maxPriceParam) : undefined;
 
-  // Client-side category list from loaded products (deduplicated).
-  const categories = Array.from(
-    new Set(products.map((p) => p.category).filter((c): c is string => Boolean(c)))
-  ).sort();
-
-  // Unique vendors for filter dropdown
   const vendors = Array.from(
     new Map(products.map((p) => [p.vendorId, p.vendorName])).entries()
   ).map(([id, name]) => ({ id, name }));
@@ -80,7 +72,6 @@ function ProductsPageInner() {
       setHasLoaded(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load catalog");
-      // hasLoaded stays false so empty state is never shown on error.
     } finally {
       setLoading(false);
     }
@@ -92,7 +83,10 @@ function ProductsPageInner() {
     try {
       const { seedCatalog } = await import("@/lib/api");
       const result = await seedCatalog();
-      toast(`Seeded ${result.productsCreated} products (${result.vendorsCreated} vendors).`, "success");
+      toast(
+        `Seeded ${result.productsCreated} products (${result.vendorsCreated} vendors).`,
+        "success"
+      );
       void loadProducts();
     } catch {
       toast("Failed to seed catalog.", "error");
@@ -133,47 +127,66 @@ function ProductsPageInner() {
     }, 2000);
   };
 
+  // URL filter helpers
   const updateFilter = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString());
-    if (value) params.set(key, value);
-    else params.delete(key);
+    if (value) {
+      params.set(key, value);
+    } else {
+      params.delete(key);
+    }
     router.push(`/products?${params.toString()}`, { scroll: false });
   };
 
   const clearFilters = () => router.push("/products", { scroll: false });
-
-  const hasFilters = Boolean(q || vendor || category || maxPrice !== undefined);
+  const hasFilters = Boolean(q || vendor || maxPrice !== undefined);
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
-      {/* Header row */}
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-[var(--color-foreground)]">
-            Catalog
-          </h1>
-          <p className="text-sm text-[var(--color-muted-foreground)] mt-0.5">
-            {loading
-              ? "Loading\u2026"
-              : hasLoaded && filtered.length === 0
-                ? "No products found"
-                : `${filtered.length} product${filtered.length !== 1 ? "s" : ""}` +
-                  (hasFilters ? " matching filters" : " available")}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={handleSeed}
-          className="px-3 py-1.5 text-sm rounded border border-[var(--color-border)] bg-[var(--color-card)] hover:bg-[var(--color-accent)] text-[var(--color-foreground)]"
-        >
-          <Package className="inline h-4 w-4 mr-1 -mt-0.5" aria-hidden />
-          Seed catalog
-        </button>
+    <div className="max-w-7xl mx-auto px-6 py-10" id="catalog-panel">
+      {/* Page header — V2 editorial */}
+      <div className="mb-8">
+        {/* Eyebrow */}
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--color-accent)] mb-1">
+          {editorialEyebrows.catalog}
+        </p>
+        {/* H1 */}
+        <h1 className="font-display text-3xl font-bold text-[var(--color-foreground)] mb-1">
+          All products
+        </h1>
+        {/* Vendor count meta */}
+        <p className="text-sm text-[var(--color-warm-muted)]">
+          {filtered.length}&nbsp;
+          {filtered.length === 1 ? "product" : "products"}
+          {vendors.length > 0 && (
+            <>
+              &nbsp;across {vendors.length}&nbsp;
+              {vendors.length === 1 ? "vendor" : "vendors"}
+            </>
+          )}
+        </p>
       </div>
 
-      {/* Category tabs — bound to ?category= URL param */}
+      {/* Seed button */}
+      <button
+        type="button"
+        onClick={handleSeed}
+        className={cn(
+          "mb-6 inline-flex items-center gap-1.5",
+          "px-3 py-1.5 rounded-full",
+          "text-xs font-semibold",
+          "border border-[var(--color-border)]",
+          "bg-[var(--color-card)] text-[var(--color-warm-muted)]",
+          "hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]",
+          "transition-colors"
+        )}
+      >
+        <Package className="h-3.5 w-3.5" aria-hidden />
+        Seed catalog
+      </button>
+
+      {/* Category tabs — V2 pill style */}
       <div
-        className="mb-5 flex items-center gap-1 overflow-x-auto pb-0.5"
+        className="mb-6 flex items-center gap-1.5 overflow-x-auto pb-0.5"
         role="tablist"
         aria-label="Filter by category"
       >
@@ -193,7 +206,7 @@ function ProductsPageInner() {
                 "focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)] focus:ring-offset-1",
                 isActive
                   ? "bg-[var(--color-primary)] text-[var(--color-primary-foreground)] border-transparent"
-                  : "bg-[var(--color-card)] text-[var(--color-muted-foreground)] border-[var(--color-border)] hover:border-[var(--color-foreground)] hover:text-[var(--color-foreground)]"
+                  : "bg-[var(--color-card)] text-[var(--color-warm-muted)] border-[var(--color-border)] hover:border-[var(--color-foreground)] hover:text-[var(--color-foreground)]"
               )}
             >
               {tab.label}
@@ -202,8 +215,8 @@ function ProductsPageInner() {
         })}
       </div>
 
-      {/* Search + vendor + maxPrice filters */}
-      <div className="mb-6 flex flex-wrap items-center gap-3">
+      {/* Search + vendor + maxPrice filters — V2 warm inputs */}
+      <div className="mb-8 flex flex-wrap items-center gap-3">
         <div className="flex-1 min-w-48">
           <label htmlFor="search" className="sr-only">
             Search products
@@ -213,15 +226,26 @@ function ProductsPageInner() {
             type="search"
             value={q}
             onChange={(e) => updateFilter("q", e.target.value)}
-            placeholder="Search products\u2026"
-            className="w-full h-10 px-3 rounded-md border border-[var(--color-border)] bg-[var(--color-card)] text-sm text-[var(--color-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)]"
+            placeholder="Search products..."
+            className={cn(
+              "w-full h-10 px-3 rounded-md border",
+              "border-[var(--color-border)] bg-[var(--color-card)]",
+              "text-sm text-[var(--color-foreground)]",
+              "placeholder:text-[var(--color-warm-subtle)]",
+              "focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)]"
+            )}
           />
         </div>
 
         <select
           value={vendor}
           onChange={(e) => updateFilter("vendor", e.target.value)}
-          className="h-10 px-3 rounded-md border border-[var(--color-border)] bg-[var(--color-card)] text-sm text-[var(--color-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)]"
+          className={cn(
+            "h-10 px-3 rounded-md border",
+            "border-[var(--color-border)] bg-[var(--color-card)]",
+            "text-sm text-[var(--color-foreground)]",
+            "focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)]"
+          )}
           aria-label="Filter by vendor"
         >
           <option value="">All vendors</option>
@@ -236,7 +260,13 @@ function ProductsPageInner() {
           value={maxPrice ?? ""}
           onChange={(e) => updateFilter("maxPrice", e.target.value)}
           placeholder="Max price"
-          className="h-10 w-32 px-3 rounded-md border border-[var(--color-border)] bg-[var(--color-card)] text-sm text-[var(--color-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)]"
+          className={cn(
+            "h-10 w-32 px-3 rounded-md border",
+            "border-[var(--color-border)] bg-[var(--color-card)]",
+            "text-sm text-[var(--color-foreground)]",
+            "placeholder:text-[var(--color-warm-subtle)]",
+            "focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)]"
+          )}
           aria-label="Maximum price"
         />
 
@@ -244,22 +274,27 @@ function ProductsPageInner() {
           <button
             type="button"
             onClick={clearFilters}
-            className="h-10 px-4 rounded-md text-sm font-medium text-[var(--color-foreground)] underline underline-offset-2 hover:opacity-80"
+            className={cn(
+              "h-10 px-4 rounded-md text-sm font-medium",
+              "text-[var(--color-warm-muted)] underline underline-offset-2",
+              "hover:text-[var(--color-foreground)] transition-colors"
+            )}
           >
             Clear filters
           </button>
         )}
       </div>
 
-      {/*
-        Explicit error banner.
-        Only shown when hasLoaded is false AND an error is present —
-        this guarantees "0 products found" is never shown on a failed fetch.
-      */}
+      {/* Error banner */}
       {error && (
         <div
           role="alert"
-          className="mb-4 rounded-md border border-[var(--color-destructive)] bg-[var(--color-destructive)]/10 text-[var(--color-destructive)] p-4 text-sm font-medium"
+          className={cn(
+            "mb-4 rounded-md border p-4 text-sm font-medium",
+            "border-[var(--color-destructive)]",
+            "bg-[var(--color-destructive)]/8",
+            "text-[var(--color-destructive)]"
+          )}
         >
           {error}
         </div>

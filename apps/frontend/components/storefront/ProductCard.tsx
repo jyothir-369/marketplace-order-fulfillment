@@ -1,23 +1,26 @@
-﻿/**
- * ProductCard — glassmorphic product tile for the buyer catalog (§3.1.2).
+/**
+ * ProductCard — V2 Premium product tile for the buyer catalog.
  *
- * Composition:
- *   - Image placeholder (hero area, aspect 4:3)
- *   - Product name + vendor name
- *   - Formatted price (`formatCurrency`) + inventory StatusBadge
- *   - Quick-add quantity stepper
- *
- * The card is intentionally dumb — quantity, add-to-cart, and add feedback
- * are all driven by the parent (CatalogGrid / products page) so the same
- * card can be reused in wishlists or search results.
+ * V2 visual treatment:
+ *   - PhotoBlock (warm gradient) instead of flat gray hex placeholder
+ *   - Brass vendor eyebrow above the serif product name
+ *   - Floating stock badge uses semantic StatusBadge palette (forest for
+ *     "in stock", clay for "only N left", gray for out of stock) — we
+ *     reuse the existing StatusBadge component for status colors; the
+ *     "Only N left" variant here maps to FULFILLING (amber) so the
+ *     vocabulary stays consistent.
+ *   - "Add" button uses ink-navy primary; "Added" success state uses
+ *     brass accent.
+ *   - Warm hairline borders, V2 shadow on lift.
  */
 
 "use client";
 
 import Link from "next/link";
-import { Minus, Plus, Package, ShoppingCart, Check } from "lucide-react";
+import { Minus, Plus, ShoppingCart, Check } from "lucide-react";
 import { formatCurrency, cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { PhotoBlock, type PhotoBlockCategory } from "@/components/ui/photo-block";
 import type { Product } from "@/lib/api";
 
 interface ProductCardProps {
@@ -25,8 +28,26 @@ interface ProductCardProps {
   quantity: number;
   onQuantityChange: (qty: number) => void;
   onAdd: () => void;
-  /** When true, the add button shows a checkmark and emerald tint for ~2s. */
+  /** When true, the add button shows a checkmark and brass tint for ~2s. */
   justAdded?: boolean;
+}
+
+/**
+ * Map a free-text product category onto one of the V2 PhotoBlock
+ * palette presets. Falls back to "neutral" for unknown categories so
+ * the catalog never renders a broken-looking tile.
+ */
+function categoryToPalette(category: string | null | undefined): PhotoBlockCategory {
+  if (!category) return "neutral";
+  const c = category.toLowerCase();
+  if (c.includes("electronic")) return "electronics";
+  if (c.includes("apparel") || c.includes("clothing")) return "apparel";
+  if (c.includes("home") || c.includes("living") || c.includes("kitchen")) return "home";
+  if (c.includes("outdoor") || c.includes("garden")) return "outdoors";
+  if (c.includes("food") || c.includes("grocery")) return "grocery";
+  if (c.includes("beauty") || c.includes("cosmetic")) return "beauty";
+  if (c.includes("book")) return "books";
+  return "neutral";
 }
 
 export function ProductCard({
@@ -38,8 +59,10 @@ export function ProductCard({
 }: ProductCardProps) {
   const isOut = product.stockCount === 0;
 
-  // Decide which stock badge to render. Mirrors backend OrderStatus vocabulary
-  // so we can reuse the same StatusBadge / colour tokens.
+  /* Stock badge: reuses the StatusBadge semantic vocabulary so colors
+     stay consistent across catalog, PDP, and order views. "Only N left"
+     stays amber (FULFILLING), "In stock" stays emerald (FULFILLED), and
+     "Out of stock" stays gray (CANCELLED). */
   const stockStatus: "fulfilled" | "fulfilling" | "cancelled" =
     isOut ? "cancelled" : product.stockCount <= 5 ? "fulfilling" : "fulfilled";
   const stockLabel =
@@ -49,49 +72,59 @@ export function ProductCard({
         ? `Only ${product.stockCount} left`
         : "In stock";
 
+  const palette = categoryToPalette(product.category);
+
   return (
     <article
       className={cn(
-        "group relative flex flex-col overflow-hidden rounded-2xl",
-        "glass-panel transition-all duration-300",
-        "hover:-translate-y-0.5 hover:shadow-[0_18px_40px_hsl(var(--color-foreground)/0.12)]",
-        justAdded && "ring-2 ring-[var(--color-info)]"
+        "group relative flex flex-col overflow-hidden rounded-xl",
+        "bg-[var(--color-card)]",
+        "border border-[var(--color-border)]",
+        "transition-all duration-300",
+        "hover:-translate-y-0.5 hover:shadow-v2-md",
+        justAdded && "ring-2 ring-[var(--color-accent)]"
       )}
     >
-      {/* Image placeholder */}
+      {/* Image area — V2 PhotoBlock */}
       <Link
         href={`/products/${product.id}`}
-        className="block relative aspect-[4/3] overflow-hidden bg-[var(--color-muted)]"
+        className="block relative"
         aria-label={`View ${product.name}`}
       >
-        <div
-          className={cn(
-            "absolute inset-0 flex items-center justify-center",
-            "bg-gradient-to-br from-[var(--color-muted)] to-[var(--color-secondary)]",
-            "text-[var(--color-muted-foreground)]"
-          )}
-        >
-          <Package className="h-12 w-12" aria-hidden />
-        </div>
+        <PhotoBlock
+          category={palette}
+          square
+          accent
+          label={`${product.name} product image`}
+          className="rounded-none border-x-0 border-t-0"
+        />
         {/* Status pill — floating top-right */}
-        <div className="absolute top-2 right-2">
+        <div className="absolute top-3 right-3">
           <StatusBadge status={stockStatus} label={stockLabel} size="sm" />
         </div>
       </Link>
 
       {/* Body */}
-      <div className="flex flex-1 flex-col gap-2 p-4">
+      <div className="flex flex-1 flex-col gap-1.5 p-4">
+        <p className="text-[10.5px] font-bold uppercase tracking-[0.18em] text-[var(--color-accent)]">
+          {product.category ?? "Marketplace"}
+        </p>
         <Link
           href={`/products/${product.id}`}
-          className="text-sm font-semibold leading-snug text-[var(--color-foreground)] hover:text-[var(--color-primary)] line-clamp-2"
+          className={cn(
+            "font-display text-base font-semibold leading-snug",
+            "text-[var(--color-foreground)]",
+            "hover:text-[var(--color-primary)]",
+            "line-clamp-2"
+          )}
         >
           {product.name}
         </Link>
-        <p className="text-xs text-[var(--color-muted-foreground)]">
+        <p className="text-xs text-[var(--color-warm-muted)]">
           by {product.vendorName}
         </p>
         <div className="mt-auto flex items-center justify-between pt-3">
-          <span className="text-xl font-bold text-[var(--color-foreground)] tabular-nums">
+          <span className="font-display text-xl font-bold text-[var(--color-foreground)] tabular-nums">
             {formatCurrency(product.price)}
           </span>
         </div>
@@ -101,7 +134,7 @@ export function ProductCard({
       <div
         className={cn(
           "flex items-center gap-2 border-t px-4 py-3",
-          "border-[var(--color-border)] bg-[var(--color-card)]/60"
+          "border-[var(--color-border)] bg-[var(--color-background)]"
         )}
       >
         <div className="flex items-center gap-1">
@@ -115,8 +148,8 @@ export function ProductCard({
             onClick={() => onQuantityChange(Math.max(1, quantity - 1))}
             className={cn(
               "h-8 w-8 flex items-center justify-center rounded-md border text-sm font-medium",
-              "border-[var(--color-border)] bg-[var(--color-background)]",
-              "hover:bg-[var(--color-accent)]",
+              "border-[var(--color-border)] bg-[var(--color-card)]",
+              "hover:bg-[var(--color-accent)] hover:text-[var(--color-accent-foreground)]",
               "disabled:opacity-40 disabled:pointer-events-none"
             )}
           >
@@ -134,7 +167,7 @@ export function ProductCard({
             }
             className={cn(
               "h-8 w-12 text-center rounded-md border text-sm tabular-nums",
-              "border-[var(--color-border)] bg-[var(--color-background)]",
+              "border-[var(--color-border)] bg-[var(--color-card)]",
               "disabled:opacity-40"
             )}
           />
@@ -145,8 +178,8 @@ export function ProductCard({
             onClick={() => onQuantityChange(quantity + 1)}
             className={cn(
               "h-8 w-8 flex items-center justify-center rounded-md border text-sm font-medium",
-              "border-[var(--color-border)] bg-[var(--color-background)]",
-              "hover:bg-[var(--color-accent)]",
+              "border-[var(--color-border)] bg-[var(--color-card)]",
+              "hover:bg-[var(--color-accent)] hover:text-[var(--color-accent-foreground)]",
               "disabled:opacity-40 disabled:pointer-events-none"
             )}
           >
@@ -163,7 +196,7 @@ export function ProductCard({
             isOut
               ? "bg-[var(--color-muted)] text-[var(--color-muted-foreground)] cursor-not-allowed"
               : justAdded
-                ? "bg-[var(--color-success)] text-[var(--color-success-foreground)]"
+                ? "bg-[var(--color-accent)] text-[var(--color-accent-foreground)]"
                 : "bg-[var(--color-primary)] text-[var(--color-primary-foreground)] hover:opacity-90"
           )}
         >
