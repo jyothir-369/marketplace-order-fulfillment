@@ -1,5 +1,11 @@
-ï»¿/**
- * app/(storefront)/vendors/[vendorId]/page.tsx â€” Vendor showcase (Â§3).
+/**
+ * app/(storefront)/vendors/[vendorId]/page.tsx — Vendor showcase (§3).
+ *
+ * V2 Premium treatment:
+ *   - Warm gradient vendor hero card with serif title
+ *   - Brass eyebrow label
+ *   - Storefront catalog grid (Phase 3 ProductCard already V2-skinned)
+ *   - Back link in editorial style
  */
 
 "use client";
@@ -15,6 +21,7 @@ import { CatalogGrid } from "@/components/storefront/CatalogGrid";
 import { useToast, ToastProvider } from "@/components/ui/toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { cn } from "@/lib/utils";
 
 function VendorStorefrontInner() {
   const params = useParams();
@@ -78,31 +85,50 @@ function VendorStorefrontInner() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
+    <div className="max-w-7xl mx-auto px-6 py-10">
+      {/* Back link */}
       <Link
         href="/vendors"
-        className="inline-flex items-center gap-1 text-sm text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors mb-4"
+        className={cn(
+          "inline-flex items-center gap-1.5 text-sm font-medium",
+          "text-[var(--color-warm-muted)] hover:text-[var(--color-accent)]",
+          "transition-colors mb-6 group"
+        )}
       >
-        <ArrowLeft className="h-4 w-4" aria-hidden />
+        <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" aria-hidden />
         Back to vendors
       </Link>
 
-      <div className="mb-6 flex items-start gap-4">
-        <div className="h-14 w-14 rounded-2xl flex items-center justify-center bg-gradient-to-br from-[var(--color-muted)] to-[var(--color-secondary)] text-[var(--color-primary)] shrink-0">
-          <Store className="h-7 w-7" aria-hidden />
+      {/* Vendor profile hero */}
+      <div className="mb-8 flex items-start gap-5">
+        {/* Gradient icon block */}
+        <div className={cn(
+          "h-16 w-16 rounded-2xl shrink-0 flex items-center justify-center",
+          "bg-gradient-to-br from-[var(--color-cream)] to-[var(--color-ivory-muted)]",
+          "text-[var(--color-accent)] shadow-v2"
+        )}
+          aria-hidden
+        >
+          <Store className="h-8 w-8" />
         </div>
         <div>
           {loading ? (
             <>
-              <Skeleton height="1.5rem" width="14rem" />
-              <Skeleton height="1rem" width="8rem" className="mt-1" />
+              <Skeleton height="2rem" width="14rem" />
+              <Skeleton height="1rem" width="8rem" className="mt-2" />
             </>
           ) : vendor ? (
             <>
-              <h1 className="text-2xl font-bold text-[var(--color-foreground)]">
+              <p
+                aria-hidden
+                className="text-[10.5px] font-bold uppercase tracking-[0.18em] text-[var(--color-accent)] mb-0.5"
+              >
+                Vendor storefront
+              </p>
+              <h1 className="font-display text-3xl font-bold text-[var(--color-foreground)]">
                 {vendor.name}
               </h1>
-              <p className="text-sm text-[var(--color-muted-foreground)] mt-0.5">
+              <p className="text-sm text-[var(--color-warm-muted)] mt-1">
                 {vendor.activeProductCount} active product{vendor.activeProductCount !== 1 ? "s" : ""}
                 {vendor.activeProductCount !== vendor.productCount && (
                   <> &middot; {vendor.productCount} total</>
@@ -111,8 +137,8 @@ function VendorStorefrontInner() {
             </>
           ) : hasLoaded ? (
             <>
-              <h1 className="text-2xl font-bold text-[var(--color-foreground)]">Vendor not found</h1>
-              <p className="text-sm text-[var(--color-muted-foreground)] mt-0.5">
+              <h1 className="font-display text-3xl font-bold text-[var(--color-foreground)]">Vendor not found</h1>
+              <p className="text-sm text-[var(--color-warm-muted)] mt-1">
                 This vendor may have been removed or has no active products.
               </p>
             </>

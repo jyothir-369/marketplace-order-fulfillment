@@ -1,5 +1,11 @@
-ï»¿/**
- * app/(storefront)/vendors/page.tsx â€” Vendor directory (Â§3).
+/**
+ * app/(storefront)/vendors/page.tsx — Vendor directory (§3).
+ *
+ * V2 Premium treatment:
+ *   - Editorial "Vendors on Marketplace" hero (eyebrow + serif H1)
+ *   - Warm ivory background, hairline card borders
+ *   - Status badges and core vendor data unchanged
+ *   - Brass underline rule under hero (decorative)
  */
 
 "use client";
@@ -10,12 +16,16 @@ import type { VendorResponseDto } from "@/lib/types";
 import { VendorCard } from "@/components/storefront/VendorCard";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
+import { editorialEyebrows } from "@/lib/theme";
 
 function VendorsGridSkeleton({ count = 8 }: { count?: number }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="glass-panel rounded-2xl p-5 space-y-3">
+        <div
+          key={i}
+          className="bg-[var(--color-card)] border border-[var(--color-warm-border)] rounded-2xl p-5 space-y-3 shadow-v2"
+        >
           <Skeleton height="3rem" width="3rem" />
           <Skeleton height="1rem" width="70%" />
           <Skeleton height="0.75rem" width="40%" />
@@ -52,10 +62,26 @@ export default function VendorsDirectoryPage() {
   }, []);
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[var(--color-foreground)]">Vendors</h1>
-        <p className="text-sm text-[var(--color-muted-foreground)] mt-0.5">
+    <div className="max-w-7xl mx-auto px-6 py-10">
+      {/* Editorial hero */}
+      <div className="mb-8">
+        <p
+          aria-hidden
+          className="text-[10.5px] font-bold uppercase tracking-[0.18em] text-[var(--color-accent)] mb-1"
+        >
+          {editorialEyebrows.vendors}
+        </p>
+        <h1 className="font-display text-3xl font-bold text-[var(--color-foreground)]">
+          Our vendors
+        </h1>
+        <span
+          aria-hidden
+          className="mt-3 block h-px w-10 bg-[var(--color-accent)]"
+        />
+        <p className="text-sm text-[var(--color-warm-muted)] mt-3 max-w-2xl leading-relaxed">
+          Discover the people and businesses behind every product in the marketplace.
+        </p>
+        <p className="text-xs text-[var(--color-warm-muted)] mt-2">
           {loading
             ? "Loading\u2026"
             : hasLoaded

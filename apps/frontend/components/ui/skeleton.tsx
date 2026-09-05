@@ -1,4 +1,4 @@
-﻿import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 interface SkeletonProps {
   className?: string;
@@ -15,7 +15,10 @@ export function Skeleton({ className, width, height }: SkeletonProps) {
     <div
       aria-hidden
       style={style}
-      className={cn("rounded-md bg-[var(--muted)] animate-pulse", className)}
+      className={cn(
+        "rounded-md bg-[var(--color-ivory-muted)] animate-pulse",
+        className
+      )}
     />
   );
 }
@@ -26,7 +29,7 @@ export function CatalogGridSkeleton({ count = 8 }: { count?: number }) {
       {Array.from({ length: count }).map((_, i) => (
         <div
           key={i}
-          className="bg-[var(--card)] border border-[var(--border)] rounded-lg p-4 flex flex-col gap-3"
+          className="bg-[var(--color-card)] border border-[var(--color-warm-border)] rounded-2xl p-4 flex flex-col gap-3 shadow-v2"
         >
           <Skeleton height="1rem" width="70%" />
           <Skeleton height="0.75rem" width="40%" />
@@ -45,15 +48,15 @@ export function OrderDetailSkeleton() {
   return (
     <div className="max-w-3xl mx-auto p-6 space-y-6">
       <div className="space-y-2">
-        <Skeleton height="2rem" width="50%" />
+        <Skeleton height="2.25rem" width="50%" />
         <Skeleton height="1rem" width="30%" />
       </div>
-      <div className="border border-[var(--border)] rounded-lg p-4 space-y-3">
+      <div className="border border-[var(--color-warm-border)] rounded-2xl p-5 space-y-3 bg-[var(--color-card)]">
         <Skeleton height="1rem" width="40%" />
         <Skeleton height="1rem" />
         <Skeleton height="1rem" width="80%" />
       </div>
-      <div className="border border-[var(--border)] rounded-lg p-4 space-y-3">
+      <div className="border border-[var(--color-warm-border)] rounded-2xl p-5 space-y-3 bg-[var(--color-card)]">
         <Skeleton height="1rem" width="30%" />
         <Skeleton height="3rem" />
         <Skeleton height="3rem" />

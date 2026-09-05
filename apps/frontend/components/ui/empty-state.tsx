@@ -1,4 +1,4 @@
-﻿import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 interface EmptyStateProps {
   icon?: React.ReactNode;
@@ -19,11 +19,13 @@ export function EmptyState({
     <div
       className={cn(
         "flex flex-col items-center justify-center gap-4 py-16 text-center",
+        "bg-[var(--color-card)] border border-[var(--color-warm-border)] rounded-2xl",
+        "px-6",
         className
       )}
       role="status"
     >
-      <div className="text-[var(--muted-foreground)] opacity-60">
+      <div className="text-[var(--color-warm-muted)] opacity-50">
         {icon ?? (
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -42,9 +44,11 @@ export function EmptyState({
         )}
       </div>
       <div className="space-y-1">
-        <h2 className="text-lg font-semibold text-[var(--foreground)]">{title}</h2>
+        <h2 className="font-display text-lg font-semibold text-[var(--color-foreground)]">
+          {title}
+        </h2>
         {description && (
-          <p className="text-sm text-[var(--muted-foreground)] max-w-sm">
+          <p className="text-sm text-[var(--color-warm-muted)] max-w-sm">
             {description}
           </p>
         )}

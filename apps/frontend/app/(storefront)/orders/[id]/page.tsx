@@ -1,26 +1,32 @@
-ï»¿/**
- * app/(storefront)/orders/[id]/page.tsx â€” Order confirmation & live tracking (Â§2.2, Â§3.2, Â§4.1, GAP-F1/F6).
+/**
+ * app/(storefront)/orders/[id]/page.tsx — Order confirmation & live tracking (§2.2, §3.2, §4.1, GAP-F1/F6).
  *
  * Features:
  *   - useOrderPolling hook (stops on terminal status)
  *   - Order header with StatusBadge
  *   - PollingIndicator (live pulse when polling)
  *   - Vendor-grouped line items with StatusBadge per item
- *   - AMBIGUOUS / DEAD_LETTER alert banners
+ *   - AMBIGUOUS / DEAD_LETTER alert banners (semantic colors untouched)
  *   - Defensive: order.lineItems ?? [] on all renders
+ *
+ * V2 Premium treatment:
+ *   - Brass editorial eyebrow + serif H1 (Playfair Display)
+ *   - Warm hairline borders, ivory card surfaces
+ *   - Status badges untouched (semantic vocabulary)
+ *   - Warm-toned alert banners keep semantic colors (amber/red) but V2 chrome
  */
 
 "use client";
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { AlertTriangle, Package } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { useOrderPolling } from "@/lib/hooks/use-order-polling";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PollingIndicator } from "@/components/order/PollingIndicator";
 import { OrderDetailSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, cn } from "@/lib/utils";
 
 const DEAD_LETTER_STATUSES = new Set(["dead_letter", "DEAD_LETTER", "FAILED"]);
 const AMBIGUOUS_STATUSES = new Set(["AMBIGUOUS", "ambiguous"]);
@@ -49,7 +55,7 @@ export default function OrderConfirmationPage() {
           action={
             <Link
               href="/products"
-              className="px-5 py-2.5 bg-indigo-600 text-white rounded font-medium hover:bg-indigo-700"
+              className="px-5 py-2.5 rounded-md font-semibold bg-[var(--color-primary)] text-[var(--color-primary-foreground)] hover:opacity-90 transition-opacity shadow-v2"
             >
               Back to Catalog
             </Link>
@@ -71,7 +77,7 @@ export default function OrderConfirmationPage() {
           action={
             <Link
               href="/products"
-              className="px-5 py-2.5 bg-indigo-600 text-white rounded font-medium hover:bg-indigo-700"
+              className="px-5 py-2.5 rounded-md font-semibold bg-[var(--color-primary)] text-[var(--color-primary-foreground)] hover:opacity-90 transition-opacity shadow-v2"
             >
               Back to Catalog
             </Link>
@@ -96,12 +102,20 @@ export default function OrderConfirmationPage() {
   }, new Map());
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-8 space-y-6">
+    <div className="max-w-3xl mx-auto px-6 py-10 space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-900">Order Confirmation</h1>
-          <p className="text-sm text-zinc-500 mt-0.5">
+          <p
+            aria-hidden
+            className="text-[10.5px] font-bold uppercase tracking-[0.18em] text-[var(--color-accent)] mb-1"
+          >
+            Order confirmation
+          </p>
+          <h1 className="font-display text-3xl font-bold text-[var(--color-foreground)]">
+            Thank you for your order
+          </h1>
+          <p className="text-sm text-[var(--color-warm-muted)] mt-1">
             Placed {new Date(order.createdAt).toLocaleString()}
           </p>
         </div>
@@ -112,60 +126,66 @@ export default function OrderConfirmationPage() {
       </div>
 
       {/* Order metadata */}
-      <div className="bg-white border border-zinc-200 rounded-lg p-4 text-sm text-zinc-600 grid grid-cols-1 sm:grid-cols-2 gap-2">
+      <div className="bg-[var(--color-card)] border border-[var(--color-warm-border)] rounded-2xl p-5 text-sm text-[var(--color-warm-muted)] grid grid-cols-1 sm:grid-cols-2 gap-3 shadow-v2">
         <div>
-          <span className="font-medium text-zinc-700">Order #:</span>{" "}
-          <span className="font-mono font-semibold">{order.orderNumber ?? order.id}</span>
+          <span className="block text-[10.5px] font-bold uppercase tracking-[0.18em] text-[var(--color-warm-muted)] mb-0.5">Order #</span>
+          <span className="font-mono font-semibold text-[var(--color-foreground)]">{order.orderNumber ?? order.id}</span>
         </div>
         <div>
-          <span className="font-medium text-zinc-700">Total:</span>{" "}
-          <span className="font-semibold">{formatCurrency(order.totalAmount)}</span>
+          <span className="block text-[10.5px] font-bold uppercase tracking-[0.18em] text-[var(--color-warm-muted)] mb-0.5">Total</span>
+          <span className="font-display text-lg font-semibold text-[var(--color-foreground)]">{formatCurrency(order.totalAmount)}</span>
         </div>
         <div className="sm:col-span-2">
-          <span className="font-medium text-zinc-700">Shipping to:</span>{" "}
+          <span className="block text-[10.5px] font-bold uppercase tracking-[0.18em] text-[var(--color-warm-muted)] mb-0.5">Shipping to</span>
           {order.shippingAddress ? (
-            <span>{order.shippingAddress}</span>
+            <span className="text-[var(--color-foreground)]">{order.shippingAddress}</span>
           ) : (
-            <span className="italic text-zinc-400">Not provided</span>
+            <span className="italic text-[var(--color-warm-subtle)]">Not provided</span>
           )}
         </div>
         <div className="sm:col-span-2">
-          <span className="font-medium text-zinc-700">Correlation ID:</span>{" "}
-          <span className="font-mono text-xs">{order.correlationId}</span>
+          <span className="block text-[10.5px] font-bold uppercase tracking-[0.18em] text-[var(--color-warm-muted)] mb-0.5">Correlation ID</span>
+          <span className="font-mono text-xs text-[var(--color-foreground)]">{order.correlationId}</span>
         </div>
       </div>
 
-      {/* AMBIGUOUS alert */}
+      {/* AMBIGUOUS alert — semantic amber, V2 chrome */}
       {hasAmbiguous && (
         <div
           role="alert"
-          className="flex items-start gap-3 p-4 rounded-lg bg-amber-50 border border-amber-300"
+          className={cn(
+            "flex items-start gap-3 p-4 rounded-2xl",
+            "bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/40"
+          )}
         >
-          <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" aria-hidden />
+          <AlertTriangle className="h-5 w-5 text-[var(--color-warning)] shrink-0 mt-0.5" aria-hidden />
           <div>
-            <p className="text-sm font-semibold text-amber-900">
+            <p className="text-sm font-semibold text-[var(--color-foreground)]">
               Pending vendor confirmation
             </p>
-            <p className="text-sm text-amber-800 mt-0.5">
+            <p className="text-sm text-[var(--color-warm-muted)] mt-0.5">
               One or more items are waiting for vendor confirmation. Your order is not
-              at risk â€” we are actively reconciling with the vendor. Check back shortly.
+              at risk — we are actively reconciling with the vendor. Check back shortly.
             </p>
           </div>
         </div>
       )}
 
-      {/* DEAD_LETTER alert */}
+      {/* DEAD_LETTER alert — semantic red, V2 chrome */}
       {hasDLQ && (
         <div
           role="alert"
-          className="flex items-start gap-3 p-4 rounded-lg bg-red-50 border border-red-300"
+          className={cn(
+            "flex items-start gap-3 p-4 rounded-2xl",
+            "bg-[var(--color-destructive)]/10 border border-[var(--color-destructive)]/40"
+          )}
         >
-          <AlertTriangle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" aria-hidden />
+          <AlertTriangle className="h-5 w-5 text-[var(--color-destructive)] shrink-0 mt-0.5" aria-hidden />
           <div>
-            <p className="text-sm font-semibold text-red-900">
+            <p className="text-sm font-semibold text-[var(--color-foreground)]">
               A fulfillment issue was detected
             </p>
-            <p className="text-sm text-red-800 mt-0.5">
+            <p className="text-sm text-[var(--color-warm-muted)] mt-0.5">
               One or more items could not be fulfilled. Our team is reviewing this
               and will update you shortly. Contact support if you need urgent help.
             </p>
@@ -177,41 +197,41 @@ export default function OrderConfirmationPage() {
       {Array.from(vendorGroups.entries()).map(([vendorId, group]) => (
         <div
           key={vendorId}
-          className="bg-white border border-zinc-200 rounded-lg overflow-hidden"
+          className="bg-[var(--color-card)] border border-[var(--color-warm-border)] rounded-2xl overflow-hidden shadow-v2"
         >
-          <div className="bg-zinc-50 border-b border-zinc-200 px-4 py-2 flex items-center justify-between">
-            <span className="text-sm font-semibold text-zinc-700">
+          <div className="bg-[var(--color-ivory)] border-b border-[var(--color-warm-border)] px-4 py-2.5 flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-warm-muted)]">
               {group.vendorName}
             </span>
-            <span className="text-xs text-zinc-400 font-mono">
+            <span className="text-xs text-[var(--color-warm-muted)] font-mono">
               {group.items.length} item{group.items.length !== 1 ? "s" : ""}
             </span>
           </div>
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-xs text-zinc-500 border-b">
-                <th className="p-3 font-medium">Item</th>
-                <th className="p-3 font-medium w-16 text-center">Qty</th>
-                <th className="p-3 font-medium w-24 text-right">Total</th>
-                <th className="p-3 font-medium w-36">Status</th>
+              <tr className="text-left text-[10.5px] font-bold uppercase tracking-[0.18em] text-[var(--color-warm-muted)] border-b border-[var(--color-warm-border)]">
+                <th className="p-3">Item</th>
+                <th className="p-3 w-16 text-center">Qty</th>
+                <th className="p-3 w-24 text-right">Total</th>
+                <th className="p-3 w-36">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody className="divide-y divide-[var(--color-warm-border)]">
               {group.items.map((item) => (
                 <tr key={item.id} className="align-top">
                   <td className="p-3">
-                    <div className="font-medium text-zinc-900">{item.productName}</div>
-                    <div className="text-xs text-zinc-400">
-                       each
+                    <div className="font-medium text-[var(--color-foreground)]">{item.productName}</div>
+                    <div className="text-xs text-[var(--color-warm-muted)] mt-0.5">
+                      each
                     </div>
                     {item.failureReason && (
-                      <div className="text-xs text-red-600 mt-1">
+                      <div className="text-xs text-[var(--color-destructive)] mt-1">
                         {item.failureReason}
                       </div>
                     )}
                   </td>
-                  <td className="p-3 text-center">{item.quantity}</td>
-                  <td className="p-3 text-right font-medium">
+                  <td className="p-3 text-center tabular-nums text-[var(--color-foreground)]">{item.quantity}</td>
+                  <td className="p-3 text-right font-medium tabular-nums text-[var(--color-foreground)]">
                     {formatCurrency(item.lineTotal)}
                   </td>
                   <td className="p-3">
@@ -225,15 +245,15 @@ export default function OrderConfirmationPage() {
       ))}
 
       {/* Footer actions */}
-      <div className="flex items-center justify-between text-sm">
+      <div className="flex items-center justify-between text-sm pt-2">
         <Link
           href="/products"
-          className="text-indigo-600 hover:underline"
+          className="text-sm font-semibold text-[var(--color-accent)] hover:text-[var(--color-foreground)] transition-colors"
         >
           Continue shopping
         </Link>
         {isTerminal && (
-          <span className="text-zinc-500">
+          <span className="text-xs text-[var(--color-warm-muted)]">
             Status updates stopped (order is {order.status.toLowerCase()}).
           </span>
         )}
