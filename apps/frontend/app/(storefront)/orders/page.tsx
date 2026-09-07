@@ -1,5 +1,11 @@
-﻿/**
+/**
  * app/(storefront)/orders/page.tsx — Buyer order history (§3).
+ *
+ * V2 Premium treatment:
+ *   - Brass editorial eyebrow + serif H1 (Playfair Display)
+ *   - Warm hairline borders, ivory card surface
+ *   - Status badges untouched (semantic vocabulary)
+ *   - Warm-toned table chrome
  */
 
 "use client";
@@ -11,6 +17,7 @@ import { getOrdersForBuyer } from "@/lib/api";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { editorialEyebrows } from "@/lib/theme";
 import type { OrderResponseDto } from "@/lib/types";
 
 const BUYER_ID = "00000000-0000-0000-0000-000000000001";
@@ -24,11 +31,11 @@ function OrderRow({ order }: OrderRowProps) {
   const totalQty = order.lineItems.reduce((sum, li) => sum + li.quantity, 0);
 
   return (
-    <tr className="border-b border-[var(--color-border)] hover:bg-[var(--color-accent)]/30 transition-colors">
+    <tr className="border-b border-[var(--color-warm-border)] last:border-b-0 hover:bg-[var(--color-ivory-hover)]/60 transition-colors">
       <td className="px-4 py-3">
         <Link
           href={`/orders/${order.id}`}
-          className="text-sm font-mono font-medium text-[var(--color-primary)] hover:underline"
+          className="text-sm font-mono font-medium text-[var(--color-primary)] hover:text-[var(--color-accent)] transition-colors"
         >
           {order.orderNumber ?? order.id.slice(0, 8)}
         </Link>
@@ -36,21 +43,21 @@ function OrderRow({ order }: OrderRowProps) {
       <td className="px-4 py-3">
         <StatusBadge status={order.status} size="sm" />
       </td>
-      <td className="px-4 py-3 text-sm text-[var(--color-muted-foreground)]">
+      <td className="px-4 py-3 text-sm text-[var(--color-warm-muted)]">
         {itemCount} item{itemCount !== 1 ? "s" : ""} ({totalQty} unit{totalQty !== 1 ? "s" : ""})
       </td>
       <td className="px-4 py-3 text-right">
-        <span className="text-sm font-semibold tabular-nums text-[var(--color-foreground)]">
+        <span className="font-display text-base font-semibold tabular-nums text-[var(--color-foreground)]">
           {formatCurrency(order.totalAmount)}
         </span>
       </td>
-      <td className="px-4 py-3 text-right text-xs text-[var(--color-muted-foreground)] whitespace-nowrap">
+      <td className="px-4 py-3 text-right text-xs text-[var(--color-warm-muted)] whitespace-nowrap">
         {formatRelativeTime(order.createdAt)}
       </td>
       <td className="px-4 py-3 text-right">
         <Link
           href={`/orders/${order.id}`}
-          className="text-sm text-[var(--color-info)] hover:underline"
+          className="text-sm font-semibold text-[var(--color-accent)] hover:text-[var(--color-foreground)] transition-colors"
         >
           View
         </Link>
@@ -61,21 +68,21 @@ function OrderRow({ order }: OrderRowProps) {
 
 function OrderTableSkeleton({ rows = 5 }: { rows?: number }) {
   return (
-    <div className="border border-[var(--color-border)] rounded-lg overflow-hidden">
+    <div className="border border-[var(--color-warm-border)] rounded-2xl overflow-hidden shadow-v2">
       <table className="w-full text-sm">
         <thead>
-          <tr className="bg-[var(--color-muted)]">
-            <th className="px-4 py-2 text-left text-xs font-medium text-[var(--color-muted-foreground)]">Order</th>
-            <th className="px-4 py-2 text-left text-xs font-medium text-[var(--color-muted-foreground)]">Status</th>
-            <th className="px-4 py-2 text-left text-xs font-medium text-[var(--color-muted-foreground)]">Items</th>
-            <th className="px-4 py-2 text-right text-xs font-medium text-[var(--color-muted-foreground)]">Total</th>
-            <th className="px-4 py-2 text-right text-xs font-medium text-[var(--color-muted-foreground)]">Placed</th>
-            <th className="px-4 py-2 text-right text-xs font-medium text-[var(--color-muted-foreground)]" />
+          <tr className="bg-[var(--color-ivory)] border-b border-[var(--color-warm-border)]">
+            <th className="px-4 py-2.5 text-left text-[10.5px] font-bold uppercase tracking-[0.18em] text-[var(--color-warm-muted)]">Order</th>
+            <th className="px-4 py-2.5 text-left text-[10.5px] font-bold uppercase tracking-[0.18em] text-[var(--color-warm-muted)]">Status</th>
+            <th className="px-4 py-2.5 text-left text-[10.5px] font-bold uppercase tracking-[0.18em] text-[var(--color-warm-muted)]">Items</th>
+            <th className="px-4 py-2.5 text-right text-[10.5px] font-bold uppercase tracking-[0.18em] text-[var(--color-warm-muted)]">Total</th>
+            <th className="px-4 py-2.5 text-right text-[10.5px] font-bold uppercase tracking-[0.18em] text-[var(--color-warm-muted)]">Placed</th>
+            <th className="px-4 py-2.5 text-right text-[10.5px] font-bold uppercase tracking-[0.18em] text-[var(--color-warm-muted)]" />
           </tr>
         </thead>
         <tbody>
           {Array.from({ length: rows }).map((_, i) => (
-            <tr key={i} className="border-t border-[var(--color-border)]">
+            <tr key={i} className="border-t border-[var(--color-warm-border)]">
               {[1, 2, 3, 4, 5, 6].map((j) => (
                 <td key={j} className="px-4 py-3">
                   <Skeleton height="1rem" width={j === 4 ? "4rem" : "6rem"} />
@@ -118,10 +125,18 @@ export default function OrdersPage() {
   }, []);
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-8">
+    <div className="max-w-5xl mx-auto px-6 py-10">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[var(--color-foreground)]">My Orders</h1>
-        <p className="text-sm text-[var(--color-muted-foreground)] mt-0.5">
+        <p
+          aria-hidden
+          className="text-[10.5px] font-bold uppercase tracking-[0.18em] text-[var(--color-accent)] mb-1"
+        >
+          {editorialEyebrows.orders}
+        </p>
+        <h1 className="font-display text-3xl font-bold text-[var(--color-foreground)]">
+          My orders
+        </h1>
+        <p className="text-sm text-[var(--color-warm-muted)] mt-1">
           {loading
             ? "Loading\u2026"
             : hasLoaded
@@ -155,23 +170,23 @@ export default function OrdersPage() {
           action={
             <Link
               href="/products"
-              className="inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium bg-[var(--color-primary)] text-[var(--color-primary-foreground)] hover:opacity-90 transition-opacity"
+              className="inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-semibold bg-[var(--color-primary)] text-[var(--color-primary-foreground)] hover:opacity-90 transition-opacity shadow-v2"
             >
               Browse catalog
             </Link>
           }
         />
       ) : (
-        <div className="border border-[var(--color-border)] rounded-lg overflow-hidden">
+        <div className="border border-[var(--color-warm-border)] rounded-2xl overflow-hidden shadow-v2">
           <table className="w-full text-sm" aria-label="Order history">
             <thead>
-              <tr className="bg-[var(--color-muted)] border-b border-[var(--color-border)]">
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--color-muted-foreground)]">Order</th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--color-muted-foreground)]">Status</th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--color-muted-foreground)]">Items</th>
-                <th className="px-4 py-2.5 text-right text-xs font-medium text-[var(--color-muted-foreground)]">Total</th>
-                <th className="px-4 py-2.5 text-right text-xs font-medium text-[var(--color-muted-foreground)]">Placed</th>
-                <th className="px-4 py-2.5 text-right text-xs font-medium text-[var(--color-muted-foreground)]" />
+              <tr className="bg-[var(--color-ivory)] border-b border-[var(--color-warm-border)]">
+                <th className="px-4 py-2.5 text-left text-[10.5px] font-bold uppercase tracking-[0.18em] text-[var(--color-warm-muted)]">Order</th>
+                <th className="px-4 py-2.5 text-left text-[10.5px] font-bold uppercase tracking-[0.18em] text-[var(--color-warm-muted)]">Status</th>
+                <th className="px-4 py-2.5 text-left text-[10.5px] font-bold uppercase tracking-[0.18em] text-[var(--color-warm-muted)]">Items</th>
+                <th className="px-4 py-2.5 text-right text-[10.5px] font-bold uppercase tracking-[0.18em] text-[var(--color-warm-muted)]">Total</th>
+                <th className="px-4 py-2.5 text-right text-[10.5px] font-bold uppercase tracking-[0.18em] text-[var(--color-warm-muted)]">Placed</th>
+                <th className="px-4 py-2.5 text-right text-[10.5px] font-bold uppercase tracking-[0.18em] text-[var(--color-warm-muted)]" />
               </tr>
             </thead>
             <tbody>

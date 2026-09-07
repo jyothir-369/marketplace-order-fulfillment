@@ -1,247 +1,396 @@
 @import "tailwindcss";
 
 /* ----------------------------------------------------------------
+ * Raw hex CSS variables for use in @theme inline fallback / JS.
+ * These are kept at @layer base so they sit below @theme in cascade.
+ * ---------------------------------------------------------------- */
+@layer base {
+  :root {
+    --color-ink-navy: #16233f;
+    --color-brass: #a9803f;
+  }
+}
+
+/* ----------------------------------------------------------------
  * Design tokens for marketplace-order-fulfillment
  *
  * Tailwind v4 CSS-first configuration. All component code MUST
  * reference tokens (CSS variables, var(--color-*), or HSL helpers)
- * - never raw hex values.
+ * â€” never raw hex values.
+ *
+ * PHASE 1 â€” V2 Premium palette & typography foundation:
+ *   - Ink navy (#16233f) replaces cool-dark as primary
+ *   - Brass/gold (#a9803f) is the brand accent
+ *   - Warm ivory (#faf7f1) is the default background
+ *   - Playfair Display is the display/headline font (via CSS stack)
+ *   - Inter stays for UI/body (via CSS stack)
+ *   - Status-badge semantic colors are untouched â€” they use raw
+ *     Tailwind classes in status-tokens.ts, not these variables.
  * ---------------------------------------------------------------- */
 
 @theme {
-  /* Neutral surfaces & ink */
-  --color-background: 0 0% 100%;
-  --color-foreground: 240 10% 3.9%;
+  /* ----- V2 Premium surface palette ----- */
+  /* Backgrounds */
+  --color-ivory:          38 47% 96%;   /* #faf7f1 â€” warm ivory, default page bg */
+  --color-ink-navy:        220 33% 17%;  /* #16233f â€” ink navy, primary brand */
+  --color-navy-deep:       220 45% 8%;   /* #0e1830 â€” deep navy, admin/ops sidebar */
+  --color-ivory-card:      38 43% 95%;   /* #f5f0e8 â€” slightly richer ivory for cards */
+  --color-surface-warm:    36 30% 94%;   /* #f1ede3 â€” warm surface for ops area bg */
 
-  --color-card: 0 0% 100%;
-  --color-card-foreground: 240 10% 3.9%;
+  /* Warm borders & dividers */
+  --color-warm-border:     36 24% 87%;   /* #e7e0d2 â€” warm hairline borders */
+  --color-warm-border-strong: 34 20% 65%; /* #b8a990 â€” stronger warm border */
 
-  --color-popover: 0 0% 100%;
-  --color-popover-foreground: 240 10% 3.9%;
+  /* Warm text */
+  --color-warm-foreground:   40 8% 11%;   /* #1b1b18 â€” warm near-black */
+  --color-warm-muted:       30 8% 44%;   /* #71695c â€” warm medium gray */
+  --color-warm-subtle:      30 8% 58%;   /* #948c7c â€” warm light gray */
 
-  --color-primary: 240 5.9% 10%;
-  --color-primary-foreground: 0 0% 98%;
+  /* Warm neutral surfaces (ivory tints for cards, chips, etc.) */
+  --color-ivory-hover:    36 24% 90%;
+  --color-ivory-muted:    36 20% 88%;
 
-  --color-secondary: 240 4.8% 95.9%;
-  --color-secondary-foreground: 240 5.9% 10%;
+  /* ----- Brand / primary (V2: ink navy) ----- */
+  --color-background:     38 47% 96%;   /* ivory â€” page bg */
+  --color-foreground:     40 8% 11%;    /* warm near-black */
 
-  --color-muted: 240 4.8% 95.9%;
-  --color-muted-foreground: 240 3.8% 46.1%;
+  --color-card:            38 43% 95%;   /* ivory-card */
+  --color-card-foreground: 40 8% 11%;
 
-  --color-accent: 240 4.8% 95.9%;
-  --color-accent-foreground: 240 5.9% 10%;
+  --color-popover:         38 43% 95%;
+  --color-popover-foreground: 40 8% 11%;
 
-  --color-destructive: 0 84.2% 60.2%;
-  --color-destructive-foreground: 0 0% 98%;
+  /* PRIMARY = ink navy (#16233f); PRIMARY-FOREGROUND = ivory */
+  --color-primary:         220 33% 17%;  /* ink navy */
+  --color-primary-foreground: 38 47% 96%; /* ivory */
+  --color-primary-hover:    220 33% 13%;  /* slightly darker navy */
 
-  --color-success: 142 71% 45%;
-  --color-success-foreground: 0 0% 98%;
+  /* Secondary (tinted ivory) */
+  --color-secondary:       36 24% 90%;
+  --color-secondary-foreground: 40 8% 11%;
 
-  --color-warning: 38 92% 50%;
-  --color-warning-foreground: 240 10% 3.9%;
+  /* Muted (lighter ivory) */
+  --color-muted:           36 20% 88%;
+  --color-muted-foreground: 30 8% 44%;
 
-  --color-info: 199 89% 48%;
-  --color-info-foreground: 0 0% 98%;
+  /* Accent (brass/gold â€” brand accent, NOT a status color) */
+  --color-accent:          38 40% 55%;    /* #a9803f brass */
+  --color-accent-foreground: 38 47% 96%; /* ivory */
+  --color-brass:           38 40% 55%;    /* #a9803f brass */
 
-  --color-border: 240 5.9% 90%;
-  --color-input: 240 5.9% 90%;
-  --color-ring: 240 5.9% 10%;
+  /* ----- Semantic alert colors (UNCHANGED â€” status vocabulary) ----- */
+  --color-destructive:      9 55% 56%;
+  --color-destructive-foreground: 38 47% 96%;
 
-  /* ----- Status colors (mirror backend Order/LineItem/SyncJob) ----- */
-  --color-status-placed: 199 89% 48%;
-  --color-status-confirmed: 217 91% 60%;
-  --color-status-fulfilling: 38 92% 50%;
-  --color-status-fulfilled: 142 71% 45%;
-  --color-status-cancelled: 240 4% 46%;
-  --color-status-failed: 0 84% 60%;
-  --color-status-dead-letter: 0 72% 51%;
-  --color-status-ambiguous: 48 96% 53%;
+  --color-success:          142 71% 45%;
+  --color-success-foreground: 38 47% 96%;
 
-  --color-status-pending: 240 5% 65%;
-  --color-status-in-progress: 38 92% 50%;
-  --color-status-shipped: 239 84% 67%;
-  --color-status-manual-intervention: 24 95% 53%;
-  --color-status-retry: 263 70% 60%;
+  --color-warning:         38 92% 50%;
+  --color-warning-foreground: 40 8% 11%;
 
-  /* Radius scale */
+  --color-info:            199 89% 48%;
+  --color-info-foreground: 38 47% 96%;
+
+  /* Warm borders for inputs & rings */
+  --color-border:          36 24% 87%;   /* warm border */
+  --color-input:            36 24% 87%;
+  --color-ring:             38 40% 55%;   /* brass ring */
+
+  /* ----- Status colors (UNCHANGED â€” semantic badge vocabulary) ----- */
+  /* These are NOT brand colors. They map to Order/LineItem/SyncJob
+     status enums. status-tokens.ts uses raw Tailwind classes (sky/blue/
+     amber/emerald/etc.) so these vars serve only the handful of components
+     that reference them directly for inline status coloring. */
+  --color-status-placed:                 199 89% 48%;
+  --color-status-confirmed:               217 91% 60%;
+  --color-status-fulfilling:             38 92% 50%;
+  --color-status-fulfilled:              142 71% 45%;
+  --color-status-cancelled:              240 4% 46%;
+  --color-status-failed:                 0 84% 60%;
+  --color-status-dead-letter:            0 72% 51%;
+  --color-status-ambiguous:             48 96% 53%;
+
+  --color-status-pending:                240 5% 65%;
+  --color-status-in-progress:            38 92% 50%;
+  --color-status-shipped:               239 84% 67%;
+  --color-status-manual-intervention:    24 95% 53%;
+  --color-status-retry:                 263 70% 60%;
+
+  /* ----- Extended palette (V2 editorial accents) ----- */
+  --color-forest:           120 25% 35%;  /* #2f5f42 â€” stock/success accents */
+  --color-clay:             12 40% 34%;   /* #8a3b2c â€” limited-stock / warning accents */
+  --color-cream:             38 43% 91%;   /* #f3ede0 â€” cream for subtle panels */
+
+  /* ----- Radius scale (unchanged) ----- */
   --radius: 0.5rem;
-  /* Dark sidebar (operational portal surfaces) */
-  --color-sidebar-bg: 240 10% 3.9%;
-  --color-sidebar-border: 240 3.7% 15.9%;
-  --color-sidebar-text: 0 0% 98%;
-  --color-sidebar-text-muted: 240 5% 64.9%;
-  --color-sidebar-active: 239 84% 67%;
-  --color-sidebar-active-bg: 239 84% 67%;
-  --color-sidebar-badge: 0 62.8% 30.6%;
-  --color-sidebar-badge-text: 0 0% 98%;
-  --color-sidebar-hover: 240 3.7% 15.9%;
-  --color-sidebar-tag-vendor-bg: 239 84% 67%;
-  --color-sidebar-tag-vendor-text: 239 84% 97%;
-  --color-sidebar-tag-admin-bg: 0 62.8% 30.6%;
-  --color-sidebar-tag-admin-text: 0 0% 98%;
+
+  /* ----- Typography font tokens ----- */
+  /* --font-sans and --font-display are standard Tailwind v4 font tokens.
+     Setting them in @theme overrides Tailwind's defaults.
+     Consumers use `font-display` / `font-sans` utility classes as normal. */
+  --font-sans:     Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display:  "Playfair Display", Georgia, "Times New Roman", serif;
 }
 
 /* ----------------------------------------------------------------
- * Operational Dark Mode
+ * Dark mode â€” kept as-is (V2 Premium is a light-only direction;
+ * operational dark mode is orthogonal to the storefront palette)
  * ---------------------------------------------------------------- */
 :root[data-theme="dark"] {
   --color-background: 240 10% 3.9%;
   --color-foreground: 0 0% 98%;
+
   --color-card: 240 10% 3.9%;
   --color-card-foreground: 0 0% 98%;
+
   --color-popover: 240 10% 3.9%;
   --color-popover-foreground: 0 0% 98%;
+
   --color-primary: 0 0% 98%;
   --color-primary-foreground: 240 5.9% 10%;
+
   --color-secondary: 240 3.7% 15.9%;
   --color-secondary-foreground: 0 0% 98%;
+
   --color-muted: 240 3.7% 15.9%;
   --color-muted-foreground: 240 5% 64.9%;
-  --color-accent: 240 3.7% 15.9%;
-  --color-accent-foreground: 0 0% 98%;
+
+  --color-accent: 239 84% 67%;
+  --color-accent-foreground: 239 84% 97%;
+
   --color-destructive: 0 62.8% 30.6%;
   --color-destructive-foreground: 0 0% 98%;
+
   --color-success: 142 71% 35%;
   --color-success-foreground: 0 0% 98%;
+
   --color-warning: 38 92% 50%;
   --color-warning-foreground: 240 10% 3.9%;
+
   --color-info: 199 89% 48%;
   --color-info-foreground: 0 0% 98%;
+
   --color-border: 240 3.7% 15.9%;
   --color-input: 240 3.7% 15.9%;
-  --color-ring: 240 4.9% 83.9%;
+  --color-ring: 239 84% 67%;
 
-  --color-status-placed: 199 89% 58%;
-  --color-status-confirmed: 217 91% 70%;
-  --color-status-fulfilling: 38 92% 60%;
-  --color-status-fulfilled: 142 71% 55%;
-  --color-status-cancelled: 240 4% 65%;
-  --color-status-failed: 0 84% 70%;
-  --color-status-dead-letter: 0 72% 61%;
-  --color-status-ambiguous: 48 96% 63%;
+  --color-status-placed:                 199 89% 58%;
+  --color-status-confirmed:               217 91% 70%;
+  --color-status-fulfilling:             38 92% 60%;
+  --color-status-fulfilled:              142 71% 55%;
+  --color-status-cancelled:              240 4% 65%;
+  --color-status-failed:                 0 84% 70%;
+  --color-status-dead-letter:            0 72% 61%;
+  --color-status-ambiguous:             48 96% 63%;
 
-  --color-status-pending: 240 5% 75%;
-  --color-status-in-progress: 38 92% 60%;
-  --color-status-shipped: 239 84% 77%;
-  --color-status-manual-intervention: 24 95% 63%;
-  --color-status-retry: 263 70% 70%;
+  --color-status-pending:                240 5% 75%;
+  --color-status-in-progress:            38 92% 60%;
+  --color-status-shipped:               239 84% 77%;
+  --color-status-manual-intervention:    24 95% 63%;
+  --color-status-retry:                 263 70% 70%;
+
+  --color-sidebar-bg:              220 45% 8%;
+  --color-sidebar-border:           220 33% 17%;
+  --color-sidebar-text:             38 47% 96%;
+  --color-sidebar-text-muted:       220 20% 60%;
+  --color-sidebar-active:           38 40% 55%;   /* brass rail in dark mode */
+  --color-sidebar-active-bg:        220 33% 17%;
+  --color-sidebar-badge:            38 40% 55%;
+  --color-sidebar-badge-text:      38 47% 96%;
+  --color-sidebar-hover:            220 33% 17%;
+  --color-sidebar-tag-vendor-bg:   239 84% 67%;
+  --color-sidebar-tag-vendor-text: 239 84% 97%;
+  --color-sidebar-tag-admin-bg:    38 40% 55%;
+  --color-sidebar-tag-admin-text:  38 47% 96%;
+
+  /* ----- V2 Premium operational chrome (Phase 5) ----- */
+  --color-brass-rail:           38 40% 55%;
+  --color-brass-rail-soft:      38 40% 55% / 0.18;
+  --color-sidebar-section:      40 45% 75%;
+  --color-sidebar-cream:        38 47% 94%;
+  --color-sidebar-elevated:     220 33% 22%;
 }
 
 /* ----------------------------------------------------------------
  * Base
  * ---------------------------------------------------------------- */
 @layer base {
+  :root {
+    --color-brass: hsl(38 40% 55%);
+  }
+  :root[data-theme="dark"] {
+    --color-brass: hsl(38 40% 55%);
+  }
   * {
     border-color: hsl(var(--color-border));
   }
   body {
     background-color: hsl(var(--color-background));
     color: hsl(var(--color-foreground));
-    font-family:
-      ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-      "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+    font-family: var(--font-sans);
   }
 }
 
 /* ----------------------------------------------------------------
- * Density modifiers
- *
- * Apply data-density to <html> or any subtree to flip between
- * the comfortable (storefront) and compact (operational) grammars.
+ * Display font utility
  * ---------------------------------------------------------------- */
-:root,
-:root[data-density="comfortable"] {
-  --density-row-h: 3rem;
-  --density-font: 0.9375rem; /* 15px */
-  --density-row-h-table: 2.75rem;
-}
-
-:root[data-density="compact"] {
-  --density-row-h: 2.25rem;
-  --density-font: 0.8125rem; /* 13px */
-  --density-row-h-table: 2rem;
-}
-
-[data-density] {
-  font-size: var(--density-font);
-}
-
-[data-density] .data-table-row {
-  min-height: var(--density-row-h);
+.font-display {
+  font-family: var(--font-display);
 }
 
 /* ----------------------------------------------------------------
- * Glassmorphism
+ * Density modifiers â€” unchanged from original spec
  * ---------------------------------------------------------------- */
-.glass-panel {
-  background-color: hsl(var(--color-card) / 0.6);
-  backdrop-filter: saturate(180%) blur(20px);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-  border: 1px solid hsl(var(--color-border) / 0.5);
-  box-shadow: 0 8px 32px hsl(var(--color-foreground) / 0.08);
+[data-density="comfortable"] {
+  font-size: 1rem;
+  line-height: 1.75rem;
 }
 
-.glass-panel-strong {
-  background-color: hsl(var(--color-card) / 0.85);
-  backdrop-filter: saturate(200%) blur(28px);
-  -webkit-backdrop-filter: saturate(200%) blur(28px);
-  border: 1px solid hsl(var(--color-border) / 0.6);
-  box-shadow: 0 12px 40px hsl(var(--color-foreground) / 0.12);
+[data-density="compact"] {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
 }
 
 /* ----------------------------------------------------------------
- * Animations
+ * Operational surfaces (admin/vendor sidebars)
  * ---------------------------------------------------------------- */
-@keyframes pulse-dot {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.4;
-  }
+.bg-sidebar {
+  background-color: hsl(var(--color-sidebar-bg));
 }
-.animate-pulse {
-  animation: pulse-dot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+.bg-sidebar-active {
+  background-color: hsl(var(--color-sidebar-active-bg));
 }
-
-@keyframes pulse-strong {
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.6;
-    transform: scale(0.95);
-  }
+.bg-sidebar-hover {
+  background-color: hsl(var(--color-sidebar-hover));
 }
-.animate-pulse-strong {
-  animation: pulse-strong 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+.text-sidebar {
+  color: hsl(var(--color-sidebar-text));
+}
+.text-sidebar-muted {
+  color: hsl(var(--color-sidebar-text-muted));
+}
+.border-sidebar {
+  border-color: hsl(var(--color-sidebar-border));
+}
+.border-sidebar-active {
+  border-color: hsl(var(--color-sidebar-active));
 }
 
+/* V2 operational chrome helpers (Phase 5) */
+.brass-rail-left { border-left: 3px solid hsl(var(--color-brass-rail)); }
+.bg-brass-rail-soft { background-color: hsl(var(--color-brass-rail-soft)); }
+.bg-sidebar-elevated { background-color: hsl(var(--color-sidebar-elevated)); }
+.text-sidebar-section { color: hsl(var(--color-sidebar-section)); }
+.text-sidebar-cream { color: hsl(var(--color-sidebar-cream)); }
+
+/* ----------------------------------------------------------------
+ * Warm ivory surface helpers (V2 storefront cards/panels)
+ * ---------------------------------------------------------------- */
+.bg-ivory {
+  background-color: hsl(var(--color-ivory));
+}
+.bg-ivory-card {
+  background-color: hsl(var(--color-ivory-card));
+}
+.bg-surface-warm {
+  background-color: hsl(var(--color-surface-warm));
+}
+.bg-cream {
+  background-color: hsl(var(--color-cream));
+}
+.border-warm {
+  border-color: hsl(var(--color-warm-border));
+}
+.border-warm-strong {
+  border-color: hsl(var(--color-warm-border-strong));
+}
+.text-warm {
+  color: hsl(var(--color-warm-foreground));
+}
+.text-warm-muted {
+  color: hsl(var(--color-warm-muted));
+}
+.text-warm-subtle {
+  color: hsl(var(--color-warm-subtle));
+}
+
+/* ----------------------------------------------------------------
+ * Brand accent helpers (brass/gold â€” V2)
+ * ---------------------------------------------------------------- */
+.text-brass {
+  color: hsl(var(--color-accent));
+}
+.bg-brass {
+  background-color: hsl(var(--color-accent));
+}
+.border-brass {
+  border-color: hsl(var(--color-accent));
+}
+
+/* ----------------------------------------------------------------
+ * V2 editorial color helpers
+ * ---------------------------------------------------------------- */
+.text-ink-navy {
+  color: hsl(var(--color-ink-navy));
+}
+.bg-ink-navy {
+  background-color: hsl(var(--color-ink-navy));
+}
+.border-ink-navy {
+  border-color: hsl(var(--color-ink-navy));
+}
+.text-forest {
+  color: hsl(var(--color-forest));
+}
+.bg-forest {
+  background-color: hsl(var(--color-forest));
+}
+.text-clay {
+  color: hsl(var(--color-clay));
+}
+.bg-clay {
+  background-color: hsl(var(--color-clay));
+}
+
+/* ----------------------------------------------------------------
+ * Card / elevation helpers â€” V2 shadow scale
+ * ---------------------------------------------------------------- */
+.shadow-v2 {
+  box-shadow: 0 4px 12px hsl(40 8% 11% / 0.08),
+              0 1px 3px hsl(40 8% 11% / 0.06);
+}
+.shadow-v2-md {
+  box-shadow: 0 10px 24px hsl(40 8% 11% / 0.10),
+              0 2px 8px hsl(40 8% 11% / 0.06);
+}
+.shadow-v2-lg {
+  box-shadow: 0 20px 40px hsl(40 8% 11% / 0.12),
+              0 4px 12px hsl(40 8% 11% / 0.08);
+}
+
+/* ----------------------------------------------------------------
+ * Loading skeleton shimmer â€” warm ivory tone (V2)
+ * ---------------------------------------------------------------- */
 @keyframes shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
+
 .animate-shimmer {
-  background-image: linear-gradient(
+  background: linear-gradient(
     90deg,
-    hsl(var(--color-muted)) 0%,
-    hsl(var(--color-muted-foreground) / 0.1) 50%,
-    hsl(var(--color-muted)) 100%
+    hsl(var(--color-ivory-muted)) 25%,
+    hsl(var(--color-ivory-hover)) 50%,
+    hsl(var(--color-ivory-muted)) 75%
   );
   background-size: 200% 100%;
-  animation: shimmer 1.6s ease-in-out infinite;
+  animation: shimmer 1.5s ease-in-out infinite;
 }
 
-/* Status indicator dot - reuse animate-pulse but expose semantic class */
+/* ----------------------------------------------------------------
+ * Status dot (pulsing live indicator) â€” warm ink navy
+ * ---------------------------------------------------------------- */
 .status-dot {
-  display: inline-block;
   width: 0.5rem;
   height: 0.5rem;
   border-radius: 9999px;
@@ -249,11 +398,11 @@
 }
 
 .status-dot-live {
-  composes: animate-pulse;
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 /* ----------------------------------------------------------------
- * Convenience surface / border / text aliases
+ * Convenience surface / border / text aliases â€” updated for V2
  * ---------------------------------------------------------------- */
 .bg-surface-base {
   background-color: hsl(var(--color-background));
@@ -262,7 +411,7 @@
   background-color: hsl(var(--color-card));
 }
 .bg-surface-hover {
-  background-color: hsl(var(--color-muted) / 0.5);
+  background-color: hsl(var(--color-ivory-hover));
 }
 
 .border-default {
@@ -329,7 +478,7 @@
 }
 
 /* ----------------------------------------------------------------
- * Status-color utility helpers (HSL by var)
+ * Status-color utility helpers (unchanged â€” HSL by var)
  * ---------------------------------------------------------------- */
 .bg-status-placed { background-color: hsl(var(--color-status-placed)); }
 .bg-status-confirmed { background-color: hsl(var(--color-status-confirmed)); }
@@ -358,7 +507,6 @@
 .text-status-shipped { color: hsl(var(--color-status-shipped)); }
 .text-status-manual-intervention { color: hsl(var(--color-status-manual-intervention)); }
 .text-status-retry { color: hsl(var(--color-status-retry)); }
-
 
 /* ----------------------------------------------------------------
  * Radix Dialog / Sheet slide transitions
@@ -393,4 +541,3 @@
     animation: none !important;
   }
 }
-

@@ -1,23 +1,21 @@
-﻿/**
- * ProductCard — glassmorphic product tile for the buyer catalog (§3.1.2).
+/**
+ * ProductCard Ã¢â‚¬â€ luxury editorial storefront tile for the buyer catalog.
  *
- * Composition:
- *   - Image placeholder (hero area, aspect 4:3)
- *   - Product name + vendor name
- *   - Formatted price (`formatCurrency`) + inventory StatusBadge
- *   - Quick-add quantity stepper
- *
- * The card is intentionally dumb — quantity, add-to-cart, and add feedback
- * are all driven by the parent (CatalogGrid / products page) so the same
- * card can be reused in wishlists or search results.
+ * V2 Premium upgrade (mirrors VendorCard):
+ *   - Rich signature gradient banner per product category
+ *   - Elevated brand emblem pill with product-category gradient
+ *   - Verified stock status badge with forest-green pulse dot
+ *   - Editorial eyebrow label + serif product name
+ *   - Slide-up CTA footer with brass border accents
+ *   - Hover lift: -translateY(-1.5px) + shadow-v2-lg + brass border
  */
 
 "use client";
 
 import Link from "next/link";
-import { Minus, Plus, Package, ShoppingCart, Check } from "lucide-react";
+import { ShoppingCart, Check, Package } from "lucide-react";
 import { formatCurrency, cn } from "@/lib/utils";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { type PhotoBlockCategory } from "@/components/ui/photo-block";
 import type { Product } from "@/lib/api";
 
 interface ProductCardProps {
@@ -25,8 +23,37 @@ interface ProductCardProps {
   quantity: number;
   onQuantityChange: (qty: number) => void;
   onAdd: () => void;
-  /** When true, the add button shows a checkmark and emerald tint for ~2s. */
+  /** When true, the add button shows a checkmark and brass tint for ~2s. */
   justAdded?: boolean;
+}
+
+/** Per-category signature gradient for the header banner. */
+const CATEGORY_GRADIENTS: Record<string, string> = {
+  neutral:     "from-[var(--color-ivory-muted)] to-[var(--color-cream)]",
+  electronics: "from-[#b8c8d8] via-[#9aafc0] to-[#7a9ab0]",
+  apparel:     "from-[#d4b89a] via-[#c0a07e] to-[#a88862]",
+  home:        "from-[#b8c8b0] via-[#98b090] to-[#789870]",
+  outdoors:    "from-[#a8d0b8] via-[#88c098] to-[#68a878]",
+  grocery:     "from-[#d8c890] via-[#c8b870] to-[#b8a850]",
+  beauty:      "from-[#d8a8b8] via-[#c890a0] to-[#b87888]",
+  books:       "from-[#b0a8d0] via-[#9088c0] to-[#7068b0]",
+};
+
+/**
+ * Map a free-text product category onto a PhotoBlock palette preset.
+ * Falls back to "neutral" for unknown categories.
+ */
+function categoryToPalette(category: string | null | undefined): PhotoBlockCategory {
+  if (!category) return "neutral";
+  const c = category.toLowerCase();
+  if (c.includes("electronic")) return "electronics";
+  if (c.includes("apparel") || c.includes("clothing")) return "apparel";
+  if (c.includes("home") || c.includes("living") || c.includes("kitchen")) return "home";
+  if (c.includes("outdoor") || c.includes("garden")) return "outdoors";
+  if (c.includes("food") || c.includes("grocery")) return "grocery";
+  if (c.includes("beauty") || c.includes("cosmetic")) return "beauty";
+  if (c.includes("book")) return "books";
+  return "neutral";
 }
 
 export function ProductCard({
@@ -37,148 +64,189 @@ export function ProductCard({
   justAdded = false,
 }: ProductCardProps) {
   const isOut = product.stockCount === 0;
-
-  // Decide which stock badge to render. Mirrors backend OrderStatus vocabulary
-  // so we can reuse the same StatusBadge / colour tokens.
-  const stockStatus: "fulfilled" | "fulfilling" | "cancelled" =
-    isOut ? "cancelled" : product.stockCount <= 5 ? "fulfilling" : "fulfilled";
-  const stockLabel =
-    isOut
-      ? "Out of stock"
-      : product.stockCount <= 5
-        ? `Only ${product.stockCount} left`
-        : "In stock";
+  const isScarcity = product.stockCount > 0 && product.stockCount <= 5;
+  const palette = categoryToPalette(product.category);
+  const gradient = CATEGORY_GRADIENTS[palette] ?? CATEGORY_GRADIENTS.neutral;
+  const initial = product.name.charAt(0).toUpperCase();
 
   return (
     <article
       className={cn(
         "group relative flex flex-col overflow-hidden rounded-2xl",
-        "glass-panel transition-all duration-300",
-        "hover:-translate-y-0.5 hover:shadow-[0_18px_40px_hsl(var(--color-foreground)/0.12)]",
-        justAdded && "ring-2 ring-[var(--color-info)]"
+        "bg-[var(--color-card)]",
+        "border border-[var(--color-warm-border)]",
+        "shadow-v2 transition-all duration-300 ease-out",
+        "hover:-translate-y-1.5 hover:shadow-v2-lg hover:border-[var(--color-brass)]/60",
+        justAdded && "ring-2 ring-[var(--color-brass)]"
       )}
+      aria-label={`${product.name} by ${product.vendorName}`}
     >
-      {/* Image placeholder */}
-      <Link
-        href={`/products/${product.id}`}
-        className="block relative aspect-[4/3] overflow-hidden bg-[var(--color-muted)]"
-        aria-label={`View ${product.name}`}
+      {/* 1. Rich Signature Header Banner */}
+      <div
+        className={cn(
+          "relative h-28 w-full overflow-hidden bg-gradient-to-r",
+          gradient
+        )}
+        aria-hidden
       >
-        <div
-          className={cn(
-            "absolute inset-0 flex items-center justify-center",
-            "bg-gradient-to-br from-[var(--color-muted)] to-[var(--color-secondary)]",
-            "text-[var(--color-muted-foreground)]"
-          )}
-        >
-          <Package className="h-12 w-12" aria-hidden />
+        {/* Subtle mesh overlay */}
+        <div className="absolute inset-0 bg-black/10 mix-blend-multiply" />
+        {/* Decorative watermark glyph */}
+        <div className="absolute -right-4 -bottom-6 opacity-20 text-white pointer-events-none select-none">
+          <span className="font-display text-[5rem] leading-none transform -rotate-12">
+            {initial}
+          </span>
         </div>
-        {/* Status pill — floating top-right */}
-        <div className="absolute top-2 right-2">
-          <StatusBadge status={stockStatus} label={stockLabel} size="sm" />
-        </div>
-      </Link>
 
-      {/* Body */}
-      <div className="flex flex-1 flex-col gap-2 p-4">
-        <Link
-          href={`/products/${product.id}`}
-          className="text-sm font-semibold leading-snug text-[var(--color-foreground)] hover:text-[var(--color-primary)] line-clamp-2"
-        >
-          {product.name}
-        </Link>
-        <p className="text-xs text-[var(--color-muted-foreground)]">
-          by {product.vendorName}
-        </p>
-        <div className="mt-auto flex items-center justify-between pt-3">
-          <span className="text-xl font-bold text-[var(--color-foreground)] tabular-nums">
-            {formatCurrency(product.price)}
+        {/* Top badges: stock status pill + scarcity pulse */}
+        <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
+          {isOut ? (
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-cream)] px-2.5 py-1 border border-[var(--color-warm-border)] shadow-xs">
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-warm-subtle)]" />
+              <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-warm-muted)]">
+                Out of Stock
+              </span>
+            </div>
+          ) : isScarcity ? (
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-ink-navy)] px-2.5 py-1 shadow-xs">
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-accent)] animate-pulse" />
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-primary-foreground)]">
+                Only {product.stockCount} left
+              </span>
+            </div>
+          ) : (
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-cream)] px-2.5 py-1 border border-[var(--color-warm-border)] shadow-xs">
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-forest)]" />
+              <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-ink-navy)]">
+                In Stock
+              </span>
+            </div>
+          )}
+
+          {/* Product count badge (mirrors VendorCard style) */}
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-black/50 text-white/90 backdrop-blur-md border border-white/20">
+            <Package className="h-3 w-3 text-[var(--color-brass)]" aria-hidden />
+            {product.stockCount} units
           </span>
         </div>
       </div>
 
-      {/* Quick-add footer */}
-      <div
-        className={cn(
-          "flex items-center gap-2 border-t px-4 py-3",
-          "border-[var(--color-border)] bg-[var(--color-card)]/60"
-        )}
-      >
-        <div className="flex items-center gap-1">
-          <label htmlFor={`qty-${product.id}`} className="sr-only">
-            Quantity for {product.name}
-          </label>
-          <button
-            type="button"
-            aria-label="Decrease quantity"
-            disabled={quantity <= 1 || isOut}
-            onClick={() => onQuantityChange(Math.max(1, quantity - 1))}
+      {/* 2. Body */}
+      <div className="px-5 pt-0 pb-5 flex flex-col flex-1 gap-1.5">
+        {/* Elevated brand emblem + product count pill */}
+        <div className="flex items-end justify-between -mt-9 mb-2.5">
+          {/* Elevated brand monogram */}
+          <div
             className={cn(
-              "h-8 w-8 flex items-center justify-center rounded-md border text-sm font-medium",
-              "border-[var(--color-border)] bg-[var(--color-background)]",
-              "hover:bg-[var(--color-accent)]",
-              "disabled:opacity-40 disabled:pointer-events-none"
+              "h-14 w-14 rounded-2xl flex items-center justify-center shrink-0",
+              "bg-gradient-to-br from-[var(--color-ink-navy)] to-[var(--color-navy-deep)]",
+              "shadow-md ring-4 ring-[var(--color-card)]"
             )}
+            aria-hidden
           >
-            <Minus className="h-3.5 w-3.5" aria-hidden />
-          </button>
-          <input
-            id={`qty-${product.id}`}
-            type="number"
-            min={1}
-            max={product.stockCount}
-            value={quantity}
-            disabled={isOut}
-            onChange={(e) =>
-              onQuantityChange(parseInt(e.target.value, 10) || 1)
-            }
-            className={cn(
-              "h-8 w-12 text-center rounded-md border text-sm tabular-nums",
-              "border-[var(--color-border)] bg-[var(--color-background)]",
-              "disabled:opacity-40"
-            )}
-          />
-          <button
-            type="button"
-            aria-label="Increase quantity"
-            disabled={quantity >= product.stockCount || isOut}
-            onClick={() => onQuantityChange(quantity + 1)}
-            className={cn(
-              "h-8 w-8 flex items-center justify-center rounded-md border text-sm font-medium",
-              "border-[var(--color-border)] bg-[var(--color-background)]",
-              "hover:bg-[var(--color-accent)]",
-              "disabled:opacity-40 disabled:pointer-events-none"
-            )}
-          >
-            <Plus className="h-3.5 w-3.5" aria-hidden />
-          </button>
+            <span className="font-display text-xl font-bold text-white leading-none">
+              {initial}
+            </span>
+          </div>
+
+          {/* Price pill */}
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-[var(--color-cream)] border border-[var(--color-warm-border)] text-[var(--color-ink-navy)] shadow-xs">
+            {formatCurrency(product.price)}
+          </span>
         </div>
-        <button
-          type="button"
-          disabled={isOut}
-          onClick={onAdd}
+
+        {/* Category eyebrow */}
+        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--color-brass)]">
+          {product.category ?? "Marketplace"}
+        </p>
+
+        {/* Product name */}
+        <Link
+          href={`/products/${product.id}`}
           className={cn(
-            "flex-1 h-8 inline-flex items-center justify-center gap-1.5 rounded-md text-sm font-medium",
-            "transition-colors duration-150",
-            isOut
-              ? "bg-[var(--color-muted)] text-[var(--color-muted-foreground)] cursor-not-allowed"
-              : justAdded
-                ? "bg-[var(--color-success)] text-[var(--color-success-foreground)]"
-                : "bg-[var(--color-primary)] text-[var(--color-primary-foreground)] hover:opacity-90"
+            "font-display text-xl font-bold leading-snug",
+            "text-[var(--color-foreground)]",
+            "hover:text-[var(--color-brass)] transition-colors duration-150",
+            "line-clamp-2"
           )}
         >
-          {justAdded ? (
-            <>
-              <Check className="h-3.5 w-3.5" aria-hidden />
-              Added
-            </>
-          ) : (
-            <>
-              <ShoppingCart className="h-3.5 w-3.5" aria-hidden />
-              Add
-            </>
+          {product.name}
+        </Link>
+
+        {/* Vendor name */}
+        <p className="text-xs text-[var(--color-warm-muted)]">
+          by {product.vendorName}
+        </p>
+
+        {/* Quantity selector */}
+        {!isOut && (
+          <div className="mt-2 flex items-center gap-3">
+            <span className="text-[11px] font-semibold text-[var(--color-warm-muted)] uppercase tracking-wide">
+              Qty
+            </span>
+            <div className="inline-flex items-center rounded-full border border-[var(--color-warm-border)] bg-[var(--color-card)] shadow-xs overflow-hidden">
+              <button
+                type="button"
+                onClick={() => onQuantityChange(Math.max(1, quantity - 1))}
+                disabled={quantity <= 1}
+                className="px-3 py-1 text-[var(--color-warm-muted)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-ivory-hover)] disabled:opacity-30 transition-colors text-sm font-medium"
+                aria-label="Decrease quantity"
+              >
+                Ã¢Ë†â€™
+              </button>
+              <span className="px-3 py-1 font-bold text-[var(--color-foreground)] tabular-nums text-sm">
+                {quantity}
+              </span>
+              <button
+                type="button"
+                onClick={() => onQuantityChange(Math.min(product.stockCount, quantity + 1))}
+                disabled={quantity >= product.stockCount}
+                className="px-3 py-1 text-[var(--color-warm-muted)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-ivory-hover)] disabled:opacity-30 transition-colors text-sm font-medium"
+                aria-label="Increase quantity"
+              >
+                +
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* 3. Action Footer Ã¢â‚¬â€ slide-up CTA with brass border */}
+        <div
+          className={cn(
+            "mt-auto pt-4 pb-1",
+            "border-t border-[var(--color-brass)]/50",
+            "transition-all duration-300 ease-out",
+            "transform translate-y-1 group-hover:translate-y-0"
           )}
-        </button>
+        >
+          <button
+            type="button"
+            disabled={isOut}
+            onClick={onAdd}
+            className={cn(
+              "flex h-10 w-full items-center justify-center gap-2 rounded-xl text-sm font-bold",
+              "transition-all duration-200",
+              "border focus:outline-none focus:ring-2 focus:ring-[var(--color-brass)] focus:ring-offset-2",
+              isOut
+                ? "bg-[var(--color-muted)] text-[var(--color-muted-foreground)] cursor-not-allowed border-transparent"
+                : justAdded
+                  ? "bg-[var(--color-accent)] text-[var(--color-accent-foreground)] border-[var(--color-brass)] shadow-sm"
+                  : "bg-[#16233f] text-white hover:bg-[#1e2f52] border-[#16233f]"
+            )}
+          >
+            {justAdded ? (
+              <>
+                <Check className="h-4 w-4" aria-hidden />
+                Added to cart
+              </>
+            ) : (
+              <>
+                <ShoppingCart className="h-4 w-4" aria-hidden />
+                Add to cart
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </article>
   );
