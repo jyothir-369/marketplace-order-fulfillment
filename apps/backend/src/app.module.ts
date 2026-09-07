@@ -28,7 +28,22 @@ const logger = new Logger('BullModule');
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: function(configService) {
+      useFactory: (configService: ConfigService) => {
+        const dbUrl = configService.get<string>('DATABASE_URL');
+        
+        if (dbUrl) {
+          return {
+            type: 'postgres',
+            url: dbUrl,
+            entities: [Vendor, Order, Product, OrderLineItem, VendorSyncJob, AuditLog],
+            synchronize: configService.get('NODE_ENV') !== 'production',
+            logging: configService.get('NODE_ENV') === 'development',
+            ssl: {
+              rejectUnauthorized: false,
+            },
+          };
+        }
+
         return {
           type: 'postgres',
           host: configService.get('DB_HOST', 'localhost'),
@@ -45,14 +60,8 @@ const logger = new Logger('BullModule');
     }),
     BullModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: function(configService) {
+      useFactory: (configService: ConfigService) => {
         return {
-          // maxRetriesPerRequest: null — required for graceful degradation when Redis
-          // is unavailable. With this setting, BullMQ stops retrying on connection
-          // failure and the NestJS app starts normally; queue operations will fail
-          // at runtime instead of crashing the bootstrap.
-          // enableOfflineQueue: false — prevents BullMQ from silently buffering
-          // jobs in memory when Redis is unreachable.
           connection: {
             host: configService.get('REDIS_HOST', 'localhost'),
             port: configService.get('REDIS_PORT', 6379),
