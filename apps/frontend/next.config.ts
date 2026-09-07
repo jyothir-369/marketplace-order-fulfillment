@@ -16,7 +16,6 @@ const nextConfig: NextConfig = {
   },
 
   // Do not fail builds on lint warnings during PR previews.
-  eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: false },
 };
 
