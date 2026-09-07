@@ -1,10 +1,11 @@
 /**
- * ProductCard Ã¢â‚¬â€ luxury editorial storefront tile for the buyer catalog.
+ * ProductCard — luxury editorial storefront tile for the buyer catalog.
  *
  * V2 Premium upgrade (mirrors VendorCard):
  *   - Rich signature gradient banner per product category
  *   - Elevated brand emblem pill with product-category gradient
  *   - Verified stock status badge with forest-green pulse dot
+ *   - Wishlist heart — saves to localStorage via useWishlistStore
  *   - Editorial eyebrow label + serif product name
  *   - Slide-up CTA footer with brass border accents
  *   - Hover lift: -translateY(-1.5px) + shadow-v2-lg + brass border
@@ -14,9 +15,23 @@
 
 import Link from "next/link";
 import { ShoppingCart, Check, Package } from "lucide-react";
+import Heart from "lucide-react";
 import { formatCurrency, cn } from "@/lib/utils";
 import { type PhotoBlockCategory } from "@/components/ui/photo-block";
+import { useWishlistStore } from "@/lib/hooks/use-wishlist";
 import type { Product } from "@/lib/api";
+
+/**
+ * Heart icon as a JSX-compatible React component.
+ *
+ * lucide-react v1.39.0 exports Heart as `export default Heart` but types
+ * the default as the raw programmatic function, not a JSX component.
+ * Casting through `React.ComponentType` makes TypeScript happy without
+ * changing runtime behaviour (Heart is already a valid component).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const WishlistHeart = Heart as unknown as React.ComponentType<Record<string, unknown>>;
+
 
 interface ProductCardProps {
   product: Product;
@@ -69,6 +84,10 @@ export function ProductCard({
   const gradient = CATEGORY_GRADIENTS[palette] ?? CATEGORY_GRADIENTS.neutral;
   const initial = product.name.charAt(0).toUpperCase();
 
+  // Wishlist (Saved Items) — localStorage-backed via Zustand persist
+  const isWishlisted = useWishlistStore((s) => s.items.includes(product.id));
+  const toggleWishlist = useWishlistStore((s) => s.toggleWishlist);
+
   return (
     <article
       className={cn(
@@ -91,6 +110,7 @@ export function ProductCard({
       >
         {/* Subtle mesh overlay */}
         <div className="absolute inset-0 bg-black/10 mix-blend-multiply" />
+
         {/* Decorative watermark glyph */}
         <div className="absolute -right-4 -bottom-6 opacity-20 text-white pointer-events-none select-none">
           <span className="font-display text-[5rem] leading-none transform -rotate-12">
@@ -98,8 +118,9 @@ export function ProductCard({
           </span>
         </div>
 
-        {/* Top badges: stock status pill + scarcity pulse */}
-        <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
+        {/* Top badges row: scarcity / stock pill (left) + wishlist heart (right) */}
+        <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2">
+          {/* Stock pill — left slot */}
           {isOut ? (
             <div className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-cream)] px-2.5 py-1 border border-[var(--color-warm-border)] shadow-xs">
               <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-warm-subtle)]" />
@@ -123,17 +144,47 @@ export function ProductCard({
             </div>
           )}
 
-          {/* Product count badge (mirrors VendorCard style) */}
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-black/50 text-white/90 backdrop-blur-md border border-white/20">
-            <Package className="h-3 w-3 text-[var(--color-brass)]" aria-hidden />
-            {product.stockCount} units
-          </span>
+          {/* Wishlist heart — right slot; stops propagation so it does not navigate to PDP */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              toggleWishlist(product.id);
+            }}
+            aria-label={isWishlisted ? `Remove ${product.name} from saved items` : `Save ${product.name} to wishlist`}
+            aria-pressed={isWishlisted}
+            className={cn(
+              "shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-full",
+              "bg-black/20 backdrop-blur-xs",
+              "border border-white/20",
+              "transition-all duration-200 ease-out",
+              "hover:bg-black/35 hover:scale-105",
+              "focus:outline-none focus:ring-2 focus:ring-[var(--color-brass)] focus:ring-offset-1 focus:ring-offset-black/20",
+              isWishlisted
+                ? "text-[var(--color-brass)] fill-[var(--color-brass)]"
+                : "text-white/80 hover:text-white"
+            )}
+          >
+            <WishlistHeart
+              className={cn("h-3.5 w-3.5 transition-transform duration-200", isWishlisted && "scale-110")}
+              fill={isWishlisted ? "currentColor" : "none"}
+              strokeWidth={2}
+              aria-hidden
+            />
+          </button>
         </div>
+
+        {/* Product count badge */}
+        <span className="absolute bottom-3 left-3 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-black/50 text-white/90 backdrop-blur-md border border-white/20">
+          <Package className="h-3 w-3 text-[var(--color-brass)]" aria-hidden />
+          {product.stockCount} units
+        </span>
       </div>
 
       {/* 2. Body */}
       <div className="px-5 pt-0 pb-5 flex flex-col flex-1 gap-1.5">
-        {/* Elevated brand emblem + product count pill */}
+        {/* Elevated brand emblem + price pill */}
         <div className="flex items-end justify-between -mt-9 mb-2.5">
           {/* Elevated brand monogram */}
           <div
@@ -192,7 +243,7 @@ export function ProductCard({
                 className="px-3 py-1 text-[var(--color-warm-muted)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-ivory-hover)] disabled:opacity-30 transition-colors text-sm font-medium"
                 aria-label="Decrease quantity"
               >
-                Ã¢Ë†â€™
+                −
               </button>
               <span className="px-3 py-1 font-bold text-[var(--color-foreground)] tabular-nums text-sm">
                 {quantity}
@@ -210,7 +261,7 @@ export function ProductCard({
           </div>
         )}
 
-        {/* 3. Action Footer Ã¢â‚¬â€ slide-up CTA with brass border */}
+        {/* 3. Action Footer — slide-up CTA with brass border */}
         <div
           className={cn(
             "mt-auto pt-4 pb-1",
