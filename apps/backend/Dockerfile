@@ -53,7 +53,7 @@ RUN npm ci --omit=dev --workspace=@marketplace/backend
 RUN npm cache clean --force
 
 # Copy built application from builder stage
-COPY --from=builder /app/apps/backend/dist ./dist
+COPY --from=builder /app/apps/backend/dist ./apps/backend/dist
 
 # Set ownership
 RUN chown -R nestjs:nodejs /app
@@ -68,4 +68,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
 
 # Start the application
-CMD ["node", "dist/main.js"]
+CMD ["node", "apps/backend/dist/main.js"]
+
