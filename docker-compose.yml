@@ -8,7 +8,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: apps/backend/Dockerfile
     container_name: marketplace-api
     restart: unless-stopped
     ports:

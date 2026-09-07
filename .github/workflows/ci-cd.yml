@@ -17,7 +17,7 @@ env:
 
 jobs:
   # ============================================
-  # Lint & Type Check — Backend
+  # Lint & Type Check
   # ============================================
   lint-and-typecheck:
     name: Lint & Type Check
@@ -25,26 +25,22 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
-
       - name: Install dependencies (monorepo root)
         run: npm ci
-
       - name: Type check backend
         working-directory: apps/backend
         run: npx tsc --noEmit
-
       - name: Type check frontend
         working-directory: apps/frontend
         run: npx tsc --noEmit || true
 
   # ============================================
-  # Build — Backend
+  # Build - Backend
   # ============================================
   build-backend:
     name: Build Backend
@@ -53,20 +49,16 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
-
       - name: Install dependencies
         run: npm ci
-
       - name: Build backend
         working-directory: apps/backend
         run: npm run build
-
       - name: Upload backend build artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -75,7 +67,7 @@ jobs:
           retention-days: 7
 
   # ============================================
-  # Build — Frontend (Vercel Preview)
+  # Build - Frontend (Vercel Preview)
   # ============================================
   build-frontend:
     name: Build Frontend
@@ -84,20 +76,16 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
-
       - name: Install dependencies
         run: npm ci
-
       - name: Build frontend
         working-directory: apps/frontend
         run: npm run build
-
       - name: Upload frontend build artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -106,38 +94,28 @@ jobs:
           retention-days: 7
 
   # ============================================
-  # Docker Build & Push — Backend Only
+  # Docker Build & Push - Backend Only
   # Runs only on main branch pushes
   # ============================================
   docker:
     name: Docker Build & Push
     runs-on: ubuntu-latest
     needs: build-backend
-    if: github.ref == '"'"'refs/heads/main'"'"'
+    if: github.ref == 'refs/heads/main'
     permissions:
       contents: read
       packages: write
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Download backend build
-        uses: actions/download-artifact@v4
-        with:
-          name: backend-dist
-          path: dist/
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
       - name: Login to Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -147,7 +125,6 @@ jobs:
             type=ref,event=branch
             type=sha,prefix={{branch}}-
             type=raw,value=latest,enable={{is_default_branch}}
-
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
@@ -157,7 +134,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          file: Dockerfile
+          file: apps/backend/Dockerfile
 
   # ============================================
   # Deploy Backend to Railway (Production)
@@ -166,13 +143,11 @@ jobs:
     name: Deploy Backend to Railway
     runs-on: ubuntu-latest
     needs: docker
-    if: github.ref == '"'"'refs/heads/main'"'"'
+    if: github.ref == 'refs/heads/main'
     environment: production
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Deploy to Railway via CLI
         run: |
           npm install -g @railway/cli
@@ -182,15 +157,14 @@ jobs:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
   # ============================================
-  # Vercel Production Deploy — Frontend
+  # Vercel Production Deploy - Frontend
   # ============================================
   deploy-frontend:
     name: Deploy Frontend to Vercel
     runs-on: ubuntu-latest
     needs: build-frontend
-    if: github.ref == '"'"'refs/heads/main'"'"'
+    if: github.ref == 'refs/heads/main'
     environment: production
-
     steps:
       - name: Deploy to Vercel
         uses: amondnet/vercel-action@v25
