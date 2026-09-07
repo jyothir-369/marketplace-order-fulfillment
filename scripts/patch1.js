@@ -1,0 +1,1 @@
+const fs = require('fs');const path = process.argv[2];const find = process.argv[3];const insert = process.argv[4];let c = fs.readFileSync(path, 'utf8');if (!c.includes(find)) { console.error('marker not found'); process.exit(1); }c = c.replace(find, find + insert);fs.writeFileSync(path, c);console.log('ok');

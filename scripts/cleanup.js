@@ -1,0 +1,1 @@
+const fs=require('fs');const p=process.argv[2];let c=fs.readFileSync(p,'utf8');c=c.replace(/MARKER_PRESENTundefined/g,'');fs.writeFileSync(p,c);console.log('cleaned');

@@ -190,6 +190,13 @@
   --color-sidebar-tag-vendor-text: 239 84% 97%;
   --color-sidebar-tag-admin-bg:    38 40% 55%;
   --color-sidebar-tag-admin-text:  38 47% 96%;
+
+  /* ----- V2 Premium operational chrome (Phase 5) ----- */
+  --color-brass-rail:           38 40% 55%;
+  --color-brass-rail-soft:      38 40% 55% / 0.18;
+  --color-sidebar-section:      40 45% 75%;
+  --color-sidebar-cream:        38 47% 94%;
+  --color-sidebar-elevated:     220 33% 22%;
 }
 
 /* ----------------------------------------------------------------
@@ -249,7 +256,14 @@
 }
 .border-sidebar-active {
   border-color: hsl(var(--color-sidebar-active));
-}
+
+
+/* V2 operational chrome helpers (Phase 5) */
+.brass-rail-left { border-left: 3px solid hsl(var(--color-brass-rail)); }
+.bg-brass-rail-soft { background-color: hsl(var(--color-brass-rail-soft)); }
+.bg-sidebar-elevated { background-color: hsl(var(--color-sidebar-elevated)); }
+.text-sidebar-section { color: hsl(var(--color-sidebar-section)); }
+.text-sidebar-cream { color: hsl(var(--color-sidebar-cream)); }
 
 /* ----------------------------------------------------------------
  * Warm ivory surface helpers (V2 storefront cards/panels)
