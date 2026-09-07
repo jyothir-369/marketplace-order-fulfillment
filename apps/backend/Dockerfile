@@ -40,7 +40,7 @@ FROM node:20-alpine AS runtime
 RUN apk add --no-cache openssl ca-certificates tzdata
 
 # Create non-root user for security
-RUN addgroup -g 1001 -S nodejs && \\
+RUN addgroup -g 1001 -S nodejs && \
     adduser -S nestjs -u 1001
 
 WORKDIR /app
@@ -50,7 +50,7 @@ COPY package*.json ./
 COPY apps/backend/package*.json ./apps/backend/
 
 # Install production-only dependencies
-RUN npm ci --omit=dev --workspace=@marketplace/backend && \\
+RUN npm ci --omit=dev --workspace=@marketplace/backend && \
     npm cache clean --force
 
 # Copy built application from builder stage
@@ -66,7 +66,7 @@ USER nestjs
 EXPOSE 3000
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \\
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
 
 # Start the application
