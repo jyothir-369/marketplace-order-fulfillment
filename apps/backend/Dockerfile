@@ -1,6 +1,6 @@
 # ============================================
 # Multi-stage Dockerfile for NestJS Backend
-# Builds from monorepo root (context: ../..)
+# Builds from monorepo root (context: .)
 # ============================================
 
 # Stage 1: Dependencies
@@ -22,7 +22,6 @@ WORKDIR /app
 
 COPY package*.json ./
 COPY apps/backend/package*.json ./apps/backend/
-COPY tsconfig.json ./tsconfig.json 2>/dev/null || true
 
 # Reuse installed dependencies from the deps stage
 COPY --from=deps /app/node_modules ./node_modules
@@ -40,8 +39,8 @@ FROM node:20-alpine AS runtime
 RUN apk add --no-cache openssl ca-certificates tzdata
 
 # Create non-root user for security
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nestjs -u 1001
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nestjs -u 1001
 
 WORKDIR /app
 
@@ -50,8 +49,8 @@ COPY package*.json ./
 COPY apps/backend/package*.json ./apps/backend/
 
 # Install production-only dependencies
-RUN npm ci --omit=dev --workspace=@marketplace/backend && \
-    npm cache clean --force
+RUN npm ci --omit=dev --workspace=@marketplace/backend
+RUN npm cache clean --force
 
 # Copy built application from builder stage
 COPY --from=builder /app/apps/backend/dist ./dist
@@ -66,8 +65,7 @@ USER nestjs
 EXPOSE 3000
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
 
 # Start the application
 CMD ["node", "dist/main.js"]

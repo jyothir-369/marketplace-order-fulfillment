@@ -30,7 +30,7 @@ import { editorialEyebrows } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
 // Stable category tab definitions.
-export const CATEGORY_TABS = [
+const CATEGORY_TABS = [
   { value: "",              label: "All" },
   { value: "Electronics",  label: "Electronics" },
   { value: "Apparel",      label: "Apparel" },
@@ -39,7 +39,7 @@ export const CATEGORY_TABS = [
 ] as const;
 
 /** Client-side sort options. Value maps to URL ?sort= param. */
-export const SORT_OPTIONS = [
+const SORT_OPTIONS = [
   { value: "",            label: "Featured"          },
   { value: "price-asc",   label: "Price: Low → High" },
   { value: "price-desc",  label: "Price: High → Low" },
