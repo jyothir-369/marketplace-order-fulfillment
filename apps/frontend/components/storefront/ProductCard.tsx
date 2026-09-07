@@ -54,6 +54,18 @@ const CATEGORY_GRADIENTS: Record<string, string> = {
   books:       "from-[#b0a8d0] via-[#9088c0] to-[#7068b0]",
 };
 
+/** Secondary (hover) gradient layer — lighter, brighter variant for the cross-fade. */
+const HOVER_GRADIENTS: Record<string, string> = {
+  neutral:     "from-[#faf7f1] via-[#f5f0e8] to-[#ebe5d6]",
+  electronics: "from-[#d8e4f0] via-[#c0d0e0] to-[#a8bcd0]",
+  apparel:     "from-[#e8d4bc] via-[#d4be9c] to-[#c0a880]",
+  home:        "from-[#d8e0d0] via-[#b8c8b0] to-[#98b098]",
+  outdoors:    "from-[#c8e0c8] via-[#a8d0a8] to-[#88c088]",
+  grocery:     "from-[#e8d8a0] via-[#d8c880] to-[#c8b860]",
+  beauty:      "from-[#e8c0d0] via-[#d8a8b8] to-[#c890a0]",
+  books:       "from-[#c8c0e0] via-[#a8a0d0] to-[#8880c0]",
+};
+
 /**
  * Map a free-text product category onto a PhotoBlock palette preset.
  * Falls back to "neutral" for unknown categories.
@@ -82,6 +94,7 @@ export function ProductCard({
   const isScarcity = product.stockCount > 0 && product.stockCount <= 5;
   const palette = categoryToPalette(product.category);
   const gradient = CATEGORY_GRADIENTS[palette] ?? CATEGORY_GRADIENTS.neutral;
+  const hoverGradient = HOVER_GRADIENTS[palette] ?? HOVER_GRADIENTS.neutral;
   const initial = product.name.charAt(0).toUpperCase();
 
   // Wishlist (Saved Items) — localStorage-backed via Zustand persist
@@ -111,7 +124,17 @@ export function ProductCard({
         {/* Subtle mesh overlay */}
         <div className="absolute inset-0 bg-black/10 mix-blend-multiply" />
 
-        {/* Decorative watermark glyph */}
+        {/* Secondary hover gradient layer — cross-fades in on group-hover */}
+        <div
+          className={cn(
+            "absolute inset-0 bg-gradient-to-r opacity-0 transition-opacity duration-500 ease-out",
+            "group-hover:opacity-100",
+            hoverGradient
+          )}
+          aria-hidden
+        />
+
+        {/* Decorative watermark glyph (top layer — above both gradients) */}
         <div className="absolute -right-4 -bottom-6 opacity-20 text-white pointer-events-none select-none">
           <span className="font-display text-[5rem] leading-none transform -rotate-12">
             {initial}
