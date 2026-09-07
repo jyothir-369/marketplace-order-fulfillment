@@ -22,7 +22,11 @@
     "resolveJsonModule": true,
     "baseUrl": "./",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "typeorm": ["../../node_modules/typeorm"],
+      "typeorm/*": ["../../node_modules/typeorm/*"],
+      "uuid": ["../../node_modules/uuid"],
+      "uuid/*": ["../../node_modules/uuid/*"]
     }
   },
   "include": ["src/**/*"],

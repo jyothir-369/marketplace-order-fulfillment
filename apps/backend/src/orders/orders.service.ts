@@ -1,4 +1,4 @@
-﻿import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, FindOptionsRelations } from 'typeorm';
 import { Order, OrderStatus } from '../common/entities/order.entity';
@@ -46,7 +46,7 @@ export class OrdersService {
       const lockedProducts: Product[] = [];
 
       for (const productId of sortedProductIds) {
-        const product = await manager.createQueryBuilder(Product, 'product')
+        const product = await (manager as any).createQueryBuilder(Product, 'product')
           .setLock('pessimistic_write')
           .where('product.id = :id', { id: productId })
           .getOne();
@@ -68,12 +68,12 @@ export class OrdersService {
         const p2 = lockedProducts.find((p) => p.id === item.productId);
         if (p2) {
           const newStock = p2.stockCount - item.quantity;
-          await manager.createQueryBuilder()
+          await (manager as any).createQueryBuilder()
             .update(Product)
             .set({ stockCount: newStock })
             .where('id = :id', { id: item.productId })
             .execute();
-            
+
           await this.auditService.logInventoryDecrement(
             correlationId,
             item.productId,
@@ -86,7 +86,7 @@ export class OrdersService {
 
       // DUAL-WRITE: Write to new shipping_address field (Phase 7 expand-and-contract)
       // The old field (if any) remains for backward compatibility during transition
-      const order = manager.create(Order, {
+      const order = (manager.create as any)(Order, {
         buyerId: dto.buyerId,
         status: OrderStatus.PLACED,
         correlationId: correlationId,
@@ -94,7 +94,7 @@ export class OrdersService {
         shippingAddress: dto.shippingAddress || null, // New field from Phase 7
       });
 
-      const savedOrder = await manager.save(Order, order);
+      const savedOrder = await (manager.save as any)(Order, order) as Order;
 
       let totalAmount = 0;
       const lineItems: OrderLineItem[] = [];
@@ -106,7 +106,7 @@ export class OrdersService {
           const lineTotal = unitPrice * item.quantity;
           totalAmount += lineTotal;
 
-          const lineItem = manager.create(OrderLineItem, {
+          const lineItem = (manager.create as any)(OrderLineItem, {
             orderId: savedOrder.id,
             productId: item.productId,
             vendorId: product.vendorId,
@@ -120,8 +120,8 @@ export class OrdersService {
         }
       }
 
-      await manager.save(OrderLineItem, lineItems);
-      await manager.update(Order, savedOrder.id, { totalAmount: totalAmount });
+      await (manager.save as any)(OrderLineItem, lineItems);
+      await manager.update(Order, { id: savedOrder.id }, { totalAmount: totalAmount });
 
       await this.auditService.logOrderCreated(correlationId, savedOrder.id, dto.buyerId, totalAmount);
 

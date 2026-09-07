@@ -1,7 +1,7 @@
-﻿/**
- * FulfillmentDataTable — headless admin data table (§4.3).
+/**
+ * FulfillmentDataTable â€” headless admin data table (Â§4.3).
  *
- * Powered by @tanstack/react-table v8. Supports:
+ * Powered by @tanstack/react-table v9. Supports:
  *   - column sorting
  *   - server-side pagination controls
  *   - status badges
@@ -18,12 +18,13 @@
 import { useMemo, type ReactNode } from "react";
 import { ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight } from "lucide-react";
 import {
-  type ColumnDef,
   type SortingState,
   flexRender,
-  getCoreRowModel,
-  getSortedRowModel,
-  useReactTable,
+  createCoreRowModel,
+  createSortedRowModel,
+  useTable,
+  type TableFeatures,
+  type RowData,
 } from "@tanstack/react-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { cn } from "@/lib/utils";
@@ -82,16 +83,15 @@ export function FulfillmentDataTable<T>({
 }: FulfillmentDataTableProps<T>) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
-  // Build tanstack column defs from our simplified shape.
-  const tanstackColumns = useMemo<ColumnDef<T, unknown>[]>(
+  const tanstackColumns = useMemo(
     () =>
       columns.map((col) => ({
         id: col.id,
         accessorKey: col.accessorKey as string | undefined,
         header: col.header,
         enableSorting: !col.disableSort,
-        cell: (info) => {
-          const row = info.row.original;
+        cell: (info: any) => {
+          const row = info.row.original as T;
           if (col.statusKey) {
             const status = String(row[col.statusKey] ?? "");
             return <StatusBadge status={status} size="sm" />;
@@ -99,26 +99,26 @@ export function FulfillmentDataTable<T>({
           if (col.cell) {
             return col.cell(row);
           }
-          const v = (col.accessorKey ? row[col.accessorKey] : undefined) as unknown;
-          return v === null || v === undefined ? <span className="text-[var(--color-muted-foreground)]">—</span> : String(v);
+          const v = col.accessorKey ? row[col.accessorKey] : undefined;
+          return v === null || v === undefined ? <span className="text-[var(--color-muted-foreground)]">â€”</span> : String(v);
         },
       })),
     [columns]
   );
 
-  const table = useReactTable<T>({
-    data,
-    columns: tanstackColumns,
-    state: {},
-    onSortingChange: (updater) => {
+  const table = useTable<TableFeatures, T extends RowData ? T : never>({
+    data: data as T[],
+    columns: tanstackColumns as any,
+    state: { sorting: [] as SortingState },
+    onSortingChange: (updater: any) => {
       if (!onSortChange) return;
       const next = typeof updater === "function" ? updater([]) : updater;
-      onSortChange(next);
+      onSortChange(next as SortingState);
     },
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getRowId: getRowId ? (row) => getRowId(row) : undefined,
-  });
+    getCoreRowModel: createCoreRowModel<TableFeatures, T extends RowData ? T : never>(),
+    getSortedRowModel: createSortedRowModel<TableFeatures, T extends RowData ? T : never>(),
+    getRowId: getRowId ? (row: any) => getRowId(row) : undefined,
+  } as any);
 
   return (
     <div
@@ -128,20 +128,19 @@ export function FulfillmentDataTable<T>({
         className
       )}
     >
-      {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            {table.getHeaderGroups().map((hg) => (
+            {table.getHeaderGroups().map((hg: any) => (
               <tr
                 key={hg.id}
                 className="border-b border-[var(--color-border)] bg-[var(--color-muted)]/40"
               >
-                {hg.headers.map((header) => {
+                {hg.headers.map((header: any) => {
                   const colDef = columns.find((c) => c.id === header.id);
                   const align = colDef?.align ?? "left";
-                  const sort = header.column.getIsSorted();
-                  const canSort = header.column.getCanSort();
+                  const sort = header.column.getIsSorted?.() ?? false;
+                  const canSort = header.column.getCanSort?.() ?? false;
                   return (
                     <th
                       key={header.id}
@@ -151,20 +150,15 @@ export function FulfillmentDataTable<T>({
                         cellAlign[align],
                         canSort && "cursor-pointer select-none hover:text-[var(--color-foreground)]"
                       )}
-                      onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
-                      aria-sort={
-                        sort === "asc" ? "ascending" :
-                        sort === "desc" ? "descending" :
-                        "none"
-                      }
+                      onClick={() => {
+                        if (canSort && header.column.toggleSorting) {
+                          const current = header.column.getIsSorted();
+                          header.column.toggleSorting(current === "asc");
+                        }
+                      }}
                     >
-                      <span
-                        className={cn(
-                          "inline-flex items-center gap-1",
-                          align === "right" && "flex-row-reverse"
-                        )}
-                      >
-                        {flexRender(header.column.columnDef.header, header.getContext())}
+                      <span className="flex items-center gap-1">
+                        {colDef?.header ?? header.id}
                         {canSort && (
                           sort === "asc" ? (
                             <ChevronUp className="h-3 w-3" aria-hidden />
@@ -202,7 +196,7 @@ export function FulfillmentDataTable<T>({
                 </td>
               </tr>
             ) : (
-              table.getRowModel().rows.map((row) => {
+              table.getRowModel().rows.map((row: any) => {
                 const colValues = row.getAllCells();
                 return (
                   <tr
@@ -212,9 +206,9 @@ export function FulfillmentDataTable<T>({
                       "hover:bg-[var(--color-muted)]/40",
                       "data-[state=selected]:bg-[var(--color-info)]/10"
                     )}
-                    data-state={row.getIsSelected() ? "selected" : undefined}
+                    data-state={row.getIsSelected?.() ? "selected" : undefined}
                   >
-                    {colValues.map((cell) => {
+                    {colValues.map((cell: any) => {
                       const colDef = columns.find((c) => c.id === cell.column.id);
                       const align = colDef?.align ?? "left";
                       return (
@@ -239,7 +233,6 @@ export function FulfillmentDataTable<T>({
         </table>
       </div>
 
-      {/* Pagination */}
       {!loading && data.length > 0 && (
         <div
           className={cn(

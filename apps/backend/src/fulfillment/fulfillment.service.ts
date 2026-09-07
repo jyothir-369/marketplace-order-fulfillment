@@ -47,7 +47,7 @@ export class FulfillmentService {
 
   async processSyncJob(jobId: string, correlationId: string): Promise<void> {
     this.logger.log('Processing sync job ' + jobId, FulfillmentService.name, correlationId);
-    const relations: FindOptionsRelations<VendorSyncJob> = { orderLineItem: true };
+    const relations: FindOptionsRelations<VendorSyncJob> = { orderLineItem: true } as FindOptionsRelations<VendorSyncJob>;
     const syncJob = await this.syncJobRepository.findOne({ where: { id: jobId }, relations: relations });
     if (!syncJob) {
       throw new NotFoundException('Sync job ' + jobId + ' not found');
@@ -180,7 +180,7 @@ export class FulfillmentService {
     const reconciliationCorrelationId = 'reconciliation-' + Date.now();
     const result: ReconciliationResultDto = { processed: 0, resolved: 0, stillAmbiguous: 0, errors: [] };
     const cutoffTime = new Date(Date.now() - olderThanMinutes * 60 * 1000);
-    const relations: FindOptionsRelations<VendorSyncJob> = { orderLineItem: true };
+    const relations: FindOptionsRelations<VendorSyncJob> = { orderLineItem: true } as FindOptionsRelations<VendorSyncJob>;
     const ambiguousJobs = await this.syncJobRepository.find({
       where: { status: SyncJobStatus.IN_PROGRESS, lastAttemptedAt: LessThan(cutoffTime) },
       relations: relations,
@@ -225,7 +225,7 @@ export class FulfillmentService {
   }
 
   async manualResolve(lineItemId: string, dto: ManualResolutionDto, correlationId: string): Promise<void> {
-    const relations: FindOptionsRelations<OrderLineItem> = { syncJob: true };
+    const relations: FindOptionsRelations<OrderLineItem> = { syncJob: true } as FindOptionsRelations<OrderLineItem>;
     const lineItem = await this.lineItemRepository.findOne({ where: { id: lineItemId }, relations: relations });
     if (!lineItem) {
       throw new NotFoundException('Line item ' + lineItemId + ' not found');

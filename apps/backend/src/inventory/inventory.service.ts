@@ -21,7 +21,7 @@ export class InventoryService {
 
     var self = this;
     return this.dataSource.transaction(async function(manager) {
-      return manager.createQueryBuilder(Product, 'product')
+      return (manager as any).createQueryBuilder(Product, 'product')
         .setLock('pessimistic_write')
         .where('product.id = :id', { id: dto.productId })
         .getOne()
@@ -56,7 +56,7 @@ export class InventoryService {
           var previousStock = product.stockCount;
           var newStock = previousStock - dto.quantity;
 
-          return manager.createQueryBuilder()
+          return (manager as any).createQueryBuilder()
             .update(Product)
             .set({ stockCount: newStock })
             .where('id = :id', { id: dto.productId })
@@ -102,7 +102,7 @@ export class InventoryService {
 
     var self = this;
     return this.dataSource.transaction(async function(manager) {
-      return manager.createQueryBuilder(Product, 'product')
+      return (manager as any).createQueryBuilder(Product, 'product')
         .setLock('pessimistic_write')
         .where('product.id = :id', { id: productId })
         .getOne()
@@ -114,7 +114,7 @@ export class InventoryService {
           var previousStock = product.stockCount;
           var newStock = previousStock + quantity;
 
-          return manager.createQueryBuilder()
+          return (manager as any).createQueryBuilder()
             .update(Product)
             .set({ stockCount: newStock })
             .where('id = :id', { id: productId })

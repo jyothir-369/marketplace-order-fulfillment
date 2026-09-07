@@ -42,7 +42,7 @@ export class CatalogService {
     const where = activeOnly ? { isActive: true } : {};
     const relations: FindOptionsRelations<Product> = { vendor: true };
     const products = await this.productRepository.find({
-      where: where,
+      where: where as any,
       relations: relations,
       order: { createdAt: 'DESC' },
     });
@@ -61,12 +61,11 @@ export class CatalogService {
       throw new NotFoundException('Product with ID ' + id + ' not found');
     }
 
-    return this.toResponseDto(product, product.vendor ? product.vendor.name : 'Unknown');
+    return this.toResponseDto(product as any, product.vendor ? product.vendor.name : 'Unknown');
   }
 
   async findByVendor(vendorId: string, activeOnly = true): Promise<ProductResponseDto[]> {
-    const where: any = { vendorId };
-    if (activeOnly) { where.isActive = true; }
+    const where: any = activeOnly ? { vendorId, isActive: true } : { vendorId };
     const relations: FindOptionsRelations<Product> = { vendor: true };
     const products = await this.productRepository.find({
       where: where,
@@ -98,7 +97,7 @@ export class CatalogService {
     const saved = await this.productRepository.save(product);
     this.logger.log('Product updated: ' + id, CatalogService.name, correlationId);
 
-    return this.toResponseDto(saved, saved.vendor ? saved.vendor.name : 'Unknown');
+    return this.toResponseDto(saved as any, saved.vendor ? saved.vendor.name : 'Unknown');
   }
 
   private toResponseDto(product: Product, vendorName: string): ProductResponseDto {
