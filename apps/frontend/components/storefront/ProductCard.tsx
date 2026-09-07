@@ -6,6 +6,7 @@
  *   - Elevated brand emblem pill with product-category gradient
  *   - Verified stock status badge with forest-green pulse dot
  *   - Wishlist heart — saves to localStorage via useWishlistStore
+ *   - Quick-View eye — opens a centered modal with full product preview
  *   - Editorial eyebrow label + serif product name
  *   - Slide-up CTA footer with brass border accents
  *   - Hover lift: -translateY(-1.5px) + shadow-v2-lg + brass border
@@ -16,9 +17,12 @@
 import Link from "next/link";
 import { ShoppingCart, Check, Package } from "lucide-react";
 import Heart from "lucide-react";
+import Eye from "lucide-react";
 import { formatCurrency, cn } from "@/lib/utils";
+import { useState } from "react";
 import { type PhotoBlockCategory } from "@/components/ui/photo-block";
 import { useWishlistStore } from "@/lib/hooks/use-wishlist";
+import { QuickViewModal } from "@/components/storefront/QuickViewModal";
 import type { Product } from "@/lib/api";
 
 /**
@@ -31,6 +35,8 @@ import type { Product } from "@/lib/api";
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const WishlistHeart = Heart as unknown as React.ComponentType<Record<string, unknown>>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const QuickViewEye = Eye as unknown as React.ComponentType<Record<string, unknown>>;
 
 
 interface ProductCardProps {
@@ -101,7 +107,12 @@ export function ProductCard({
   const isWishlisted = useWishlistStore((s) => s.items.includes(product.id));
   const toggleWishlist = useWishlistStore((s) => s.toggleWishlist);
 
+  // Quick-View modal — local state; the parent card is a <Link>, so the
+  // trigger calls e.stopPropagation() to avoid navigation.
+  const [quickViewOpen, setQuickViewOpen] = useState(false);
+
   return (
+    <>
     <article
       className={cn(
         "group relative flex flex-col overflow-hidden rounded-2xl",
@@ -166,6 +177,27 @@ export function ProductCard({
               </span>
             </div>
           )}
+
+          {/* Quick-View eye — opens the centered modal; stops propagation so it does not navigate to PDP */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              setQuickViewOpen(true);
+            }}
+            aria-label={`Quick view of ${product.name}`}
+            className={cn(
+              "shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-full",
+              "bg-black/20 backdrop-blur-xs",
+              "border border-white/20",
+              "text-white/80 hover:text-white hover:bg-black/35",
+              "transition-all duration-200 ease-out hover:scale-105",
+              "focus:outline-none focus:ring-2 focus:ring-[var(--color-brass)] focus:ring-offset-1 focus:ring-offset-black/20"
+            )}
+          >
+            <QuickViewEye className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+          </button>
 
           {/* Wishlist heart — right slot; stops propagation so it does not navigate to PDP */}
           <button
@@ -323,5 +355,16 @@ export function ProductCard({
         </div>
       </div>
     </article>
+
+    <QuickViewModal
+      product={product}
+      open={quickViewOpen}
+      onOpenChange={setQuickViewOpen}
+      onAdd={(_id, qty) => {
+        onQuantityChange(qty);
+        onAdd();
+      }}
+    />
+    </>
   );
 }
