@@ -149,12 +149,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Deploy to Railway via CLI
-        run: |
-          npm install -g @railway/cli
-          railway login --token ${{ secrets.RAILWAY_TOKEN }}
-          railway up --service marketplace-backend --environment production
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          npm install -g @railway/cli
+          railway up --service marketplace-backend --environment production
 
   # ============================================
   # Vercel Production Deploy - Frontend
@@ -170,7 +169,9 @@ jobs:
         uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+            vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_FRONTEND_PROJECT_ID }}
           vercel-args: --prod
           working-directory: apps/frontend
+
+
