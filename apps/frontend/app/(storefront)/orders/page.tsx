@@ -1,5 +1,5 @@
 /**
- * app/(storefront)/orders/page.tsx — Buyer order history (§3).
+ * app/(storefront)/orders/page.tsx ï¿½ Buyer order history (ï¿½3).
  *
  * V2 Premium treatment:
  *   - Brass editorial eyebrow + serif H1 (Playfair Display)

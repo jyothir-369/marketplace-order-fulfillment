@@ -1,0 +1,1 @@
+const fs=require('fs');const p='C:\\\\Users\\\\raghava\\\\OneDrive\\\\Desktop\\\\marketplace-order-fulfillment\\\\apps\\\\frontend\\\\app\\\\globals.css';const c=fs.readFileSync(p,'utf8');const lines=c.split(String.fromCharCode(10));for(let i=254;i<262;i++)console.log((i+1)+String.fromCharCode(124)+lines[i].slice(0,90));

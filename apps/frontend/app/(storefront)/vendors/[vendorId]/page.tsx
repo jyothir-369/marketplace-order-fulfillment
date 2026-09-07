@@ -1,5 +1,5 @@
 /**
- * app/(storefront)/vendors/[vendorId]/page.tsx — Vendor showcase (§3).
+ * app/(storefront)/vendors/[vendorId]/page.tsx ï¿½ Vendor showcase (ï¿½3).
  *
  * V2 Premium treatment:
  *   - Warm gradient vendor hero card with serif title

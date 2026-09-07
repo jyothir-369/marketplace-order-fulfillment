@@ -1,5 +1,5 @@
 /**
- * CartDrawer — slide-over cart panel (§3.1.3).
+ * CartDrawer ï¿½ slide-over cart panel (ï¿½3.1.3).
  *
  * Uses Radix Dialog for accessibility (focus trap, ESC-to-close, scroll lock)
  * and CSS transitions for the slide animation.
@@ -61,7 +61,7 @@ function CartDrawerItem({
         "border-b border-[var(--color-warm-border)] last:border-b-0"
       )}
     >
-      {/* Product image placeholder — warm gradient block */}
+      {/* Product image placeholder ï¿½ warm gradient block */}
       <div
         className={cn(
           "h-14 w-14 shrink-0 rounded-lg overflow-hidden",
@@ -206,7 +206,7 @@ export function CartDrawer() {
         )}
       />
 
-      {/* Panel — slides in from the right */}
+      {/* Panel ï¿½ slides in from the right */}
       <DialogContent
         className={cn(
           "fixed right-0 top-0 z-50 h-full w-full max-w-md",

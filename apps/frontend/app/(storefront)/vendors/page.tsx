@@ -1,5 +1,5 @@
 /**
- * app/(storefront)/vendors/page.tsx — Vendor directory (§3).
+ * app/(storefront)/vendors/page.tsx ï¿½ Vendor directory (ï¿½3).
  *
  * V2 Premium treatment:
  *   - Editorial "Vendors on Marketplace" hero (eyebrow + serif H1)

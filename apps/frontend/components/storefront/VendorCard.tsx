@@ -1,5 +1,5 @@
 /**
- * VendorCard — single vendor tile used by /vendors directory (§3).
+ * VendorCard ï¿½ single vendor tile used by /vendors directory (ï¿½3).
  *
  * V2 Premium treatment:
  *   - Warm hairline card border (#e7e0d2)

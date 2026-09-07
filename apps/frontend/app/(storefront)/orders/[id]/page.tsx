@@ -1,5 +1,5 @@
 /**
- * app/(storefront)/orders/[id]/page.tsx — Order confirmation & live tracking (§2.2, §3.2, §4.1, GAP-F1/F6).
+ * app/(storefront)/orders/[id]/page.tsx ï¿½ Order confirmation & live tracking (ï¿½2.2, ï¿½3.2, ï¿½4.1, GAP-F1/F6).
  *
  * Features:
  *   - useOrderPolling hook (stops on terminal status)
@@ -149,7 +149,7 @@ export default function OrderConfirmationPage() {
         </div>
       </div>
 
-      {/* AMBIGUOUS alert — semantic amber, V2 chrome */}
+      {/* AMBIGUOUS alert ï¿½ semantic amber, V2 chrome */}
       {hasAmbiguous && (
         <div
           role="alert"
@@ -165,13 +165,13 @@ export default function OrderConfirmationPage() {
             </p>
             <p className="text-sm text-[var(--color-warm-muted)] mt-0.5">
               One or more items are waiting for vendor confirmation. Your order is not
-              at risk — we are actively reconciling with the vendor. Check back shortly.
+              at risk ï¿½ we are actively reconciling with the vendor. Check back shortly.
             </p>
           </div>
         </div>
       )}
 
-      {/* DEAD_LETTER alert — semantic red, V2 chrome */}
+      {/* DEAD_LETTER alert ï¿½ semantic red, V2 chrome */}
       {hasDLQ && (
         <div
           role="alert"

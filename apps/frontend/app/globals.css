@@ -256,7 +256,7 @@
 }
 .border-sidebar-active {
   border-color: hsl(var(--color-sidebar-active));
-
+}
 
 /* V2 operational chrome helpers (Phase 5) */
 .brass-rail-left { border-left: 3px solid hsl(var(--color-brass-rail)); }
