@@ -1,10 +1,12 @@
 /**
- * ProductCard Ã¢â‚¬â€ luxury editorial storefront tile for the buyer catalog.
+ * ProductCard — luxury editorial storefront tile for the buyer catalog.
  *
  * V2 Premium upgrade (mirrors VendorCard):
  *   - Rich signature gradient banner per product category
  *   - Elevated brand emblem pill with product-category gradient
  *   - Verified stock status badge with forest-green pulse dot
+ *   - Wishlist heart — saves to localStorage via useWishlistStore
+ *   - Quick-View eye — opens a centered modal with full product preview
  *   - Editorial eyebrow label + serif product name
  *   - Slide-up CTA footer with brass border accents
  *   - Hover lift: -translateY(-1.5px) + shadow-v2-lg + brass border
@@ -15,8 +17,12 @@
 import Link from "next/link";
 import { ShoppingCart, Check, Package } from "lucide-react";
 import { formatCurrency, cn } from "@/lib/utils";
+import { useState } from "react";
 import { type PhotoBlockCategory } from "@/components/ui/photo-block";
+import { useWishlistStore } from "@/lib/hooks/use-wishlist";
+import { QuickViewModal } from "@/components/storefront/QuickViewModal";
 import type { Product } from "@/lib/api";
+
 
 interface ProductCardProps {
   product: Product;
@@ -28,6 +34,45 @@ interface ProductCardProps {
 }
 
 /** Per-category signature gradient for the header banner. */
+
+/** Wishlist heart — inline SVG to avoid lucide-react v1.39.0 type conflicts */
+function WishlistHeartIcon({ filled, className }: { filled?: boolean; className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="14" height="14" viewBox="0 0 24 24"
+      fill={filled ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+    </svg>
+  );
+}
+
+/** Quick-view eye — inline SVG to avoid lucide-react v1.39.0 type conflicts */
+function QuickViewEyeIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="14" height="14" viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
 const CATEGORY_GRADIENTS: Record<string, string> = {
   neutral:     "from-[var(--color-ivory-muted)] to-[var(--color-cream)]",
   electronics: "from-[#b8c8d8] via-[#9aafc0] to-[#7a9ab0]",
@@ -37,6 +82,18 @@ const CATEGORY_GRADIENTS: Record<string, string> = {
   grocery:     "from-[#d8c890] via-[#c8b870] to-[#b8a850]",
   beauty:      "from-[#d8a8b8] via-[#c890a0] to-[#b87888]",
   books:       "from-[#b0a8d0] via-[#9088c0] to-[#7068b0]",
+};
+
+/** Secondary (hover) gradient layer — lighter, brighter variant for the cross-fade. */
+const HOVER_GRADIENTS: Record<string, string> = {
+  neutral:     "from-[#faf7f1] via-[#f5f0e8] to-[#ebe5d6]",
+  electronics: "from-[#d8e4f0] via-[#c0d0e0] to-[#a8bcd0]",
+  apparel:     "from-[#e8d4bc] via-[#d4be9c] to-[#c0a880]",
+  home:        "from-[#d8e0d0] via-[#b8c8b0] to-[#98b098]",
+  outdoors:    "from-[#c8e0c8] via-[#a8d0a8] to-[#88c088]",
+  grocery:     "from-[#e8d8a0] via-[#d8c880] to-[#c8b860]",
+  beauty:      "from-[#e8c0d0] via-[#d8a8b8] to-[#c890a0]",
+  books:       "from-[#c8c0e0] via-[#a8a0d0] to-[#8880c0]",
 };
 
 /**
@@ -67,9 +124,19 @@ export function ProductCard({
   const isScarcity = product.stockCount > 0 && product.stockCount <= 5;
   const palette = categoryToPalette(product.category);
   const gradient = CATEGORY_GRADIENTS[palette] ?? CATEGORY_GRADIENTS.neutral;
+  const hoverGradient = HOVER_GRADIENTS[palette] ?? HOVER_GRADIENTS.neutral;
   const initial = product.name.charAt(0).toUpperCase();
 
+  // Wishlist (Saved Items) — localStorage-backed via Zustand persist
+  const isWishlisted = useWishlistStore((s) => s.items.includes(product.id));
+  const toggleWishlist = useWishlistStore((s) => s.toggleWishlist);
+
+  // Quick-View modal — local state; the parent card is a <Link>, so the
+  // trigger calls e.stopPropagation() to avoid navigation.
+  const [quickViewOpen, setQuickViewOpen] = useState(false);
+
   return (
+    <>
     <article
       className={cn(
         "group relative flex flex-col overflow-hidden rounded-2xl",
@@ -91,15 +158,27 @@ export function ProductCard({
       >
         {/* Subtle mesh overlay */}
         <div className="absolute inset-0 bg-black/10 mix-blend-multiply" />
-        {/* Decorative watermark glyph */}
+
+        {/* Secondary hover gradient layer — cross-fades in on group-hover */}
+        <div
+          className={cn(
+            "absolute inset-0 bg-gradient-to-r opacity-0 transition-opacity duration-500 ease-out",
+            "group-hover:opacity-100",
+            hoverGradient
+          )}
+          aria-hidden
+        />
+
+        {/* Decorative watermark glyph (top layer — above both gradients) */}
         <div className="absolute -right-4 -bottom-6 opacity-20 text-white pointer-events-none select-none">
           <span className="font-display text-[5rem] leading-none transform -rotate-12">
             {initial}
           </span>
         </div>
 
-        {/* Top badges: stock status pill + scarcity pulse */}
-        <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
+        {/* Top badges row: scarcity / stock pill (left) + wishlist heart (right) */}
+        <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2">
+          {/* Stock pill — left slot */}
           {isOut ? (
             <div className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-cream)] px-2.5 py-1 border border-[var(--color-warm-border)] shadow-xs">
               <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-warm-subtle)]" />
@@ -123,17 +202,66 @@ export function ProductCard({
             </div>
           )}
 
-          {/* Product count badge (mirrors VendorCard style) */}
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-black/50 text-white/90 backdrop-blur-md border border-white/20">
-            <Package className="h-3 w-3 text-[var(--color-brass)]" aria-hidden />
-            {product.stockCount} units
-          </span>
+          {/* Quick-View eye — opens the centered modal; stops propagation so it does not navigate to PDP */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              setQuickViewOpen(true);
+            }}
+            aria-label={`Quick view of ${product.name}`}
+            className={cn(
+              "shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-full",
+              "bg-black/20 backdrop-blur-xs",
+              "border border-white/20",
+              "text-white/80 hover:text-white hover:bg-black/35",
+              "transition-all duration-200 ease-out hover:scale-105",
+              "focus:outline-none focus:ring-2 focus:ring-[var(--color-brass)] focus:ring-offset-1 focus:ring-offset-black/20"
+            )}
+          >
+            <QuickViewEyeIcon className="h-3.5 w-3.5" />
+          </button>
+
+          {/* Wishlist heart — right slot; stops propagation so it does not navigate to PDP */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              toggleWishlist(product.id);
+            }}
+            aria-label={isWishlisted ? `Remove ${product.name} from saved items` : `Save ${product.name} to wishlist`}
+            aria-pressed={isWishlisted}
+            className={cn(
+              "shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-full",
+              "bg-black/20 backdrop-blur-xs",
+              "border border-white/20",
+              "transition-all duration-200 ease-out",
+              "hover:bg-black/35 hover:scale-105",
+              "focus:outline-none focus:ring-2 focus:ring-[var(--color-brass)] focus:ring-offset-1 focus:ring-offset-black/20",
+              isWishlisted
+                ? "text-[var(--color-brass)] fill-[var(--color-brass)]"
+                : "text-white/80 hover:text-white"
+            )}
+          >
+            <WishlistHeartIcon
+              className={cn("h-3.5 w-3.5 transition-transform duration-200", isWishlisted && "scale-110")}
+              filled={isWishlisted}
+            />
+          </button>
         </div>
+
+        {/* Product count badge */}
+        <span className="absolute bottom-3 left-3 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-black/50 text-white/90 backdrop-blur-md border border-white/20">
+          <Package className="h-3 w-3 text-[var(--color-brass)]" aria-hidden />
+          {product.stockCount} units
+        </span>
       </div>
 
       {/* 2. Body */}
       <div className="px-5 pt-0 pb-5 flex flex-col flex-1 gap-1.5">
-        {/* Elevated brand emblem + product count pill */}
+        {/* Elevated brand emblem + price pill */}
         <div className="flex items-end justify-between -mt-9 mb-2.5">
           {/* Elevated brand monogram */}
           <div
@@ -192,7 +320,7 @@ export function ProductCard({
                 className="px-3 py-1 text-[var(--color-warm-muted)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-ivory-hover)] disabled:opacity-30 transition-colors text-sm font-medium"
                 aria-label="Decrease quantity"
               >
-                Ã¢Ë†â€™
+                −
               </button>
               <span className="px-3 py-1 font-bold text-[var(--color-foreground)] tabular-nums text-sm">
                 {quantity}
@@ -210,7 +338,7 @@ export function ProductCard({
           </div>
         )}
 
-        {/* 3. Action Footer Ã¢â‚¬â€ slide-up CTA with brass border */}
+        {/* 3. Action Footer — slide-up CTA with brass border */}
         <div
           className={cn(
             "mt-auto pt-4 pb-1",
@@ -249,5 +377,16 @@ export function ProductCard({
         </div>
       </div>
     </article>
+
+    <QuickViewModal
+      product={product}
+      open={quickViewOpen}
+      onOpenChange={setQuickViewOpen}
+      onAdd={(_id, qty) => {
+        onQuantityChange(qty);
+        onAdd();
+      }}
+    />
+    </>
   );
 }

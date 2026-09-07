@@ -20,6 +20,8 @@ export interface VendorMeta {
   accentBadgeText: string;
   highlights: string[];
   iconType: "tools" | "electronics" | "fashion" | "home" | "sports" | "default";
+  /** Editorial provenance tags displayed below the vendor name */
+  tags: string[];
 }
 
 const VENDOR_PRESETS: Record<string, VendorMeta> = {
@@ -36,6 +38,7 @@ const VENDOR_PRESETS: Record<string, VendorMeta> = {
     accentBadgeText: "text-amber-800 dark:text-amber-300",
     highlights: ["Industrial Grade", "10-Yr Guarantee", "Ships in 24h"],
     iconType: "tools",
+    tags: ["Industrial Grade", "10-Yr Guarantee", "Carbon Neutral"],
   },
   "electronics world": {
     category: "Audio & Smart Computing",
@@ -50,6 +53,7 @@ const VENDOR_PRESETS: Record<string, VendorMeta> = {
     accentBadgeText: "text-blue-800 dark:text-blue-300",
     highlights: ["Audiophile Grade", "USB-C Fast Sync", "Ships in 24h"],
     iconType: "electronics",
+    tags: ["Audiophile Grade", "USB-C Fast Sync", "Carbon Neutral"],
   },
   "fashion forward": {
     category: "Luxury Apparel & Knitwear",
@@ -64,6 +68,7 @@ const VENDOR_PRESETS: Record<string, VendorMeta> = {
     accentBadgeText: "text-rose-800 dark:text-rose-300",
     highlights: ["100% Merino & Silk", "Hand-Finished", "Free Exchanges"],
     iconType: "fashion",
+    tags: ["100% Merino & Silk", "Hand-Finished", "Family-Run"],
   },
   "home & kitchen co": {
     category: "Artisan Culinary & Living",
@@ -78,6 +83,7 @@ const VENDOR_PRESETS: Record<string, VendorMeta> = {
     accentBadgeText: "text-emerald-800 dark:text-emerald-300",
     highlights: ["Forged High-Carbon", "BPA Free", "Eco Packaging"],
     iconType: "home",
+    tags: ["Forged High-Carbon", "BPA Free", "Family-Run"],
   },
   "sports gear inc": {
     category: "Endurance & Athletic Gear",
@@ -92,6 +98,7 @@ const VENDOR_PRESETS: Record<string, VendorMeta> = {
     accentBadgeText: "text-orange-800 dark:text-orange-300",
     highlights: ["Impact Tested", "Ergonomic Grip", "Ships in 24h"],
     iconType: "sports",
+    tags: ["Impact Tested", "Ergonomic Grip", "Carbon Neutral"],
   },
 };
 
@@ -144,5 +151,6 @@ function getDefaultVendorMeta(name: string): VendorMeta {
     accentBadgeText: "text-[var(--color-accent)]",
     highlights: ["Verified Seller", "Buyer Protected", "Fast Dispatch"],
     iconType: "default",
+    tags: ["Verified Seller", "Buyer Protected", "Fast Dispatch"],
   };
 }

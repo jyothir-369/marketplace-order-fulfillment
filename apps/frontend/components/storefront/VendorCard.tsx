@@ -132,6 +132,23 @@ export function VendorCard({ vendor }: VendorCardProps) {
           {vendor.name}
         </h3>
 
+        {/* Editorial Provenance Tags */}
+        {meta.tags && meta.tags.length > 0 && (
+          <p
+            className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[10px] font-semibold tracking-widest uppercase text-[var(--color-brass)]"
+            aria-label="Vendor provenance"
+          >
+            {meta.tags.map((tag, i) => (
+              <span key={tag} className="inline-flex items-center">
+                <span>{tag}</span>
+                {i < meta.tags.length - 1 && (
+                  <span aria-hidden className="ml-1.5 h-1 w-1 rounded-full bg-[var(--color-brass)]/60" />
+                )}
+              </span>
+            ))}
+          </p>
+        )}
+
         {/* Curated Editorial Tagline */}
         <p className="mt-2 text-xs text-[var(--color-warm-muted)] line-clamp-2 leading-relaxed flex-1">
           {meta.tagline}

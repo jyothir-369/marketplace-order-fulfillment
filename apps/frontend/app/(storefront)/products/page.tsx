@@ -38,6 +38,14 @@ export const CATEGORY_TABS = [
   { value: "Industrial",   label: "Industrial" },
 ] as const;
 
+/** Client-side sort options. Value maps to URL ?sort= param. */
+export const SORT_OPTIONS = [
+  { value: "",            label: "Featured"          },
+  { value: "price-asc",   label: "Price: Low → High" },
+  { value: "price-desc",  label: "Price: High → Low" },
+  { value: "newest",      label: "Newest"             },
+] as const;
+
 function ProductsPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -58,6 +66,7 @@ function ProductsPageInner() {
   const category = searchParams.get("category") ?? "";
   const maxPriceParam = searchParams.get("maxPrice");
   const maxPrice = maxPriceParam ? Number(maxPriceParam) : undefined;
+  const sort = searchParams.get("sort") ?? "";
 
   const vendors = Array.from(
     new Map(products.map((p) => [p.vendorId, p.vendorName])).entries()
@@ -103,6 +112,15 @@ function ProductsPageInner() {
     if (category && p.category !== category) return false;
     if (maxPrice !== undefined && p.price > maxPrice) return false;
     return true;
+  });
+
+  // Client-side sort — applied after filtering so sort state is preserved
+  // across filter changes without a server round-trip.
+  const sorted = [...filtered].sort((a, b) => {
+    if (sort === "price-asc")  return a.price - b.price;
+    if (sort === "price-desc") return b.price - a.price;
+    // "Featured" (default) and "newest" both retain catalog insertion order.
+    return 0;
   });
 
   const setQty = (productId: string, n: number) =>
@@ -230,7 +248,7 @@ function ProductsPageInner() {
           {[
             { label: "Products", value: products.length, icon: <Package className="h-4 w-4" /> },
             { label: "Verified Sellers", value: vendors.length, icon: <ShieldCheck className="h-4 w-4" /> },
-            { label: "Showing", value: filtered.length, icon: <Sparkles className="h-4 w-4" /> },
+            { label: "Showing", value: sorted.length, icon: <Sparkles className="h-4 w-4" /> },
             { label: "Categories", value: CATEGORY_TABS.length - 1, icon: <ShoppingBag className="h-4 w-4" /> },
           ].map(({ label, value, icon }) => (
             <div key={label} className="flex items-center gap-2.5 px-3 py-2">
@@ -290,8 +308,27 @@ function ProductsPageInner() {
           </button>
         </div>
 
-        {/* Vendor + Max price + clear */}
+        {/* Vendor + Sort + Max price + clear */}
         <div className="flex flex-wrap items-center gap-3">
+          <label className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-warm-muted)]">
+            <span>Sort by</span>
+            <select
+              value={sort}
+              onChange={(e) => updateFilter("sort", e.target.value)}
+              className={cn(
+                "h-9 px-3 rounded-lg border text-xs font-medium",
+                "border-[var(--color-warm-border)] bg-[var(--color-card)]",
+                "text-[var(--color-foreground)]",
+                "focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)]"
+              )}
+              aria-label="Sort products"
+            >
+              {SORT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </label>
+
           <select
             value={vendor}
             onChange={(e) => updateFilter("vendor", e.target.value)}
@@ -340,7 +377,7 @@ function ProductsPageInner() {
 
           {/* Live count */}
           <span className="ml-auto text-xs text-[var(--color-warm-muted)] tabular-nums">
-            Showing <strong className="text-[var(--color-foreground)]">{filtered.length}</strong>
+            Showing <strong className="text-[var(--color-foreground)]">{sorted.length}</strong>
             {hasFilters && " of "}{hasFilters && products.length} products
           </span>
         </div>
@@ -359,7 +396,7 @@ function ProductsPageInner() {
       {/* 5. Product Catalog Grid */}
       <section aria-label="Product catalog">
         <CatalogGrid
-          products={filtered}
+          products={sorted}
           loading={loading}
           quantities={quantities}
           onQuantityChange={setQty}

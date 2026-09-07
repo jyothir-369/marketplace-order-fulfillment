@@ -1,11 +1,10 @@
 /**
- * app/(storefront)/vendors/[vendorId]/page.tsx — Luxury Vendor Showcase (§3).
+ * app/(storefront)/vendors/[vendorId]/page.tsx — Luxury Vendor Detail Page (V2 Premium).
  *
- * Upgraded from a plain gray box to a signature editorial brand showcase:
- *   - Rich signature category gradient hero banner
- *   - Elevated brand monogram emblem with brass rim
- *   - Trust & verification badges (Rating, Dispatch speed, Authenticity)
- *   - Clean back navigation & editorial breadcrumbs
+ * Full editorial brand experience upgraded from a basic card hero to:
+ *   - Midnight navy + brass editorial hero (mirrors /products hero pattern)
+ *   - "Our Story" editorial block with Playfair serif typography
+ *   - 4-item stats grid (Active Catalog, Dispatch, Founded, Rating)
  *   - CatalogGrid with Phase 3 luxury ProductCards
  */
 
@@ -22,6 +21,8 @@ import {
   Truck,
   Package,
   CheckCircle2,
+  ArrowRight,
+
   Wrench,
   Cpu,
   Shirt,
@@ -36,6 +37,7 @@ import { useToast, ToastProvider } from "@/components/ui/toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getVendorMeta, type VendorMeta } from "@/lib/vendor-meta";
+import { editorialEyebrows } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
 function CategoryIcon({ type, className }: { type: VendorMeta["iconType"]; className?: string }) {
@@ -56,7 +58,8 @@ function CategoryIcon({ type, className }: { type: VendorMeta["iconType"]; class
 }
 
 function VendorStorefrontInner() {
-  const params = useParams();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const params = useParams();
   const vendorId = String(params.vendorId ?? "");
   const { push: toast } = useToast();
   const addToCart = useCartStore((s) => s.addToCart);
@@ -79,9 +82,7 @@ function VendorStorefrontInner() {
       const vendorProducts = all.filter((p) => p.vendorId === vendorId && p.isActive);
       setProducts(vendorProducts);
       const init: Record<string, number> = {};
-      vendorProducts.forEach((p) => {
-        init[p.id] = 1;
-      });
+      vendorProducts.forEach((p) => { init[p.id] = 1; });
       setQuantities(init);
       setHasLoaded(true);
     } catch (err) {
@@ -91,9 +92,7 @@ function VendorStorefrontInner() {
     }
   }, [vendorId]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   const setQty = (productId: string, n: number) =>
     setQuantities((prev) => ({ ...prev, [productId]: Math.max(1, n) }));
@@ -124,13 +123,14 @@ function VendorStorefrontInner() {
   const initial = (vendor?.name ?? "M").charAt(0).toUpperCase();
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
+    <div className="max-w-7xl mx-auto px-6 py-8 space-y-12">
+
       {/* Back link */}
       <Link
         href="/vendors"
         className={cn(
           "inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider",
-          "text-[var(--color-warm-muted)] hover:text-[var(--color-brass)]",
+          "text-white/60 hover:text-[var(--color-brass)]",
           "transition-colors group"
         )}
       >
@@ -138,115 +138,84 @@ function VendorStorefrontInner() {
         <span>Back to All Vendors</span>
       </Link>
 
-      {/* Signature Brand Showcase Hero Banner */}
-      <div
+      {/* ================================================================
+          1. Editorial Hero — Midnight Navy + Brass
+          ================================================================ */}
+      <section
         className={cn(
           "relative overflow-hidden rounded-3xl",
-          "bg-[var(--color-card)] border border-[var(--color-warm-border)]",
-          "shadow-v2-lg"
+          "bg-gradient-to-br from-[#0e1830] via-[#16233f] to-[#1d2d4f]",
+          "border border-[var(--color-brass)]/35 text-white shadow-v2-lg",
+          "p-8 sm:p-12"
         )}
       >
-        {/* Upper Signature Gradient Canvas */}
+        {/* Decorative monogram watermark */}
         <div
-          className={cn(
-            "relative h-40 sm:h-52 w-full overflow-hidden bg-gradient-to-r",
-            meta.gradient
-          )}
+          aria-hidden
+          className="absolute -right-8 -bottom-10 select-none pointer-events-none opacity-[0.07]"
         >
-          <div className="absolute inset-0 bg-black/20 mix-blend-multiply" />
-          <div className="absolute -right-8 -bottom-8 opacity-20 text-white pointer-events-none">
-            <CategoryIcon type={meta.iconType} className="h-48 w-48 transform -rotate-12" />
-          </div>
-
-          {/* Top banner badges */}
-          <div className="absolute top-4 right-4 flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-black/50 text-white backdrop-blur-md border border-white/20 shadow-xs">
-              <ShieldCheck className="h-3.5 w-3.5 text-amber-300" />
-              Verified Marketplace Partner
-            </span>
-            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-black/60 text-amber-300 backdrop-blur-md border border-amber-400/30 shadow-xs">
-              <Star className="h-3.5 w-3.5 fill-amber-300 text-amber-300" />
-              {meta.rating.toFixed(1)} Rating
-            </span>
-          </div>
+          <CategoryIcon type={meta.iconType} className="h-56 w-56" />
         </div>
+        {/* Radial brass glow */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_20%_50%,rgba(169,128,63,0.12),transparent_60%)]" />
 
-        {/* Lower Content & Brand Details */}
-        <div className="px-6 sm:px-10 pb-8 pt-0">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 -mt-12 sm:-mt-16 mb-6">
-            {/* Brand Monogram Avatar */}
-            <div
-              className={cn(
-                "h-24 w-24 sm:h-28 sm:w-28 rounded-3xl flex items-center justify-center shrink-0",
-                "bg-gradient-to-br shadow-xl ring-4 ring-[var(--color-card)]",
-                meta.emblemGradient
-              )}
-            >
-              <span className="font-display text-4xl sm:text-5xl font-bold text-white leading-none">
-                {initial}
-              </span>
-            </div>
+        <div className="relative z-10 max-w-2xl space-y-6">
+          {/* Eyebrow */}
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--color-brass)]">
+            {editorialEyebrows.vendors}
+          </p>
 
-            {/* Live Stats Pills */}
-            <div className="flex flex-wrap items-center gap-2 sm:self-end">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-[var(--color-cream)] text-[var(--color-ink-navy)] border border-[var(--color-warm-border)] shadow-xs">
-                <Package className="h-4 w-4 text-[var(--color-brass)]" />
-                {products.length} Active Products
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-[var(--color-cream)] text-[var(--color-ink-navy)] border border-[var(--color-warm-border)] shadow-xs">
-                <Truck className="h-4 w-4 text-[var(--color-forest)]" />
-                Direct Dispatch
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-[var(--color-cream)] text-[var(--color-ink-navy)] border border-[var(--color-warm-border)] shadow-xs">
-                <CheckCircle2 className="h-4 w-4 text-sky-600" />
-                Guaranteed Fulfillment
-              </span>
-            </div>
+          {/* Vendor monogram emblem */}
+          <div
+            className={cn(
+              "h-16 w-16 rounded-2xl flex items-center justify-center",
+              "bg-gradient-to-br shadow-lg ring-4 ring-white/20"
+            )}
+            style={{ background: `linear-gradient(135deg, hsl(220 33% 22%), hsl(220 45% 8%))` }}
+            aria-hidden
+          >
+            <span className="font-display text-3xl font-bold text-white/90 leading-none">
+              {initial}
+            </span>
           </div>
 
-          {/* Titles & Editorial Description */}
+          {/* Vendor name + category */}
           {loading ? (
-            <div className="space-y-3">
-              <Skeleton height="2.5rem" width="18rem" />
-              <Skeleton height="1.25rem" width="30rem" />
+            <div className="space-y-2">
+              <Skeleton height="3rem" width="18rem" className="rounded-xl" />
+              <Skeleton height="1rem" width="12rem" className="rounded" />
             </div>
           ) : vendor ? (
-            <div className="space-y-3 max-w-3xl">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-brass)]">
-                  {meta.category} &middot; {meta.established}
-                </p>
-                <h1 className="font-display text-3xl sm:text-4xl font-bold text-[var(--color-foreground)] mt-1">
-                  {vendor.name}
-                </h1>
-              </div>
-
-              <p className="text-sm sm:text-base text-[var(--color-warm-muted)] leading-relaxed">
+            <>
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/50">
+                {meta.category} &middot; {meta.established}
+              </p>
+              <h1 className="font-display text-4xl sm:text-5xl font-bold leading-[1.1] text-white">
+                {vendor.name}
+              </h1>
+              <p className="text-sm text-white/60 leading-relaxed max-w-md">
                 {meta.tagline}
               </p>
-
-              {/* Badges row */}
-              <div className="pt-2 flex flex-wrap gap-2">
-                {meta.highlights.map((h, i) => (
-                  <span
-                    key={i}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium bg-[var(--color-cream)]/70 text-[var(--color-warm-muted)] border border-[var(--color-warm-border)]"
-                  >
-                    ✦ {h}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ) : hasLoaded ? (
-            <div>
-              <h1 className="font-display text-3xl font-bold text-[var(--color-foreground)]">Vendor not found</h1>
-              <p className="text-sm text-[var(--color-warm-muted)] mt-1">
-                This vendor may have been removed or has no active products.
-              </p>
-            </div>
+            </>
           ) : null}
+
+          {/* Trust badges */}
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-1">
+            <span className="inline-flex items-center gap-1.5 text-xs text-white/70">
+              <ShieldCheck className="h-3.5 w-3.5 text-[var(--color-brass)]" />
+              Verified Seller
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-xs text-white/70">
+              <Truck className="h-3.5 w-3.5 text-[var(--color-brass)]" />
+              Fast Dispatch
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-xs text-white/70">
+              <Star className="h-3.5 w-3.5 text-[var(--color-brass)]" />
+              {meta.rating.toFixed(1)} ({meta.reviewsCount} reviews)
+            </span>
+          </div>
         </div>
-      </div>
+      </section>
 
       {error && (
         <div
@@ -257,20 +226,172 @@ function VendorStorefrontInner() {
         </div>
       )}
 
-      {/* Catalog Grid Section */}
-      <section className="space-y-6 pt-2">
+      {/* ================================================================
+          2. "Our Story" Editorial Block
+          ================================================================ */}
+      {!loading && vendor && (
+        <section className="space-y-6">
+          {/* Section header */}
+          <div className="flex items-center gap-4">
+            <span className="h-px flex-1 bg-[var(--color-warm-border)]" />
+            <h2 className="font-display text-xl font-bold text-[var(--color-foreground)] shrink-0">
+              Our Story
+            </h2>
+            <span className="h-px flex-1 bg-[var(--color-warm-border)]" />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Paragraph 1 */}
+            <div className="space-y-3">
+              <p className="font-display text-lg font-bold text-[var(--color-foreground)] leading-snug">
+                Founded on craft &amp; precision
+              </p>
+              <p className="text-sm text-[var(--color-warm-muted)] leading-relaxed">
+                {vendor.name} has been a trusted name in the {meta.category.toLowerCase()} space since {meta.established.toLowerCase()}. Every item in the storefront reflects a commitment to quality that can not be rushed — from material selection to final inspection.
+              </p>
+            </div>
+
+            {/* Paragraph 2 */}
+            <div className="space-y-3">
+              <p className="font-display text-lg font-bold text-[var(--color-foreground)] leading-snug">
+                Sourced with intention
+              </p>
+              <p className="text-sm text-[var(--color-warm-muted)] leading-relaxed">
+                {meta.tagline} The team behind {vendor.name} personally tests and curates every product to ensure it meets the standard their community of buyers has come to expect. Authenticity is never compromised.
+              </p>
+            </div>
+
+            {/* Paragraph 3 */}
+            <div className="space-y-3">
+              <p className="font-display text-lg font-bold text-[var(--color-foreground)] leading-snug">
+                Delivered with care
+              </p>
+              <p className="text-sm text-[var(--color-warm-muted)] leading-relaxed">
+                Every order is handled directly through our automated multi-carrier fulfillment network — meaning faster dispatch, real-time tracking, and buyer protection built in. Questions? Our merchant team is one message away.
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ================================================================
+          3. Stats Grid — 4 key metrics
+          ================================================================ */}
+      {!loading && vendor && (
+        <section
+          className={cn(
+            "grid grid-cols-2 sm:grid-cols-4 gap-3",
+            "bg-[var(--color-card)] border border-[var(--color-warm-border)]",
+            "rounded-2xl p-5 shadow-v2"
+          )}
+        >
+          {/* Active Catalog */}
+          <div className="flex items-start gap-3 px-3 py-2">
+            <div className="mt-0.5 rounded-lg bg-[var(--color-brass)]/15 p-2 text-[var(--color-brass)]">
+              <Package className="h-4 w-4" aria-hidden />
+            </div>
+            <div>
+              <p className="font-display text-xl font-bold text-[var(--color-foreground)] tabular-nums leading-none">
+                {vendor.activeProductCount}
+              </p>
+              <p className="text-[10px] text-[var(--color-warm-muted)] mt-0.5 leading-tight">
+                Active<br />Catalog
+              </p>
+            </div>
+          </div>
+
+          {/* Ships in Window */}
+          <div className="flex items-start gap-3 px-3 py-2">
+            <div className="mt-0.5 rounded-lg bg-[var(--color-forest)]/15 p-2 text-[var(--color-forest)]">
+              <Truck className="h-4 w-4" aria-hidden />
+            </div>
+            <div>
+              <p className="font-display text-xl font-bold text-[var(--color-foreground)] tabular-nums leading-none">
+                &lt;48h
+              </p>
+              <p className="text-[10px] text-[var(--color-warm-muted)] mt-0.5 leading-tight">
+                Dispatch<br />Window
+              </p>
+            </div>
+          </div>
+
+          {/* Founding Year */}
+          <div className="flex items-start gap-3 px-3 py-2">
+            <div className="mt-0.5 rounded-lg bg-[var(--color-ink-navy)]/10 p-2 text-[var(--color-ink-navy)]">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+            </div>
+            <div>
+              <p className="font-display text-xl font-bold text-[var(--color-foreground)] tabular-nums leading-none">
+                {meta.established.replace("Est. ", "")}
+              </p>
+              <p className="text-[10px] text-[var(--color-warm-muted)] mt-0.5 leading-tight">
+                Founded<br />Year
+              </p>
+            </div>
+          </div>
+
+          {/* Fulfillment Rating */}
+          <div className="flex items-start gap-3 px-3 py-2">
+            <div className="mt-0.5 rounded-lg bg-[var(--color-accent)]/15 p-2 text-[var(--color-accent)]">
+              <Star className="h-4 w-4" aria-hidden />
+            </div>
+            <div>
+              <p className="font-display text-xl font-bold text-[var(--color-foreground)] tabular-nums leading-none">
+                {meta.rating.toFixed(1)}
+              </p>
+              <p className="text-[10px] text-[var(--color-warm-muted)] mt-0.5 leading-tight">
+                Seller<br />Rating
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ================================================================
+          4. Vendor Provenance Tags
+          ================================================================ */}
+      {!loading && vendor && meta.tags && meta.tags.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-warm-muted)]">
+            Provenance:
+          </p>
+          {meta.tags.map((tag, i) => (
+            <span key={tag} className="inline-flex items-center">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-brass)]">
+                {tag}
+              </span>
+              {i < meta.tags.length - 1 && (
+                <span className="mx-2 h-1 w-1 rounded-full bg-[var(--color-brass)]/50" aria-hidden />
+              )}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* ================================================================
+          5. Catalog Grid Section
+          ================================================================ */}
+      <section className="space-y-6">
         <div className="flex items-center justify-between border-b border-[var(--color-warm-border)] pb-4">
           <div>
-            <h2 className="font-display text-2xl font-bold text-[var(--color-foreground)]">
-              Storefront Collection
-            </h2>
-            <p className="text-xs text-[var(--color-warm-muted)] mt-0.5">
-              Browse all authentic items fulfilled directly by {vendor?.name ?? "this vendor"}
-            </p>
+            {loading ? (
+              <Skeleton height="1.75rem" width="12rem" className="rounded" />
+            ) : (
+              <h2 className="font-display text-2xl font-bold text-[var(--color-foreground)]">
+                Storefront Collection
+              </h2>
+            )}
+            {!loading && (
+              <p className="text-xs text-[var(--color-warm-muted)] mt-0.5">
+                Browse all authentic items fulfilled directly by {vendor?.name ?? "this vendor"}
+              </p>
+            )}
           </div>
-          <span className="text-xs font-semibold text-[var(--color-warm-muted)]">
-            {products.length} {products.length === 1 ? "Item" : "Items"}
-          </span>
+          {!loading && (
+            <span className="text-xs font-semibold text-[var(--color-warm-muted)]">
+              {products.length} {products.length === 1 ? "Item" : "Items"}
+            </span>
+          )}
         </div>
 
         {loading ? (
