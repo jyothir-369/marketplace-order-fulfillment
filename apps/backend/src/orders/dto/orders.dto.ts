@@ -1,4 +1,4 @@
-import { IsUUID, IsNumber, IsArray, ValidateNested, Min, ArrayMinSize, IsOptional, IsString, IsIn, IsInt, Min as MinInt } from 'class-validator';
+﻿import { IsUUID, IsNumber, IsArray, ValidateNested, Min, ArrayMinSize, IsOptional, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
 import { OrderStatus } from '../../common/entities/order.entity';
 import { FulfillmentStatus } from '../../common/entities/order-line-item.entity';
@@ -32,32 +32,6 @@ export class CheckoutDto {
   shippingAddress?: string;
 }
 
-/**
- * Order lifecycle actions exposed to vendors.
- * CONFIRM: placed -> confirmed
- * FULFILL: confirmed -> fulfilling
- * SHIP:    fulfilling -> fulfilled
- * CANCEL:  placed|confirmed|fulfilling -> cancelled (restores inventory)
- */
-export const ORDER_TRANSITION_ACTIONS = ['CONFIRM', 'FULFILL', 'SHIP', 'CANCEL'] as const;
-export type OrderTransitionAction = (typeof ORDER_TRANSITION_ACTIONS)[number];
-
-export class TransitionOrderDto {
-  @IsIn(ORDER_TRANSITION_ACTIONS as readonly string[])
-  action: OrderTransitionAction;
-
-  @IsOptional()
-  @IsString()
-  reason?: string;
-
-  /**
-   * Optional actor (vendor/user) identifier for audit attribution.
-   */
-  @IsOptional()
-  @IsUUID()
-  actorId?: string;
-}
-
 export class OrderLineItemResponseDto {
   id: string;
   productId: string;
@@ -73,21 +47,18 @@ export class OrderLineItemResponseDto {
 }
 
 export class OrderResponseDto {
-  /** Human-readable order number (e.g. ORD-20260902-A1B2). */
-  orderNumber: string;
-
   id: string;
   buyerId: string;
   status: OrderStatus;
   totalAmount: number;
   correlationId: string;
-
+  
   /**
    * Shipping address for the order.
    * Added as part of Phase 7 expand-and-contract migration.
    */
   shippingAddress?: string;
-
+  
   lineItems: OrderLineItemResponseDto[];
   createdAt: Date;
   updatedAt: Date;
@@ -98,32 +69,4 @@ export class CheckoutResponseDto {
   order?: OrderResponseDto;
   message: string;
   correlationId: string;
-}
-
-/**
- * Paginated order list query params for GET /api/orders.
- */
-export class PaginatedOrdersQueryDto {
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @MinInt(1)
-  page?: number = 1;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @MinInt(1)
-  limit?: number = 20;
-
-  @IsOptional()
-  @IsString()
-  status?: string;
-}
-
-export class PaginatedOrdersResponseDto {
-  total: number;
-  page: number;
-  limit: number;
-  orders: OrderResponseDto[];
 }

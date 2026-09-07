@@ -5,7 +5,7 @@ import { OrderLineItem, FulfillmentStatus } from '../common/entities/order-line-
 import { VendorSyncJob, SyncJobStatus, MAX_RETRY_ATTEMPTS } from '../common/entities/vendor-sync-job.entity';
 import { Order, OrderStatus } from '../common/entities/order.entity';
 import { VendorMockService } from '../integrations/vendor-mock/vendor-mock.service';
-import { VendorFulfillmentRequestDto, VendorResponseType } from '../integrations/vendor-mock/dto/vendor-mock.dto';
+import { VendorFulfillmentRequestDto } from '../integrations/vendor-mock/dto/vendor-mock.dto';
 import { SyncJobDto, ReconciliationResultDto, ManualResolutionDto } from './dto/fulfillment.dto';
 import { AuditService } from '../common/audit';
 
@@ -206,10 +206,6 @@ export class FulfillmentService {
             await this.auditService.logReconciliationResolved(correlationId, job.id, 'Vendor confirmed fulfillment');
 
             result.resolved++;
-          } else if (statusResponse.responseType === VendorResponseType.FAILURE) {
-            await this.syncJobRepository.update(job.id, { status: SyncJobStatus.DEAD_LETTER, errorMessage: statusResponse.message });
-            await this.lineItemRepository.update(lineItem.id, { fulfillmentStatus: FulfillmentStatus.FAILED, failureReason: statusResponse.message });
-            result.resolved++; // Treated as resolved because we got a definitive answer
           } else {
             await this.syncJobRepository.update(job.id, { status: SyncJobStatus.AMBIGUOUS });
             await this.lineItemRepository.update(lineItem.id, { fulfillmentStatus: FulfillmentStatus.AMBIGUOUS });
@@ -235,12 +231,6 @@ export class FulfillmentService {
       throw new NotFoundException('Line item ' + lineItemId + ' not found');
     }
 
-    // Validate transition
-    const validFromStatuses = [FulfillmentStatus.PENDING, FulfillmentStatus.SYNCING, FulfillmentStatus.AMBIGUOUS];
-    if (!validFromStatuses.includes(lineItem.fulfillmentStatus)) {
-      throw new Error('Invalid state transition: Cannot resolve from ' + lineItem.fulfillmentStatus);
-    }
-
     const previousStatus = lineItem.fulfillmentStatus;
     const updateData: any = { fulfillmentStatus: dto.newStatus };
     if (dto.vendorReference) { updateData.vendorReference = dto.vendorReference; }
@@ -249,11 +239,8 @@ export class FulfillmentService {
     await this.lineItemRepository.update(lineItemId, updateData);
 
     if (lineItem.syncJob) {
-      const newJobStatus = dto.newStatus === FulfillmentStatus.CONFIRMED ? SyncJobStatus.COMPLETED : SyncJobStatus.DEAD_LETTER;
       await this.syncJobRepository.update(lineItem.syncJob.id, {
-        status: newJobStatus,
-        errorMessage: dto.reason || null,
-        completedAt: new Date(),
+        status: dto.newStatus === FulfillmentStatus.CONFIRMED ? SyncJobStatus.COMPLETED : SyncJobStatus.DEAD_LETTER,
       });
     }
 
@@ -271,45 +258,22 @@ export class FulfillmentService {
   }
 
   async checkOrderFulfillment(orderId: string, correlationId: string): Promise<void> {
-    const order = await this.orderRepository.findOne({
-      where: { id: orderId },
-      relations: { lineItems: true },
-    });
-    if (!order || order.status === OrderStatus.CANCELLED) return;
-
-    const lineItems = order.lineItems;
-    const anySyncing = lineItems.some(
-      (item) => item.fulfillmentStatus === FulfillmentStatus.SYNCING || item.fulfillmentStatus === FulfillmentStatus.PENDING,
-    );
-    const anyConfirmed = lineItems.some((item) => item.fulfillmentStatus === FulfillmentStatus.CONFIRMED);
-    const anyFailed = lineItems.some((item) => item.fulfillmentStatus === FulfillmentStatus.FAILED);
-    const allFinished = lineItems.every(
+    const lineItems = await this.lineItemRepository.find({ where: { orderId } });
+    const allConfirmed = lineItems.every(
       (item) => item.fulfillmentStatus === FulfillmentStatus.CONFIRMED || item.fulfillmentStatus === FulfillmentStatus.FAILED,
     );
+    const anyDeadLetter = lineItems.some((item) => item.fulfillmentStatus === FulfillmentStatus.DEAD_LETTER);
 
-    let newStatus: OrderStatus = order.status;
+    if (allConfirmed) {
+      const order = await this.orderRepository.findOne({ where: { id: orderId } });
+      if (order) {
+        const previousStatus = order.status;
+        const newStatus = anyDeadLetter ? OrderStatus.FULFILLING : OrderStatus.FULFILLED;
+        await this.orderRepository.update(orderId, { status: newStatus });
 
-    // Transition to FULFILLING if not already in a terminal state and fulfillment has started
-    if (order.status === OrderStatus.PLACED || order.status === OrderStatus.CONFIRMED) {
-      if (anySyncing || anyConfirmed || anyFailed) {
-        newStatus = OrderStatus.FULFILLING;
+        // Audit: log order status change
+        await this.auditService.logOrderStatusChange(correlationId, orderId, previousStatus, newStatus);
       }
-    }
-
-    // Transition to FULFILLED or FAILED (or partial) when all items finished
-    if (allFinished) {
-      if (anyConfirmed && !anyFailed) {
-        newStatus = OrderStatus.FULFILLED;
-      } else if (anyFailed) {
-        // If there's any failure, it might not be fully FULFILLED, but keep as FULFILLING or handle FAILED
-        // Based on prompt: FAILED+SUCCESS combination check. Let's mark as FAILED for now if not fully fulfilled.
-        newStatus = anyConfirmed ? OrderStatus.FULFILLED : OrderStatus.CANCELLED; // Simplified for iteration
-      }
-    }
-
-    if (newStatus !== order.status) {
-      await this.orderRepository.update(orderId, { status: newStatus });
-      await this.auditService.logOrderStatusChange(correlationId, orderId, order.status, newStatus);
     }
   }
 

@@ -1,15 +1,43 @@
-
+# Dependencies
 node_modules/
-dist/
-tsconfig.tsbuildinfo
 
-
+# Build outputs
 dist/
+.next/
+.turbo/
 *.tsbuildinfo
-node_modules/
 
-dist/
-*.tsbuildinfo
-node_modules/
+# Environment
+.env
+.env.local
+.env.*.local
 
-dist/
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Tests
+coverage/
+.nyc_output/
+
+# Docker
+docker-compose*.yml
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# Misc
+*.bak
+*.tmp
