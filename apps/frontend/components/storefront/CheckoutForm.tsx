@@ -1,5 +1,5 @@
 /**
- * CheckoutForm � react-hook-form + Zod checkout form (�3.1.4).
+ * CheckoutForm — react-hook-form + Zod checkout form (§3.1.4).
  *
  * Mirrors the backend `CheckoutDto` schema:
  *   - shippingAddress: 5-500 characters
@@ -390,8 +390,8 @@ function CheckoutInner() {
             )}
           >
             {isSubmitting
-              ? "Placing order�"
-              : `Place Order � ${formatCurrency(totalAmount)}`}
+              ? "Placing order..."
+              : `Place Order · ${formatCurrency(totalAmount)}`}
           </button>
         </div>
       </form>

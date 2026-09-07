@@ -1,11 +1,12 @@
 /**
- * app/(storefront)/vendors/[vendorId]/page.tsx � Vendor showcase (�3).
+ * app/(storefront)/vendors/[vendorId]/page.tsx — Luxury Vendor Showcase (§3).
  *
- * V2 Premium treatment:
- *   - Warm gradient vendor hero card with serif title
- *   - Brass eyebrow label
- *   - Storefront catalog grid (Phase 3 ProductCard already V2-skinned)
- *   - Back link in editorial style
+ * Upgraded from a plain gray box to a signature editorial brand showcase:
+ *   - Rich signature category gradient hero banner
+ *   - Elevated brand monogram emblem with brass rim
+ *   - Trust & verification badges (Rating, Dispatch speed, Authenticity)
+ *   - Clean back navigation & editorial breadcrumbs
+ *   - CatalogGrid with Phase 3 luxury ProductCards
  */
 
 "use client";
@@ -13,7 +14,20 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Store } from "lucide-react";
+import {
+  ArrowLeft,
+  Store,
+  ShieldCheck,
+  Star,
+  Truck,
+  Package,
+  CheckCircle2,
+  Wrench,
+  Cpu,
+  Shirt,
+  Utensils,
+  Activity,
+} from "lucide-react";
 import { getCatalog, getVendors } from "@/lib/api";
 import type { ProductDto, VendorResponseDto } from "@/lib/types";
 import { useCartStore } from "@/context/CartStore";
@@ -21,7 +35,25 @@ import { CatalogGrid } from "@/components/storefront/CatalogGrid";
 import { useToast, ToastProvider } from "@/components/ui/toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { getVendorMeta, type VendorMeta } from "@/lib/vendor-meta";
 import { cn } from "@/lib/utils";
+
+function CategoryIcon({ type, className }: { type: VendorMeta["iconType"]; className?: string }) {
+  switch (type) {
+    case "tools":
+      return <Wrench className={className} />;
+    case "electronics":
+      return <Cpu className={className} />;
+    case "fashion":
+      return <Shirt className={className} />;
+    case "home":
+      return <Utensils className={className} />;
+    case "sports":
+      return <Activity className={className} />;
+    default:
+      return <Store className={className} />;
+  }
+}
 
 function VendorStorefrontInner() {
   const params = useParams();
@@ -47,7 +79,9 @@ function VendorStorefrontInner() {
       const vendorProducts = all.filter((p) => p.vendorId === vendorId && p.isActive);
       setProducts(vendorProducts);
       const init: Record<string, number> = {};
-      vendorProducts.forEach((p) => { init[p.id] = 1; });
+      vendorProducts.forEach((p) => {
+        init[p.id] = 1;
+      });
       setQuantities(init);
       setHasLoaded(true);
     } catch (err) {
@@ -57,7 +91,9 @@ function VendorStorefrontInner() {
     }
   }, [vendorId]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const setQty = (productId: string, n: number) =>
     setQuantities((prev) => ({ ...prev, [productId]: Math.max(1, n) }));
@@ -84,64 +120,130 @@ function VendorStorefrontInner() {
     }, 2000);
   };
 
+  const meta = getVendorMeta(vendor?.name);
+  const initial = (vendor?.name ?? "M").charAt(0).toUpperCase();
+
   return (
-    <div className="max-w-7xl mx-auto px-6 py-10">
+    <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
       {/* Back link */}
       <Link
         href="/vendors"
         className={cn(
-          "inline-flex items-center gap-1.5 text-sm font-medium",
-          "text-[var(--color-warm-muted)] hover:text-[var(--color-accent)]",
-          "transition-colors mb-6 group"
+          "inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider",
+          "text-[var(--color-warm-muted)] hover:text-[var(--color-brass)]",
+          "transition-colors group"
         )}
       >
-        <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" aria-hidden />
-        Back to vendors
+        <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" aria-hidden />
+        <span>Back to All Vendors</span>
       </Link>
 
-      {/* Vendor profile hero */}
-      <div className="mb-8 flex items-start gap-5">
-        {/* Gradient icon block */}
-        <div className={cn(
-          "h-16 w-16 rounded-2xl shrink-0 flex items-center justify-center",
-          "bg-gradient-to-br from-[var(--color-cream)] to-[var(--color-ivory-muted)]",
-          "text-[var(--color-accent)] shadow-v2"
+      {/* Signature Brand Showcase Hero Banner */}
+      <div
+        className={cn(
+          "relative overflow-hidden rounded-3xl",
+          "bg-[var(--color-card)] border border-[var(--color-warm-border)]",
+          "shadow-v2-lg"
         )}
-          aria-hidden
+      >
+        {/* Upper Signature Gradient Canvas */}
+        <div
+          className={cn(
+            "relative h-40 sm:h-52 w-full overflow-hidden bg-gradient-to-r",
+            meta.gradient
+          )}
         >
-          <Store className="h-8 w-8" />
+          <div className="absolute inset-0 bg-black/20 mix-blend-multiply" />
+          <div className="absolute -right-8 -bottom-8 opacity-20 text-white pointer-events-none">
+            <CategoryIcon type={meta.iconType} className="h-48 w-48 transform -rotate-12" />
+          </div>
+
+          {/* Top banner badges */}
+          <div className="absolute top-4 right-4 flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-black/50 text-white backdrop-blur-md border border-white/20 shadow-xs">
+              <ShieldCheck className="h-3.5 w-3.5 text-amber-300" />
+              Verified Marketplace Partner
+            </span>
+            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-black/60 text-amber-300 backdrop-blur-md border border-amber-400/30 shadow-xs">
+              <Star className="h-3.5 w-3.5 fill-amber-300 text-amber-300" />
+              {meta.rating.toFixed(1)} Rating
+            </span>
+          </div>
         </div>
-        <div>
+
+        {/* Lower Content & Brand Details */}
+        <div className="px-6 sm:px-10 pb-8 pt-0">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 -mt-12 sm:-mt-16 mb-6">
+            {/* Brand Monogram Avatar */}
+            <div
+              className={cn(
+                "h-24 w-24 sm:h-28 sm:w-28 rounded-3xl flex items-center justify-center shrink-0",
+                "bg-gradient-to-br shadow-xl ring-4 ring-[var(--color-card)]",
+                meta.emblemGradient
+              )}
+            >
+              <span className="font-display text-4xl sm:text-5xl font-bold text-white leading-none">
+                {initial}
+              </span>
+            </div>
+
+            {/* Live Stats Pills */}
+            <div className="flex flex-wrap items-center gap-2 sm:self-end">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-[var(--color-cream)] text-[var(--color-ink-navy)] border border-[var(--color-warm-border)] shadow-xs">
+                <Package className="h-4 w-4 text-[var(--color-brass)]" />
+                {products.length} Active Products
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-[var(--color-cream)] text-[var(--color-ink-navy)] border border-[var(--color-warm-border)] shadow-xs">
+                <Truck className="h-4 w-4 text-[var(--color-forest)]" />
+                Direct Dispatch
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-[var(--color-cream)] text-[var(--color-ink-navy)] border border-[var(--color-warm-border)] shadow-xs">
+                <CheckCircle2 className="h-4 w-4 text-sky-600" />
+                Guaranteed Fulfillment
+              </span>
+            </div>
+          </div>
+
+          {/* Titles & Editorial Description */}
           {loading ? (
-            <>
-              <Skeleton height="2rem" width="14rem" />
-              <Skeleton height="1rem" width="8rem" className="mt-2" />
-            </>
+            <div className="space-y-3">
+              <Skeleton height="2.5rem" width="18rem" />
+              <Skeleton height="1.25rem" width="30rem" />
+            </div>
           ) : vendor ? (
-            <>
-              <p
-                aria-hidden
-                className="text-[10.5px] font-bold uppercase tracking-[0.18em] text-[var(--color-accent)] mb-0.5"
-              >
-                Vendor storefront
+            <div className="space-y-3 max-w-3xl">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-brass)]">
+                  {meta.category} &middot; {meta.established}
+                </p>
+                <h1 className="font-display text-3xl sm:text-4xl font-bold text-[var(--color-foreground)] mt-1">
+                  {vendor.name}
+                </h1>
+              </div>
+
+              <p className="text-sm sm:text-base text-[var(--color-warm-muted)] leading-relaxed">
+                {meta.tagline}
               </p>
-              <h1 className="font-display text-3xl font-bold text-[var(--color-foreground)]">
-                {vendor.name}
-              </h1>
-              <p className="text-sm text-[var(--color-warm-muted)] mt-1">
-                {vendor.activeProductCount} active product{vendor.activeProductCount !== 1 ? "s" : ""}
-                {vendor.activeProductCount !== vendor.productCount && (
-                  <> &middot; {vendor.productCount} total</>
-                )}
-              </p>
-            </>
+
+              {/* Badges row */}
+              <div className="pt-2 flex flex-wrap gap-2">
+                {meta.highlights.map((h, i) => (
+                  <span
+                    key={i}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium bg-[var(--color-cream)]/70 text-[var(--color-warm-muted)] border border-[var(--color-warm-border)]"
+                  >
+                    ✦ {h}
+                  </span>
+                ))}
+              </div>
+            </div>
           ) : hasLoaded ? (
-            <>
+            <div>
               <h1 className="font-display text-3xl font-bold text-[var(--color-foreground)]">Vendor not found</h1>
               <p className="text-sm text-[var(--color-warm-muted)] mt-1">
                 This vendor may have been removed or has no active products.
               </p>
-            </>
+            </div>
           ) : null}
         </div>
       </div>
@@ -149,43 +251,54 @@ function VendorStorefrontInner() {
       {error && (
         <div
           role="alert"
-          className="mb-4 rounded-md border border-[var(--color-destructive)] bg-[var(--color-destructive)]/10 text-[var(--color-destructive)] p-4 text-sm font-medium"
+          className="rounded-2xl border border-[var(--color-destructive)] bg-[var(--color-destructive)]/10 text-[var(--color-destructive)] p-5 text-sm font-medium"
         >
           {error}
         </div>
       )}
 
-      {loading ? (
-        <CatalogGrid
-          products={[]}
-          loading={true}
-          quantities={{}}
-          onQuantityChange={() => undefined}
-          onAdd={() => undefined}
-          addedIds={new Set()}
-        />
-      ) : hasLoaded && products.length === 0 ? (
-        <EmptyState
-          icon={
-            <svg xmlns="http://www.w3.org/2000/svg" width={56} height={56} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden>
-              <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
-              <line x1="3" y1="6" x2="21" y2="6" />
-              <path d="M16 10a4 4 0 0 1-8 0" />
-            </svg>
-          }
-          title="No products from this vendor yet"
-          description="Check back later or browse other vendors."
-        />
-      ) : (
-        <CatalogGrid
-          products={products}
-          loading={false}
-          quantities={quantities}
-          onQuantityChange={setQty}
-          onAdd={handleAdd}
-          addedIds={addedIds}
-        />
-      )}
+      {/* Catalog Grid Section */}
+      <section className="space-y-6 pt-2">
+        <div className="flex items-center justify-between border-b border-[var(--color-warm-border)] pb-4">
+          <div>
+            <h2 className="font-display text-2xl font-bold text-[var(--color-foreground)]">
+              Storefront Collection
+            </h2>
+            <p className="text-xs text-[var(--color-warm-muted)] mt-0.5">
+              Browse all authentic items fulfilled directly by {vendor?.name ?? "this vendor"}
+            </p>
+          </div>
+          <span className="text-xs font-semibold text-[var(--color-warm-muted)]">
+            {products.length} {products.length === 1 ? "Item" : "Items"}
+          </span>
+        </div>
+
+        {loading ? (
+          <CatalogGrid
+            products={[]}
+            loading={true}
+            quantities={{}}
+            onQuantityChange={() => undefined}
+            onAdd={() => undefined}
+            addedIds={new Set()}
+          />
+        ) : hasLoaded && products.length === 0 ? (
+          <EmptyState
+            icon={<Store className="h-10 w-10 text-[var(--color-brass)]" />}
+            title="No products from this vendor yet"
+            description="Check back later or browse our other verified merchants."
+          />
+        ) : (
+          <CatalogGrid
+            products={products}
+            loading={false}
+            quantities={quantities}
+            onQuantityChange={setQty}
+            onAdd={handleAdd}
+            addedIds={addedIds}
+          />
+        )}
+      </section>
     </div>
   );
 }

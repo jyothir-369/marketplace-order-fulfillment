@@ -86,6 +86,7 @@ export const tokens = {
   ivory:                 "--color-ivory",
   ivoryCard:             "--color-ivory-card",
   cream:                 "--color-cream",
+  brass:                 "--color-brass",
   inkNavy:               "--color-ink-navy",
   navyDeep:              "--color-navy-deep",
   forest:                "--color-forest",

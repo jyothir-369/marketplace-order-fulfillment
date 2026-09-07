@@ -1,46 +1,57 @@
 @import "tailwindcss";
 
 /* ----------------------------------------------------------------
+ * Raw hex CSS variables for use in @theme inline fallback / JS.
+ * These are kept at @layer base so they sit below @theme in cascade.
+ * ---------------------------------------------------------------- */
+@layer base {
+  :root {
+    --color-ink-navy: #16233f;
+    --color-brass: #a9803f;
+  }
+}
+
+/* ----------------------------------------------------------------
  * Design tokens for marketplace-order-fulfillment
  *
  * Tailwind v4 CSS-first configuration. All component code MUST
  * reference tokens (CSS variables, var(--color-*), or HSL helpers)
- * — never raw hex values.
+ * â€” never raw hex values.
  *
- * PHASE 1 — V2 Premium palette & typography foundation:
+ * PHASE 1 â€” V2 Premium palette & typography foundation:
  *   - Ink navy (#16233f) replaces cool-dark as primary
  *   - Brass/gold (#a9803f) is the brand accent
  *   - Warm ivory (#faf7f1) is the default background
  *   - Playfair Display is the display/headline font (via CSS stack)
  *   - Inter stays for UI/body (via CSS stack)
- *   - Status-badge semantic colors are untouched — they use raw
+ *   - Status-badge semantic colors are untouched â€” they use raw
  *     Tailwind classes in status-tokens.ts, not these variables.
  * ---------------------------------------------------------------- */
 
 @theme {
   /* ----- V2 Premium surface palette ----- */
   /* Backgrounds */
-  --color-ivory:          38 47% 96%;   /* #faf7f1 — warm ivory, default page bg */
-  --color-ink-navy:        220 33% 17%;  /* #16233f — ink navy, primary brand */
-  --color-navy-deep:       220 45% 8%;   /* #0e1830 — deep navy, admin/ops sidebar */
-  --color-ivory-card:      38 43% 95%;   /* #f5f0e8 — slightly richer ivory for cards */
-  --color-surface-warm:    36 30% 94%;   /* #f1ede3 — warm surface for ops area bg */
+  --color-ivory:          38 47% 96%;   /* #faf7f1 â€” warm ivory, default page bg */
+  --color-ink-navy:        220 33% 17%;  /* #16233f â€” ink navy, primary brand */
+  --color-navy-deep:       220 45% 8%;   /* #0e1830 â€” deep navy, admin/ops sidebar */
+  --color-ivory-card:      38 43% 95%;   /* #f5f0e8 â€” slightly richer ivory for cards */
+  --color-surface-warm:    36 30% 94%;   /* #f1ede3 â€” warm surface for ops area bg */
 
   /* Warm borders & dividers */
-  --color-warm-border:     36 24% 87%;   /* #e7e0d2 — warm hairline borders */
-  --color-warm-border-strong: 34 20% 65%; /* #b8a990 — stronger warm border */
+  --color-warm-border:     36 24% 87%;   /* #e7e0d2 â€” warm hairline borders */
+  --color-warm-border-strong: 34 20% 65%; /* #b8a990 â€” stronger warm border */
 
   /* Warm text */
-  --color-warm-foreground:   40 8% 11%;   /* #1b1b18 — warm near-black */
-  --color-warm-muted:       30 8% 44%;   /* #71695c — warm medium gray */
-  --color-warm-subtle:      30 8% 58%;   /* #948c7c — warm light gray */
+  --color-warm-foreground:   40 8% 11%;   /* #1b1b18 â€” warm near-black */
+  --color-warm-muted:       30 8% 44%;   /* #71695c â€” warm medium gray */
+  --color-warm-subtle:      30 8% 58%;   /* #948c7c â€” warm light gray */
 
   /* Warm neutral surfaces (ivory tints for cards, chips, etc.) */
   --color-ivory-hover:    36 24% 90%;
   --color-ivory-muted:    36 20% 88%;
 
   /* ----- Brand / primary (V2: ink navy) ----- */
-  --color-background:     38 47% 96%;   /* ivory — page bg */
+  --color-background:     38 47% 96%;   /* ivory â€” page bg */
   --color-foreground:     40 8% 11%;    /* warm near-black */
 
   --color-card:            38 43% 95%;   /* ivory-card */
@@ -62,11 +73,12 @@
   --color-muted:           36 20% 88%;
   --color-muted-foreground: 30 8% 44%;
 
-  /* Accent (brass/gold — brand accent, NOT a status color) */
+  /* Accent (brass/gold â€” brand accent, NOT a status color) */
   --color-accent:          38 40% 55%;    /* #a9803f brass */
   --color-accent-foreground: 38 47% 96%; /* ivory */
+  --color-brass:           38 40% 55%;    /* #a9803f brass */
 
-  /* ----- Semantic alert colors (UNCHANGED — status vocabulary) ----- */
+  /* ----- Semantic alert colors (UNCHANGED â€” status vocabulary) ----- */
   --color-destructive:      9 55% 56%;
   --color-destructive-foreground: 38 47% 96%;
 
@@ -84,7 +96,7 @@
   --color-input:            36 24% 87%;
   --color-ring:             38 40% 55%;   /* brass ring */
 
-  /* ----- Status colors (UNCHANGED — semantic badge vocabulary) ----- */
+  /* ----- Status colors (UNCHANGED â€” semantic badge vocabulary) ----- */
   /* These are NOT brand colors. They map to Order/LineItem/SyncJob
      status enums. status-tokens.ts uses raw Tailwind classes (sky/blue/
      amber/emerald/etc.) so these vars serve only the handful of components
@@ -105,9 +117,9 @@
   --color-status-retry:                 263 70% 60%;
 
   /* ----- Extended palette (V2 editorial accents) ----- */
-  --color-forest:           120 25% 35%;  /* #2f5f42 — stock/success accents */
-  --color-clay:             12 40% 34%;   /* #8a3b2c — limited-stock / warning accents */
-  --color-cream:             38 43% 91%;   /* #f3ede0 — cream for subtle panels */
+  --color-forest:           120 25% 35%;  /* #2f5f42 â€” stock/success accents */
+  --color-clay:             12 40% 34%;   /* #8a3b2c â€” limited-stock / warning accents */
+  --color-cream:             38 43% 91%;   /* #f3ede0 â€” cream for subtle panels */
 
   /* ----- Radius scale (unchanged) ----- */
   --radius: 0.5rem;
@@ -121,7 +133,7 @@
 }
 
 /* ----------------------------------------------------------------
- * Dark mode — kept as-is (V2 Premium is a light-only direction;
+ * Dark mode â€” kept as-is (V2 Premium is a light-only direction;
  * operational dark mode is orthogonal to the storefront palette)
  * ---------------------------------------------------------------- */
 :root[data-theme="dark"] {
@@ -203,6 +215,12 @@
  * Base
  * ---------------------------------------------------------------- */
 @layer base {
+  :root {
+    --color-brass: hsl(38 40% 55%);
+  }
+  :root[data-theme="dark"] {
+    --color-brass: hsl(38 40% 55%);
+  }
   * {
     border-color: hsl(var(--color-border));
   }
@@ -221,7 +239,7 @@
 }
 
 /* ----------------------------------------------------------------
- * Density modifiers — unchanged from original spec
+ * Density modifiers â€” unchanged from original spec
  * ---------------------------------------------------------------- */
 [data-density="comfortable"] {
   font-size: 1rem;
@@ -297,7 +315,7 @@
 }
 
 /* ----------------------------------------------------------------
- * Brand accent helpers (brass/gold — V2)
+ * Brand accent helpers (brass/gold â€” V2)
  * ---------------------------------------------------------------- */
 .text-brass {
   color: hsl(var(--color-accent));
@@ -335,7 +353,7 @@
 }
 
 /* ----------------------------------------------------------------
- * Card / elevation helpers — V2 shadow scale
+ * Card / elevation helpers â€” V2 shadow scale
  * ---------------------------------------------------------------- */
 .shadow-v2 {
   box-shadow: 0 4px 12px hsl(40 8% 11% / 0.08),
@@ -351,7 +369,7 @@
 }
 
 /* ----------------------------------------------------------------
- * Loading skeleton shimmer — warm ivory tone (V2)
+ * Loading skeleton shimmer â€” warm ivory tone (V2)
  * ---------------------------------------------------------------- */
 @keyframes shimmer {
   0% { background-position: -200% 0; }
@@ -370,7 +388,7 @@
 }
 
 /* ----------------------------------------------------------------
- * Status dot (pulsing live indicator) — warm ink navy
+ * Status dot (pulsing live indicator) â€” warm ink navy
  * ---------------------------------------------------------------- */
 .status-dot {
   width: 0.5rem;
@@ -384,7 +402,7 @@
 }
 
 /* ----------------------------------------------------------------
- * Convenience surface / border / text aliases — updated for V2
+ * Convenience surface / border / text aliases â€” updated for V2
  * ---------------------------------------------------------------- */
 .bg-surface-base {
   background-color: hsl(var(--color-background));
@@ -460,7 +478,7 @@
 }
 
 /* ----------------------------------------------------------------
- * Status-color utility helpers (unchanged — HSL by var)
+ * Status-color utility helpers (unchanged â€” HSL by var)
  * ---------------------------------------------------------------- */
 .bg-status-placed { background-color: hsl(var(--color-status-placed)); }
 .bg-status-confirmed { background-color: hsl(var(--color-status-confirmed)); }

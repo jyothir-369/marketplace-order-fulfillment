@@ -1,19 +1,19 @@
 /**
- * PhotoBlock — soft-gradient image placeholder (V2 Premium).
+ * PhotoBlock — gradient image placeholder (V2 Premium).
  *
- * Replaces the flat gray hex-icon placeholders used in v1. Renders a
- * warm gradient that suggests product photography without requiring a
- * real image. Includes a subtle brass-accented watermark glyph and
- * accepts an optional category to pick a fitting gradient palette.
+ * Renders a rich, multi-stop linear gradient that serves as a warm
+ * editorial photo-placeholder. Each category maps to a distinct
+ * saturated palette — Bronze, Indigo, Burgundy, Emerald, Rust —
+ * so PhotoBlock cards never look flat or washed-out.
  *
  * Consumers:
  *   - StorefrontHeader (favicon-style use in wordmark)
  *   - StorefrontFooter
  *   - Future: PDP gallery, category hero, vendor profile cards
  *
- * Tokens: pulls gradient stops from --color-ivory, --color-ivory-muted,
- * --color-cream, --color-forest, --color-clay via `v2Palette`. No
- * raw hex in the component.
+ * Tokens: all colors reference var(--color-*) tokens where defined;
+ * inline HSL triples are used for gradient stops that don't need a
+ * token alias.
  */
 
 import { cn } from "@/lib/utils";
@@ -43,18 +43,33 @@ interface PhotoBlockProps {
   square?: boolean;
 }
 
-/* Each palette is a pair of HSL triples (start, end) feeding a linear
-   gradient. Tones are warm-leaning and designed to read as a soft
-   photographic wash, not a colored chip. */
-const GRADIENTS: Record<PhotoBlockCategory, [string, string]> = {
-  neutral:     ["38 43% 95%",  "30 28% 85%"],   /* ivory → warm taupe */
-  electronics: ["220 18% 92%", "210 22% 78%"],   /* cool slate */
-  apparel:     ["18 38% 92%",  "12 40% 82%"],    /* warm clay */
-  home:        ["120 18% 92%", "90 22% 80%"],    /* sage / forest */
-  outdoors:    ["160 22% 90%", "140 28% 75%"],   /* sea-green */
-  grocery:     ["50 60% 92%",  "42 65% 80%"],    /* warm wheat */
-  beauty:      ["340 30% 92%", "320 40% 82%"],   /* dusty rose */
-  books:       ["260 18% 92%", "240 22% 80%"],   /* dusty indigo */
+/* Each entry is a 3-stop [start, mid, end] HSL triple for a
+   linear-gradient. Stops are chosen for richness and distinctiveness
+   — never washed-out past L=80%. */
+const GRADIENTS: Record<PhotoBlockCategory, [string, string, string]> = {
+  /* Warm ivory cream — the editorial default */
+  neutral:     ["38 43% 91%",  "36 35% 80%",  "30 25% 68%"],
+
+  /* Rich cobalt / indigo — premium electronics */
+  electronics: ["220 45% 28%", "235 40% 42%", "250 35% 55%"],
+
+  /* Burnished bronze / terracotta — artisan apparel */
+  apparel:     ["22  55% 44%", "28  58% 56%", "18  48% 66%"],
+
+  /* Deep forest / emerald — home & living */
+  home:        ["140 32% 28%", "125 28% 42%", "115 22% 55%"],
+
+  /* Rich spruce / teal — outdoors & garden */
+  outdoors:    ["170 38% 30%", "155 32% 44%", "145 25% 58%"],
+
+  /* Golden amber / wheat — grocery & pantry */
+  grocery:     ["38  80% 50%", "42  72% 62%", "45  65% 74%"],
+
+  /* Dusty rose / burgundy — beauty & cosmetics */
+  beauty:      ["345 38% 52%", "338 32% 65%", "330 28% 78%"],
+
+  /* Deep violet / indigo — books & media */
+  books:       ["265 35% 38%", "275 30% 52%", "285 25% 66%"],
 };
 
 export function PhotoBlock({
@@ -65,9 +80,9 @@ export function PhotoBlock({
   accent = false,
   square = true,
 }: PhotoBlockProps) {
-  const [start, end] = GRADIENTS[category];
+  const [start, mid, end] = GRADIENTS[category];
   const bg: React.CSSProperties = {
-    backgroundImage: `linear-gradient(135deg, hsl(${start}) 0%, hsl(${end}) 100%)`,
+    backgroundImage: `linear-gradient(135deg, hsl(${start}) 0%, hsl(${mid}) 50%, hsl(${end}) 100%)`,
   };
 
   const accessibleLabel = label ?? `${category} photo placeholder`;
@@ -91,11 +106,11 @@ export function PhotoBlock({
           className={cn(
             "absolute inset-0 flex items-center justify-center",
             "font-display text-[clamp(2.5rem,8cqw,5rem)]",
-            "text-[var(--color-warm-foreground)] opacity-25",
+            "text-white/55",
             "select-none pointer-events-none leading-none"
           )}
         >
-          &mdash;
+          ◆
         </span>
       )}
 
