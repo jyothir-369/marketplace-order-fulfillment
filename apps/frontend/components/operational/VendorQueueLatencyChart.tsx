@@ -1,5 +1,5 @@
-﻿/**
- * VendorQueueLatencyChart — Recharts bar chart for vendor queue latency (§4.4).
+/**
+ * VendorQueueLatencyChart â€” Recharts bar chart for vendor queue latency (Â§4.4).
  *
  * Visualises per-vendor pipeline latency (in milliseconds) so operators
  * can spot vendors that are causing fulfillment delays.
@@ -169,8 +169,8 @@ export function VendorQueueLatencyChart({
                 color: "hsl(var(--color-foreground))",
               }}
               labelStyle={{ color: "hsl(var(--color-muted-foreground))" }}
-              formatter={(value: number | string) => {
-                const n = typeof value === "number" ? value : Number(value);
+              formatter={(value: unknown) => {
+                const n = typeof value === "number" ? value : Number(String(value ?? "0"));
                 if (!Number.isFinite(n)) return [String(value), "Latency"];
                 return [`${(n / 1000).toFixed(2)}s`, "Latency"];
               }}

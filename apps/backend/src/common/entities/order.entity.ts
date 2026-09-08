@@ -1,4 +1,4 @@
-import {
+﻿import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
@@ -6,9 +6,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   Index,
-  BeforeInsert,
 } from 'typeorm';
-import { randomBytes } from 'crypto';
 import { OrderLineItem } from './order-line-item.entity';
 
 export enum OrderStatus {
@@ -21,19 +19,9 @@ export enum OrderStatus {
 
 @Entity('orders')
 @Index(['buyerId', 'status'])
-@Index(['status'])
-@Index(['orderNumber'], { unique: true })
 export class Order {
   @PrimaryGeneratedColumn('uuid')
   id: string;
-
-  /**
-   * Human-readable order number generated at checkout time.
-   * Format: ORD-YYYYMMDD-XXXX (zero-padded random hex suffix).
-   * Unique at the database level via @Index above.
-   */
-  @Column({ type: 'varchar', length: 20, name: 'order_number' })
-  orderNumber: string;
 
   @Column({ type: 'uuid', name: 'buyer_id' })
   buyerId: string;
@@ -74,22 +62,4 @@ export class Order {
 
   @OneToMany(() => OrderLineItem, (lineItem) => lineItem.order, { cascade: true })
   lineItems: OrderLineItem[];
-
-  /**
-   * Hook to auto-generate a human-readable order number before insert.
-   * Format: ORD-YYYYMMDD-XXXX (XXXX = 4 random hex chars).
-   * Unique constraint at the DB layer guarantees no collisions in practice.
-   */
-  @BeforeInsert()
-  generateOrderNumber(): void {
-    if (!this.orderNumber) {
-      const now = new Date();
-      const dateStr =
-        now.getFullYear().toString() +
-        String(now.getMonth() + 1).padStart(2, '0') +
-        String(now.getDate()).padStart(2, '0');
-      const suffix = randomBytes(2).toString('hex').toUpperCase();
-      this.orderNumber = `ORD-${dateStr}-${suffix}`;
-    }
-  }
 }

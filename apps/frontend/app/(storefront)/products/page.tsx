@@ -29,7 +29,27 @@ import { useToast, ToastProvider } from "@/components/ui/toast";
 import { editorialEyebrows } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
+<<<<<<< HEAD
 import { CATEGORY_TABS, SORT_OPTIONS } from "@/lib/catalog-options";
+=======
+// Stable category tab definitions.
+const CATEGORY_TABS = [
+  { value: "",              label: "All" },
+  { value: "Electronics",  label: "Electronics" },
+  { value: "Apparel",      label: "Apparel" },
+  { value: "Home & Living",label: "Home & Living" },
+  { value: "Industrial",   label: "Industrial" },
+] as const;
+
+/** Client-side sort options. Value maps to URL ?sort= param. */
+const SORT_OPTIONS = [
+  { value: "",            label: "Featured"          },
+  { value: "price-asc",   label: "Price: Low → High" },
+  { value: "price-desc",  label: "Price: High → Low" },
+  { value: "newest",      label: "Newest"             },
+] as const;
+
+>>>>>>> origin/main
 function ProductsPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();

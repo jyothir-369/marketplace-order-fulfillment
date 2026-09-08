@@ -1,80 +1,26 @@
-# ============================================
-# Multi-stage Dockerfile for Production
-# Phase 10 Implementation
-# ============================================
-
-# Stage 1: Dependencies
 FROM node:20-alpine AS deps
-
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
-
-# Copy package files
 COPY package*.json ./
-
-# Install dependencies with production flag
-RUN npm ci --only=production && \
-    npm cache clean --force
-
-# Stage 2: Builder
-FROM node:20-alpine AS builder
-
-WORKDIR /app
-
-# Copy package files
-COPY package*.json ./
-
-# Install all dependencies
+COPY apps/backend/package*.json ./apps/backend/
 RUN npm ci
 
-# Copy source code
-COPY tsconfig.json ./
-COPY tsconfig.tsbuildinfo ./
-COPY src ./src
-
-# Build the application
-RUN npm run build
-
-# Prune dev dependencies after build
-RUN npm prune --production
-
-# Stage 3: Runtime
-FROM node:20-alpine AS runtime
-
-# Install OpenSSL for Node.js crypto
-RUN apk add --no-cache openssl ca-certificates tzdata
-
-# Create non-root user for security
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nestjs -u 1001
-
+FROM node:20-alpine AS builder
 WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN npm run build --workspace=@marketplace/backend
 
-# Copy package files for production dependencies
+FROM node:20-alpine AS runtime
+WORKDIR /app
+RUN addgroup -g 1001 -S nodejs && adduser -S nestjs -u 1001
+RUN apk add --no-cache openssl ca-certificates tzdata
 COPY package*.json ./
-
-# Install production dependencies only
-RUN npm ci --only=production && \
-    npm cache clean --force
-
-# Copy built application from builder stage
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
-
-# Copy TypeScript source for migrations (optional for production)
-COPY --from=builder /app/src ./src
-
-# Set ownership
+COPY apps/backend/package*.json ./apps/backend/
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=builder /app/apps/backend/dist ./apps/backend/dist
 RUN chown -R nestjs:nodejs /app
-
-# Switch to non-root user
 USER nestjs
-
-# Expose port
-EXPOSE 3000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
-
-# Start the application
-CMD ["node", "dist/main.js"]
+ENV PORT=3001
+EXPOSE 3001
+CMD ["node", "apps/backend/dist/main.js"]

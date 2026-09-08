@@ -1,9 +1,10 @@
 import 'reflect-metadata';
+<<<<<<< HEAD
 require('dotenv').config({ path: require('path').join(__dirname, '../../../../.env') });
+=======
+>>>>>>> origin/main
 import { DataSource } from 'typeorm';
-import * as entities from '../common/entities';
-import { Vendor } from '../common/entities/vendor.entity';
-import { Product } from '../common/entities/product.entity';
+import { Vendor, Product } from '../common/entities';
 
 function parsePostgresUrl(url: string): {
   host: string;
@@ -29,6 +30,7 @@ const parsedUrl = databaseUrl ? parsePostgresUrl(databaseUrl) : null;
 
 const AppDataSource = new DataSource({
   type: 'postgres',
+<<<<<<< HEAD
   host: parsedUrl?.host ?? (process.env.DB_HOST || 'localhost'),
   port: parsedUrl?.port ?? parseInt(process.env.DB_PORT || '5433'),
   username: parsedUrl?.username ?? (process.env.DB_USERNAME || 'postgres'),
@@ -36,9 +38,18 @@ const AppDataSource = new DataSource({
   database: parsedUrl?.database ?? (process.env.DB_DATABASE || 'marketplace'),
   ssl: parsedUrl ? (parsedUrl.ssl ? { rejectUnauthorized: false } : false) : undefined,
   entities: Object.values(entities) as Function[],
+=======
+  host: process.env.DB_HOST || 'localhost',
+  port: parseInt(process.env.DB_PORT || '5432'),
+  username: process.env.DB_USERNAME || 'postgres',
+  password: process.env.DB_PASSWORD || 'postgres',
+  database: process.env.DB_DATABASE || 'marketplace',
+  entities: [Vendor, Product],
+>>>>>>> origin/main
   synchronize: true,
-  logging: false,
+  logging: true,
 });
+
 interface VendorSeed {
   name: string;
   category: string;
@@ -120,8 +131,8 @@ async function seedDatabase(): Promise<void> {
     console.log('');
 
     console.log('Clearing existing data...');
-    await AppDataSource.createQueryBuilder().delete().from(Product).execute();
-    await AppDataSource.createQueryBuilder().delete().from(Vendor).execute();
+    await AppDataSource.getRepository(Product).delete({});
+    await AppDataSource.getRepository(Vendor).delete({});
     console.log('Existing data cleared');
     console.log('');
 

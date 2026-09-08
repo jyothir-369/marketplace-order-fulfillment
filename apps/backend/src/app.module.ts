@@ -50,13 +50,35 @@ function parsePostgresUrl(url: string): {
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: [path.resolve(__dirname, '../../../.env'), '.env'],
+      envFilePath: [
+        path.resolve(process.cwd(), '.env'),
+        path.resolve(__dirname, '../../../.env'),
+        '.env',
+      ],
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
+<<<<<<< HEAD
       useFactory: function(configService) {
         const databaseUrl = configService.get('DATABASE_URL') as string | undefined;
         const parsed = databaseUrl ? parsePostgresUrl(databaseUrl) : null;
+=======
+      useFactory: (configService: ConfigService) => {
+        const dbUrl = configService.get<string>('DATABASE_URL');
+        const isCloudDb = dbUrl && (dbUrl.includes('supabase.co') || dbUrl.includes('sslmode=require'));
+
+        if (dbUrl && dbUrl.trim() !== '') {
+          return {
+            type: 'postgres',
+            url: dbUrl,
+            entities: [Vendor, Order, Product, OrderLineItem, VendorSyncJob, AuditLog],
+            synchronize: configService.get('NODE_ENV') !== 'production',
+            logging: configService.get('NODE_ENV') === 'development',
+            ssl: isCloudDb ? { rejectUnauthorized: false } : false,
+          };
+        }
+
+>>>>>>> origin/main
         return {
           type: 'postgres',
           host: parsed?.host ?? configService.get('DB_HOST', 'localhost'),
@@ -67,6 +89,7 @@ function parsePostgresUrl(url: string): {
           entities: [Vendor, Order, Product, OrderLineItem, VendorSyncJob, AuditLog],
           synchronize: configService.get('NODE_ENV') !== 'production',
           logging: configService.get('NODE_ENV') === 'development',
+<<<<<<< HEAD
           ...(parsed
             ? {
                 ssl: databaseUrl?.includes('sslmode=no-verify') ||
@@ -77,20 +100,17 @@ function parsePostgresUrl(url: string): {
                     : { rejectUnauthorized: false },
               }
             : {}),
+=======
+          ssl: false,
+>>>>>>> origin/main
         };
       },
       inject: [ConfigService],
     }),
     BullModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: function(configService) {
+      useFactory: (configService: ConfigService) => {
         return {
-          // maxRetriesPerRequest: null — required for graceful degradation when Redis
-          // is unavailable. With this setting, BullMQ stops retrying on connection
-          // failure and the NestJS app starts normally; queue operations will fail
-          // at runtime instead of crashing the bootstrap.
-          // enableOfflineQueue: false — prevents BullMQ from silently buffering
-          // jobs in memory when Redis is unreachable.
           connection: {
             host: configService.get('REDIS_HOST', 'localhost'),
             port: configService.get('REDIS_PORT', 6379),

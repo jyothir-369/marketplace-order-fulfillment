@@ -1,0 +1,23 @@
+# Auto-detect text files and normalize line endings to LF on commit
+* text=auto
+
+# Enforce LF for Docker and shell files (Windows editors love CRLF)
+Dockerfile text eol=lf
+*.dockerfile text eol=lf
+
+# Shell scripts — Linux line endings required
+*.sh text eol=lf
+
+# YAML/TOML/JSON — also enforce LF
+*.yml text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+
+# Windows batch files (should not exist, but belt-and-suspenders)
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Tell git not to diff/merge binary-ish files
+*.png binary
+*.jpg binary
+*.ico binary

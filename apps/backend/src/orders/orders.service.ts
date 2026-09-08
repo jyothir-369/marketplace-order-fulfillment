@@ -4,26 +4,9 @@ import { Repository, DataSource, FindOptionsRelations } from 'typeorm';
 import { Order, OrderStatus } from '../common/entities/order.entity';
 import { OrderLineItem, FulfillmentStatus } from '../common/entities/order-line-item.entity';
 import { Product } from '../common/entities/product.entity';
-import {
-  CheckoutDto,
-  CheckoutResponseDto,
-  OrderResponseDto,
-  OrderLineItemResponseDto,
-  TransitionOrderDto,
-  OrderTransitionAction,
-  PaginatedOrdersQueryDto,
-  PaginatedOrdersResponseDto,
-} from './dto/orders.dto';
+import { CheckoutDto, CheckoutResponseDto, OrderResponseDto, OrderLineItemResponseDto } from './dto/orders.dto';
 import { InventoryService } from '../inventory/inventory.service';
-import { AuditService } from '../common/audit/audit.service';
-import { VendorQueueService } from '../fulfillment/vendor-queue.service';
-
-const TRANSITION_TARGET: Record<OrderTransitionAction, { from: OrderStatus[]; to: OrderStatus }> = {
-  CONFIRM: { from: [OrderStatus.PLACED], to: OrderStatus.CONFIRMED },
-  FULFILL: { from: [OrderStatus.CONFIRMED], to: OrderStatus.FULFILLING },
-  SHIP:    { from: [OrderStatus.FULFILLING], to: OrderStatus.FULFILLED },
-  CANCEL:  { from: [OrderStatus.PLACED, OrderStatus.CONFIRMED, OrderStatus.FULFILLING], to: OrderStatus.CANCELLED },
-};
+import { AuditService } from '../common/audit';
 
 @Injectable()
 export class OrdersService {
@@ -39,10 +22,10 @@ export class OrdersService {
     private readonly dataSource: DataSource,
     private readonly inventoryService: InventoryService,
     private readonly auditService: AuditService,
-    private readonly vendorQueueService: VendorQueueService,
   ) {}
 
   async checkout(dto: CheckoutDto, correlationId: string): Promise<CheckoutResponseDto> {
+<<<<<<< HEAD
 
     if (dto.idempotencyKey) {
       const existing = await this.orderRepository.findOne({
@@ -67,6 +50,9 @@ export class OrdersService {
       OrdersService.name,
       correlationId,
     );
+=======
+    this.logger.log('Starting checkout for buyer ' + dto.buyerId + ' with ' + dto.items.length + ' items', OrdersService.name, correlationId);
+>>>>>>> origin/main
 
     const dedupedIds = new Set(dto.items.map((i) => i.productId));
     if (dedupedIds.size !== dto.items.length) {
@@ -87,24 +73,23 @@ export class OrdersService {
     const productMap = new Map<string, Product>();
     products.forEach((p) => productMap.set(p.id, p));
 
-    const result = await this.dataSource.transaction(async (manager) => {
-      // Acquire pessimistic locks in sorted order to prevent deadlocks
+    return this.dataSource.transaction(async (manager) => {
       const sortedProductIds = [...productIds].sort();
       const lockedProducts: Product[] = [];
 
       for (const productId of sortedProductIds) {
-        const product = await manager
-          .createQueryBuilder(Product, 'product')
+        const product = await (manager as any).createQueryBuilder(Product, 'product')
           .setLock('pessimistic_write')
           .where('product.id = :id', { id: productId })
           .getOne();
 
         if (!product) {
-          throw new NotFoundException(`Product ${productId} not found`);
+          throw new NotFoundException('Product ' + productId + ' not found');
         }
         lockedProducts.push(product);
       }
 
+<<<<<<< HEAD
       // Validate stock availability via shared inventory guard
       const availability = await this.inventoryService.validateStockAvailability(
         dto.items.map((item) => ({
@@ -124,16 +109,21 @@ export class OrdersService {
           error: 'Conflict',
           conflictingProductIds: conflicting,
         });
+=======
+      for (const item of dto.items) {
+        const prod = lockedProducts.find((p) => p.id === item.productId);
+        if (prod && prod.stockCount < item.quantity) {
+          throw new BadRequestException('Insufficient stock for ' + prod.name + ': requested ' + item.quantity + ', available ' + prod.stockCount);
+        }
+>>>>>>> origin/main
       }
 
-      // Decrement stock
       for (const item of dto.items) {
         const p2 = lockedProducts.find((p) => p.id === item.productId);
         if (p2) {
           const newStock = p2.stockCount - item.quantity;
-          await manager
-            .createQueryBuilder(Product, 'product')
-            .update()
+          await (manager as any).createQueryBuilder()
+            .update(Product)
             .set({ stockCount: newStock })
             .where('id = :id', { id: item.productId })
             .execute();
@@ -148,19 +138,23 @@ export class OrdersService {
         }
       }
 
-      // Create order — orderNumber is auto-generated via @BeforeInsert
-      const order = manager.create(Order, {
+      // DUAL-WRITE: Write to new shipping_address field (Phase 7 expand-and-contract)
+      // The old field (if any) remains for backward compatibility during transition
+      const order = (manager.create as any)(Order, {
         buyerId: dto.buyerId,
         status: OrderStatus.PLACED,
         correlationId: correlationId,
         totalAmount: 0,
+<<<<<<< HEAD
         shippingAddress: dto.shippingAddress || null,
         clientReferenceId: dto.idempotencyKey || null,
+=======
+        shippingAddress: dto.shippingAddress || null, // New field from Phase 7
+>>>>>>> origin/main
       });
 
-      const savedOrder = await manager.save(Order, order);
+      const savedOrder = await (manager.save as any)(Order, order) as Order;
 
-      // Build line items
       let totalAmount = 0;
       const lineItems: OrderLineItem[] = [];
 
@@ -171,70 +165,36 @@ export class OrdersService {
           const lineTotal = unitPrice * item.quantity;
           totalAmount += lineTotal;
 
-          lineItems.push(
-            manager.create(OrderLineItem, {
-              orderId: savedOrder.id,
-              productId: item.productId,
-              vendorId: product.vendorId,
-              quantity: item.quantity,
-              unitPrice: unitPrice,
-              lineTotal: lineTotal,
-              fulfillmentStatus: FulfillmentStatus.PENDING,
-            }),
-          );
+          const lineItem = (manager.create as any)(OrderLineItem, {
+            orderId: savedOrder.id,
+            productId: item.productId,
+            vendorId: product.vendorId,
+            quantity: item.quantity,
+            unitPrice: unitPrice,
+            lineTotal: lineTotal,
+            fulfillmentStatus: FulfillmentStatus.PENDING,
+          });
+
+          lineItems.push(lineItem);
         }
       }
 
-      await manager.save(OrderLineItem, lineItems);
-      await manager.update(Order, savedOrder.id, { totalAmount: totalAmount });
+      await (manager.save as any)(OrderLineItem, lineItems);
+      await manager.update(Order, { id: savedOrder.id }, { totalAmount: totalAmount });
 
-      await this.auditService.logOrderCreated(
-        correlationId,
-        savedOrder.id,
-        dto.buyerId,
-        totalAmount,
-      );
+      await this.auditService.logOrderCreated(correlationId, savedOrder.id, dto.buyerId, totalAmount);
 
-      this.logger.log(
-        `Order ${savedOrder.id} (${savedOrder.orderNumber}) created with total ${totalAmount}`,
-        OrdersService.name,
-        correlationId,
-      );
+      this.logger.log('Order ' + savedOrder.id + ' created with total ' + totalAmount, OrdersService.name, correlationId);
 
-      return { savedOrder, lineItems };
+      const response = await this.getOrderById(savedOrder.id, correlationId);
+
+      return {
+        success: true,
+        order: response,
+        message: 'Order placed successfully',
+        correlationId: correlationId,
+      };
     });
-
-    // Post-transaction: enqueue vendor sync jobs
-    for (const item of result.lineItems) {
-      try {
-        await this.vendorQueueService.addJobToVendorQueue(item.vendorId, {
-          jobId: 'sync-' + item.id,
-          orderLineItemId: item.id,
-          vendorId: item.vendorId,
-          correlationId: correlationId,
-        });
-      } catch (error) {
-        this.logger.error(
-          `Failed to enqueue fulfillment job for line item ${item.id}`,
-          error instanceof Error ? error.stack : undefined,
-          OrdersService.name,
-          correlationId,
-        );
-        await this.lineItemRepository.update(item.id, {
-          fulfillmentStatus: FulfillmentStatus.FAILED,
-          failureReason: 'Failed to enqueue fulfillment job',
-        });
-      }
-    }
-
-    const response = await this.getOrderById(result.savedOrder.id, correlationId);
-
-    return {
-      success: true,
-      order: response,
-      message: 'Order placed successfully',
-      correlationId: correlationId,
-    };
   }
 
   async getOrderById(id: string, correlationId: string): Promise<OrderResponseDto> {
@@ -245,41 +205,10 @@ export class OrdersService {
     });
 
     if (!order) {
-      throw new NotFoundException(`Order ${id} not found`);
+      throw new NotFoundException('Order ' + id + ' not found');
     }
 
     return this.toOrderResponseDto(order);
-  }
-
-  /**
-   * Global paginated order listing — used by the admin portal.
-   */
-  async getOrdersPaginated(
-    query: PaginatedOrdersQueryDto,
-  ): Promise<PaginatedOrdersResponseDto> {
-    const page = query.page ?? 1;
-    const limit = Math.min(query.limit ?? 20, 100);
-    const skip = (page - 1) * limit;
-
-    const where: Record<string, unknown> = {};
-    if (query.status) {
-      where.status = query.status as OrderStatus;
-    }
-
-    const [orders, total] = await this.orderRepository.findAndCount({
-      where,
-      relations: { lineItems: { product: true, vendor: true } },
-      order: { createdAt: 'DESC' },
-      skip,
-      take: limit,
-    });
-
-    return {
-      total,
-      page,
-      limit,
-      orders: orders.map((o) => this.toOrderResponseDto(o)),
-    };
   }
 
   async getOrdersByBuyer(buyerId: string): Promise<OrderResponseDto[]> {
@@ -289,74 +218,12 @@ export class OrdersService {
       relations: relations,
       order: { createdAt: 'DESC' },
     });
-    return orders.map((o) => this.toOrderResponseDto(o));
-  }
-
-  async getOrdersByVendor(vendorId: string): Promise<OrderResponseDto[]> {
-    const orderIds = await this.lineItemRepository
-      .createQueryBuilder('lineItem')
-      .select('DISTINCT lineItem.orderId', 'orderId')
-      .where('lineItem.vendorId = :vendorId', { vendorId })
-      .getRawMany<{ orderId: string }>();
-
-    if (orderIds.length === 0) {
-      return [];
-    }
-
-    const relations: FindOptionsRelations<Order> = { lineItems: { product: true, vendor: true } };
-    const orders = await this.orderRepository.find({
-      where: orderIds.map((row) => ({ id: row.orderId })),
-      relations: relations,
-      order: { createdAt: 'DESC' },
-    });
 
     return orders.map((o) => this.toOrderResponseDto(o));
-  }
-
-  async transitionOrder(
-    orderId: string,
-    dto: TransitionOrderDto,
-    correlationId: string,
-    actorId?: string,
-  ): Promise<OrderResponseDto> {
-    this.logger.log(
-      `Transitioning order ${orderId} via ${dto.action}` +
-        (dto.reason ? ` (reason: ${dto.reason})` : ''),
-      OrdersService.name,
-      correlationId,
-    );
-
-    if (dto.action === 'CANCEL') {
-      return this.cancelOrder(orderId, correlationId);
-    }
-
-    const order = await this.orderRepository.findOne({ where: { id: orderId } });
-    if (!order) {
-      throw new NotFoundException(`Order ${orderId} not found`);
-    }
-
-    const rule = TRANSITION_TARGET[dto.action];
-    if (!rule.from.includes(order.status)) {
-      throw new BadRequestException(
-        `Illegal transition ${dto.action}: order is in status '${order.status}', expected one of [${rule.from.join(', ')}]`,
-      );
-    }
-
-    const previousStatus = order.status;
-    await this.orderRepository.update(orderId, { status: rule.to });
-    await this.auditService.logOrderStatusChange(
-      correlationId,
-      orderId,
-      previousStatus,
-      rule.to,
-      actorId,
-    );
-
-    return this.getOrderById(orderId, correlationId);
   }
 
   async cancelOrder(orderId: string, correlationId: string): Promise<OrderResponseDto> {
-    this.logger.log(`Cancelling order ${orderId}`, OrdersService.name, correlationId);
+    this.logger.log('Cancelling order ' + orderId, OrdersService.name, correlationId);
 
     const order = await this.orderRepository.findOne({
       where: { id: orderId },
@@ -364,19 +231,20 @@ export class OrdersService {
     });
 
     if (!order) {
-      throw new NotFoundException(`Order ${orderId} not found`);
+      throw new NotFoundException('Order ' + orderId + ' not found');
     }
 
-    const validCancelStatuses = [OrderStatus.PLACED, OrderStatus.CONFIRMED, OrderStatus.FULFILLING];
-    if (!validCancelStatuses.includes(order.status)) {
-      throw new BadRequestException(`Cannot cancel order in status: ${order.status}`);
+    if (order.status === OrderStatus.FULFILLED) {
+      throw new BadRequestException('Cannot cancel a fulfilled order');
+    }
+
+    if (order.status === OrderStatus.CANCELLED) {
+      throw new BadRequestException('Order is already cancelled');
     }
 
     const previousStatus = order.status;
     const itemsToRestore = order.lineItems.filter(
-      (item) =>
-        item.fulfillmentStatus === FulfillmentStatus.PENDING ||
-        item.fulfillmentStatus === FulfillmentStatus.SYNCING,
+      (item) => item.fulfillmentStatus === FulfillmentStatus.PENDING || item.fulfillmentStatus === FulfillmentStatus.SYNCING,
     );
 
     for (const item of itemsToRestore) {
@@ -389,30 +257,21 @@ export class OrdersService {
     }
 
     await this.orderRepository.update(orderId, { status: OrderStatus.CANCELLED });
-    await this.lineItemRepository.update(
-      { orderId },
-      { fulfillmentStatus: FulfillmentStatus.FAILED, failureReason: 'Order cancelled' },
-    );
+    await this.lineItemRepository.update({ orderId }, { fulfillmentStatus: FulfillmentStatus.FAILED, failureReason: 'Order cancelled' });
 
-    await this.auditService.logOrderStatusChange(
-      correlationId,
-      orderId,
-      previousStatus,
-      OrderStatus.CANCELLED,
-    );
+    await this.auditService.logOrderStatusChange(correlationId, orderId, previousStatus, OrderStatus.CANCELLED);
 
     return this.getOrderById(orderId, correlationId);
   }
 
   private toOrderResponseDto(order: Order): OrderResponseDto {
     return {
-      orderNumber: order.orderNumber || 'UNKNOWN',
       id: order.id,
       buyerId: order.buyerId,
       status: order.status,
       totalAmount: Number(order.totalAmount),
       correlationId: order.correlationId || '',
-      shippingAddress: order.shippingAddress || '',
+      shippingAddress: order.shippingAddress || '', // CUT-OVER: Read from new field
       lineItems: (order.lineItems || []).map((item) => this.toLineItemResponseDto(item)),
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
