@@ -1,20 +1,46 @@
-npm warn config ignoring workspace config at C:\Users\raghava\OneDrive\Desktop\marketplace-order-fulfillment\apps\frontend/.npmrc
 
 > @marketplace/frontend@0.1.0 build
 > next build
 
 ▲ Next.js 16.3.4 (Turbopack)
 - Environments: .env.local
-✓ Running next.config.ts took 32ms
+✓ Running next.config.ts took 182ms
 
   Creating an optimized production build ...
-✓ Compiled successfully in 1322ms
+✓ Compiled successfully in 4.6s
   Running TypeScript ...
-spawn EPERM
-npm error Lifecycle script `build` failed with error:
-npm error code 1
-npm error path C:\Users\raghava\OneDrive\Desktop\marketplace-order-fulfillment\apps\frontend
-npm error workspace @marketplace/frontend@0.1.0
-npm error location C:\Users\raghava\OneDrive\Desktop\marketplace-order-fulfillment\apps\frontend
-npm error command failed
-npm error command C:\WINDOWS\system32\cmd.exe /d /s /c next build
+  Finished TypeScript in 5.0s ...
+  Collecting page data using 7 workers ...
+  Generating static pages using 7 workers (0/18) ...
+  Generating static pages using 7 workers (4/18) 
+  Generating static pages using 7 workers (8/18) 
+  Generating static pages using 7 workers (13/18) 
+✓ Generating static pages using 7 workers (18/18) in 2.8s
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /admin
+├ ○ /admin/audit-logs
+├ ○ /admin/categories
+├ ○ /admin/dead-letter
+├ ○ /admin/orders
+├ ƒ /admin/orders/[id]
+├ ○ /admin/vendors
+├ ○ /checkout
+├ ○ /orders
+├ ƒ /orders/[id]
+├ ○ /products
+├ ƒ /products/[id]
+├ ○ /vendor/dashboard
+├ ○ /vendor/dead-letter
+├ ○ /vendor/inventory
+├ ○ /vendor/orders
+├ ○ /vendors
+└ ƒ /vendors/[vendorId]
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

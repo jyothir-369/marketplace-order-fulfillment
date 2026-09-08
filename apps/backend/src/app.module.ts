@@ -24,23 +24,26 @@ const logger = new Logger('BullModule');
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: [path.resolve(__dirname, '../../../.env'), '.env'],
+      envFilePath: [
+        path.resolve(process.cwd(), '.env'),
+        path.resolve(__dirname, '../../../.env'),
+        '.env',
+      ],
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => {
         const dbUrl = configService.get<string>('DATABASE_URL');
-        
-        if (dbUrl) {
+        const isCloudDb = dbUrl && (dbUrl.includes('supabase.co') || dbUrl.includes('sslmode=require'));
+
+        if (dbUrl && dbUrl.trim() !== '') {
           return {
             type: 'postgres',
             url: dbUrl,
             entities: [Vendor, Order, Product, OrderLineItem, VendorSyncJob, AuditLog],
             synchronize: configService.get('NODE_ENV') !== 'production',
             logging: configService.get('NODE_ENV') === 'development',
-            ssl: {
-              rejectUnauthorized: false,
-            },
+            ssl: isCloudDb ? { rejectUnauthorized: false } : false,
           };
         }
 
@@ -54,6 +57,7 @@ const logger = new Logger('BullModule');
           entities: [Vendor, Order, Product, OrderLineItem, VendorSyncJob, AuditLog],
           synchronize: configService.get('NODE_ENV') !== 'production',
           logging: configService.get('NODE_ENV') === 'development',
+          ssl: false,
         };
       },
       inject: [ConfigService],
