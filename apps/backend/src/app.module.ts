@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bullmq';
 import { CatalogModule } from './catalog/catalog.module';
+import { CartModule } from './cart/cart.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { OrdersModule } from './orders/orders.module';
 import { FulfillmentModule } from './fulfillment/fulfillment.module';
@@ -109,6 +110,7 @@ function parsePostgresUrl(url: string): {
     AuditModule,
     VendorMockModule,
     CatalogModule,
+    CartModule,
     InventoryModule,
     OrdersModule,
     FulfillmentModule,

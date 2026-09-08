@@ -59,6 +59,13 @@ export class Order {
   @Column({ type: 'varchar', length: 500, nullable: true, name: 'shipping_address' })
   shippingAddress: string;
 
+  /**
+   * Idempotency reference from the client (CheckoutDto.idempotencyKey).
+   * Used to dedupe checkout retries at the application layer.
+   */
+  @Column({ type: 'varchar', length: 120, nullable: true, name: 'client_reference_id' })
+  clientReferenceId: string;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

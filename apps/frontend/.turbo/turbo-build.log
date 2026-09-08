@@ -5,10 +5,10 @@ npm warn config ignoring workspace config at C:\Users\raghava\OneDrive\Desktop\m
 
 ▲ Next.js 16.3.4 (Turbopack)
 - Environments: .env.local
-✓ Running next.config.ts took 32ms
+✓ Running next.config.mjs took 50ms
 
   Creating an optimized production build ...
-✓ Compiled successfully in 1322ms
+✓ Compiled successfully in 30.0s
   Running TypeScript ...
 spawn EPERM
 npm error Lifecycle script `build` failed with error:

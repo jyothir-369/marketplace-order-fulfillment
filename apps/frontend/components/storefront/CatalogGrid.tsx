@@ -1,12 +1,13 @@
 /**
- * CatalogGrid — responsive product grid (§3.1.1).
+ * CatalogGrid — responsive product grid (V2 Premium).
  *
- * V2 Premium upgrade: mirrors the luxury editorial Vendors grid.
- *   - 3-column base grid (md:2 → lg:3) matching VendorCard density
- *   - VendorCard-style card elevation: rounded-2xl, shadow-v2,
- *     warm-border, brass hover accent, sticky CTA footer
- *   - Animated card lift on hover: translateY(-1.5px) + shadow-v2-lg
- *   - "Artisan Collection" partner invitation card anchors the grid
+ * Breakpoints (Tailwind responsive utilities):
+ *   grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4
+ *
+ * Product card images use `aspect-[4/3]` + `object-cover` so tiles never
+ * collapse when a product lacks imagery; the grid stays balanced at 1, 2, 3,
+ * or 4 columns and the trailing "Artisan Collection" invitation card fills a
+ * remainder slot.
  */
 
 "use client";
@@ -66,12 +67,9 @@ export function CatalogGrid({
     );
   }
 
-  // Anchor: fill the grid so (count % 3) never leaves a trailing solo card.
-  const fillSlots = (3 - (products.length % 3)) % 3;
-
   return (
     <div
-      className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+      className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6"
       aria-label="Product catalog"
     >
       {products.map((product) => (
@@ -116,7 +114,8 @@ export function CatalogGrid({
             className={cn(
               "inline-flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-xl text-xs font-bold",
               "bg-[var(--color-ink-navy)] text-white hover:bg-[var(--color-primary-hover)]",
-              "border border-[var(--color-brass)]/40 shadow-xs transition-all duration-200"
+              "border border-[var(--color-brass)]/40 shadow-xs transition-all duration-200",
+              "focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)]"
             )}
           >
             <span>Browse All Vendors</span>

@@ -40,16 +40,21 @@ interface CartState {
   cart: CartItem[];
   hydrated: boolean;
   drawerOpen: boolean;
+  syncStatus: "idle" | "syncing" | "error";
+  lastSyncedAt: string | null;
+  replacingRemote: boolean;
 
   // Actions
   addToCart: (item: CartItem) => void;
   removeFromCart: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
+  setCart: (items: CartItem[]) => void;
   clearCart: () => void;
   markHydrated: () => void;
   openDrawer: () => void;
   closeDrawer: () => void;
   toggleDrawer: () => void;
+  setSyncStatus: (status: CartState["syncStatus"]) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -62,6 +67,9 @@ export const useCartStore = create<CartState>()(
       cart: [],
       hydrated: false,
       drawerOpen: false,
+      syncStatus: "idle",
+      lastSyncedAt: null,
+      replacingRemote: false,
 
       markHydrated: () => set({ hydrated: true }),
 
@@ -109,7 +117,12 @@ export const useCartStore = create<CartState>()(
             .filter((i) => i.quantity > 0),
         })),
 
-      clearCart: () => set({ cart: [] }),
+      /** Replace the entire cart (used for remote hydration / rollback). */
+      setCart: (items) => set({ cart: items }),
+
+      clearCart: () => set({ cart: [], lastSyncedAt: null }),
+
+      setSyncStatus: (status) => set({ syncStatus: status }),
 
       openDrawer: () => set({ drawerOpen: true }),
       closeDrawer: () => set({ drawerOpen: false }),

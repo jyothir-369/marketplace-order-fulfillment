@@ -12,6 +12,6 @@ import { AuditModule } from '../common/audit';
   ],
   controllers: [InventoryController],
   providers: [InventoryService],
-  exports: [InventoryService],
+  exports: [InventoryService, TypeOrmModule],
 })
 export class InventoryModule {}

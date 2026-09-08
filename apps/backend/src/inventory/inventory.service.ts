@@ -2,7 +2,14 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, EntityManager } from 'typeorm';
 import { Product } from '../common/entities/product.entity';
-import { DecrementStockDto, StockOperationResult, StockInfoDto } from './dto/inventory.dto';
+import {
+  DecrementStockDto,
+  StockOperationResult,
+  StockInfoDto,
+  StockCheckItemDto,
+  StockAvailabilityItem,
+  StockAvailabilityResult,
+} from './dto/inventory.dto';
 import { AuditService } from '../common/audit';
 
 @Injectable()
@@ -131,6 +138,68 @@ export class InventoryService {
         requestedQuantity: dto.quantity,
       };
     });
+  }
+
+  /**
+   * Batch availability guard used by cart/checkout endpoints.
+   *
+   * Acquires pessimistic write locks in sorted id order (same discipline as
+   * checkout) so concurrent cart validations can never deadlock, then reports
+   * per-item availability. This is deliberately non-mutating: reservations are
+   * only applied at checkout time inside the checkout transaction.
+   */
+  async validateStockAvailability(
+    items: StockCheckItemDto[],
+    correlationId: string,
+    manager?: EntityManager,
+  ): Promise<StockAvailabilityResult> {
+    const run = async (m: EntityManager): Promise<StockAvailabilityResult> => {
+      const sortedIds = items.map((i) => i.productId).sort();
+      const loaded = await m
+        .createQueryBuilder(Product, 'product')
+        .setLock('pessimistic_write')
+        .where('product.id IN (:...ids)', { ids: sortedIds })
+        .getMany();
+
+      const map = new Map<string, Product>();
+      loaded.forEach((p) => map.set(p.id, p));
+
+      const availability: StockAvailabilityItem[] = items.map((item) => {
+        const product = map.get(item.productId);
+        const availableQuantity = product?.isActive ? product.stockCount : 0;
+        return {
+          productId: item.productId,
+          productName: product?.name ?? 'Unknown product',
+          requestedQuantity: item.quantity,
+          availableQuantity: Math.max(0, availableQuantity),
+        };
+      });
+
+      const available = availability.every(
+        (a) => a.availableQuantity >= a.requestedQuantity,
+      );
+
+      if (!available) {
+        this.logger.warn(
+          'Stock validation failed for ' +
+            items.length +
+            ' item(s); insufficient: ' +
+            availability
+              .filter((a) => a.availableQuantity < a.requestedQuantity)
+              .map((a) => a.productId + ' (' + a.availableQuantity + '/' + a.requestedQuantity + ')')
+              .join(', '),
+          InventoryService.name,
+          correlationId,
+        );
+      }
+
+      return { available, items: availability };
+    };
+
+    if (manager) {
+      return run(manager);
+    }
+    return this.dataSource.transaction(run);
   }
 
   async getStockInfo(productId: string): Promise<StockInfoDto> {

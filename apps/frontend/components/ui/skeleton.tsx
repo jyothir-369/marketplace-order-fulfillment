@@ -25,14 +25,14 @@ export function Skeleton({ className, width, height }: SkeletonProps) {
 
 export function CatalogGridSkeleton({ count = 6 }: { count?: number }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
       {Array.from({ length: count }).map((_, i) => (
         <div
           key={i}
           className="bg-[var(--color-card)] border border-[var(--color-warm-border)] rounded-2xl overflow-hidden shadow-v2"
         >
           {/* Gradient banner placeholder */}
-          <div className="h-32 bg-gradient-to-br from-[var(--color-ivory-muted)] to-[var(--color-cream)] animate-pulse" />
+          <div className="aspect-[4/3] bg-gradient-to-br from-[var(--color-ivory-muted)] to-[var(--color-cream)] animate-pulse" />
           {/* Card body */}
           <div className="p-5 space-y-3">
             <Skeleton height="1rem" width="55%" />

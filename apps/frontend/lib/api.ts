@@ -25,6 +25,8 @@ import type {
   CategorySummaryDto,
   VendorDetailDto,
   VendorResponseDto,
+  CartItemApiDto,
+  CartResponseDto,
 } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
@@ -103,6 +105,52 @@ function parseOrder(order: unknown): OrderResponseDto {
     (o as unknown as OrderResponseDto).lineItems = [];
   }
   return o as unknown as OrderResponseDto;
+}
+
+// ---------------------------------------------------------------------------
+// Cart sync
+// ---------------------------------------------------------------------------
+
+const CART_BUYER_ID =
+  process.env.NEXT_PUBLIC_BUYER_ID ??
+  "22222222-2222-2222-2222-222222222222";
+
+export function getCartBuyerId(): string {
+  return CART_BUYER_ID;
+}
+
+/** GET /api/cart/:buyerId — snapshot from the session cart. */
+export async function getRemoteCart(buyerId: string = getCartBuyerId()): Promise<CartResponseDto> {
+  return apiFetch<CartResponseDto>(`/cart/${buyerId}`);
+}
+
+/** PUT /api/cart/:buyerId — optimistic full-state sync with inventory guard. */
+export async function syncRemoteCart(
+  items: CartItemApiDto[],
+  buyerId: string = getCartBuyerId(),
+): Promise<CartResponseDto> {
+  return apiFetch<CartResponseDto>(`/cart/${buyerId}`, {
+    method: "PUT",
+    body: JSON.stringify({ buyerId, items }),
+  });
+}
+
+/** POST /api/cart/validate — pre-checkout inventory guard. */
+export async function validateRemoteCart(
+  items: CartItemApiDto[],
+  buyerId: string = getCartBuyerId(),
+): Promise<CartResponseDto> {
+  return apiFetch<CartResponseDto>("/cart/validate", {
+    method: "POST",
+    body: JSON.stringify({ buyerId, items }),
+  });
+}
+
+/** DELETE /api/cart/:buyerId — clear after successful checkout. */
+export async function clearRemoteCart(
+  buyerId: string = getCartBuyerId(),
+): Promise<{ success: boolean }> {
+  return apiFetch<{ success: boolean }>(`/cart/${buyerId}`, { method: "DELETE" });
 }
 
 // ---------------------------------------------------------------------------
