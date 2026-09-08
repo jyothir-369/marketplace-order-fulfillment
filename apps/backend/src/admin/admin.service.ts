@@ -1,13 +1,13 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+﻿import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan, In } from 'typeorm';
 import { Order, OrderStatus } from '../common/entities/order.entity';
 import { OrderLineItem, FulfillmentStatus } from '../common/entities/order-line-item.entity';
 import { VendorSyncJob, SyncJobStatus } from '../common/entities/vendor-sync-job.entity';
-import { AdminResolveDto, AdminDashboardDto, StuckOrdersResponseDto, StuckOrderDto, StuckOrderLineItemDto } from './dto/admin.dto';
+import { AdminResolveDto, AdminDashboardDto, AdminOrderFilterDto, AdminOrderResponseDto, AdminOrderDto, StuckOrderLineItemDto } from './dto/admin.dto';
 import { OrdersService } from '../orders/orders.service';
 import { FulfillmentService } from '../fulfillment/fulfillment.service';
-import { AuditService, AuditLogQuery } from '../common/audit';
+import { AuditService, AuditLogQuery } from '../common/audit/audit.service';
 import { AuditLog } from '../common/audit/audit-log.entity';
 
 @Injectable()
@@ -52,7 +52,48 @@ export class AdminService {
     };
   }
 
-  async getStuckOrders(correlationId: string): Promise<StuckOrdersResponseDto> {
+  async getOrders(filter: AdminOrderFilterDto, correlationId: string): Promise<AdminOrderResponseDto> {
+    if (filter.type === 'stuck') {
+      return this.getStuckOrders(correlationId);
+    }
+
+    const query = this.orderRepository.createQueryBuilder('order');
+    if (filter.status) {
+      query.andWhere('order.status = :status', { status: filter.status });
+    }
+
+    // Join line items to support vendor filtering
+    query.leftJoinAndSelect('order.lineItems', 'lineItems');
+    if (filter.vendorId) {
+      query.andWhere('lineItems.vendorId = :vendorId', { vendorId: filter.vendorId });
+    }
+
+    const total = await query.getCount();
+    const orders = await query
+      .skip(filter.offset || 0)
+      .take(filter.limit || 100)
+      .getMany();
+
+    return {
+      total,
+      orders: orders.map((o) => ({
+        orderId: o.id,
+        orderNumber: o.orderNumber,
+        buyerId: o.buyerId,
+        status: o.status,
+        createdAt: o.createdAt,
+        lineItems: (o.lineItems || []).map((li) => ({
+          lineItemId: li.id,
+          productId: li.productId,
+          vendorId: li.vendorId,
+          fulfillmentStatus: li.fulfillmentStatus,
+          attempts: 0,
+        })),
+      })),
+    };
+  }
+
+  async getStuckOrders(correlationId: string): Promise<AdminOrderResponseDto> {
     this.logger.log('Querying stuck orders', AdminService.name, correlationId);
 
     // Find orders with line items in stuck states:
@@ -92,17 +133,18 @@ export class AdminService {
       .getMany();
 
     // Group by order
-    const orderMap = new Map<string, StuckOrderDto>();
+    const orderMap = new Map<string, AdminOrderDto>();
     for (const item of stuckLineItems) {
       if (!orderMap.has(item.orderId)) {
         const stuckReason = this.determineStuckReason(item);
         orderMap.set(item.orderId, {
           orderId: item.orderId,
+          orderNumber: item.order.orderNumber,
           buyerId: item.order.buyerId,
           status: item.order.status,
           createdAt: item.order.createdAt,
           stuckReason: stuckReason,
-          stuckLineItems: [],
+          lineItems: [],
         });
       }
 
@@ -116,7 +158,7 @@ export class AdminService {
         lastAttemptedAt: item.syncJob?.lastAttemptedAt || undefined,
       };
 
-      orderMap.get(item.orderId)!.stuckLineItems.push(lineItemDto);
+      orderMap.get(item.orderId)!.lineItems.push(lineItemDto);
     }
 
     const orders = Array.from(orderMap.values());

@@ -58,15 +58,11 @@ function parsePostgresUrl(url: string): {
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
-<<<<<<< HEAD
-      useFactory: function(configService) {
-        const databaseUrl = configService.get('DATABASE_URL') as string | undefined;
-        const parsed = databaseUrl ? parsePostgresUrl(databaseUrl) : null;
-=======
       useFactory: (configService: ConfigService) => {
         const dbUrl = configService.get<string>('DATABASE_URL');
         const isCloudDb = dbUrl && (dbUrl.includes('supabase.co') || dbUrl.includes('sslmode=require'));
 
+        // Supabase / managed cloud database fast-path.
         if (dbUrl && dbUrl.trim() !== '') {
           return {
             type: 'postgres',
@@ -78,7 +74,9 @@ function parsePostgresUrl(url: string): {
           };
         }
 
->>>>>>> origin/main
+        // Local / component-level Postgres fallback using discrete env vars.
+        const databaseUrl = configService.get('DATABASE_URL') as string | undefined;
+        const parsed = databaseUrl ? parsePostgresUrl(databaseUrl) : null;
         return {
           type: 'postgres',
           host: parsed?.host ?? configService.get('DB_HOST', 'localhost'),
@@ -89,7 +87,6 @@ function parsePostgresUrl(url: string): {
           entities: [Vendor, Order, Product, OrderLineItem, VendorSyncJob, AuditLog],
           synchronize: configService.get('NODE_ENV') !== 'production',
           logging: configService.get('NODE_ENV') === 'development',
-<<<<<<< HEAD
           ...(parsed
             ? {
                 ssl: databaseUrl?.includes('sslmode=no-verify') ||
@@ -100,9 +97,6 @@ function parsePostgresUrl(url: string): {
                     : { rejectUnauthorized: false },
               }
             : {}),
-=======
-          ssl: false,
->>>>>>> origin/main
         };
       },
       inject: [ConfigService],

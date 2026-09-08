@@ -1,5 +1,5 @@
-/**
- * FulfillmentDataTable â€” headless admin data table (Â§4.3).
+﻿/**
+ * FulfillmentDataTable Ã¢â‚¬â€ headless admin data table (Ã‚Â§4.3).
  *
  * Powered by @tanstack/react-table v9. Supports:
  *   - column sorting
@@ -13,6 +13,7 @@
  * `onSortChange` callbacks.
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any -- TanStack Table generics are intentionally loose */
 "use client";
 
 import { useMemo, type ReactNode } from "react";
@@ -20,10 +21,10 @@ import { ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight } fro
 import {
   type SortingState,
   flexRender,
-  createCoreRowModel,
-  createSortedRowModel,
-  useTable,
-  type TableFeatures,
+  getCoreRowModel,
+  getSortedRowModel,
+  useReactTable,
+  type Table,
   type RowData,
 } from "@tanstack/react-table";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -100,13 +101,13 @@ export function FulfillmentDataTable<T>({
             return col.cell(row);
           }
           const v = col.accessorKey ? row[col.accessorKey] : undefined;
-          return v === null || v === undefined ? <span className="text-[var(--color-muted-foreground)]">â€”</span> : String(v);
+          return v === null || v === undefined ? <span className="text-[var(--color-muted-foreground)]">Ã¢â‚¬â€</span> : String(v);
         },
       })),
     [columns]
   );
 
-  const table = useTable<TableFeatures, T extends RowData ? T : never>({
+  const table = useReactTable<T extends RowData ? T : never>({
     data: data as T[],
     columns: tanstackColumns as any,
     state: { sorting: [] as SortingState },
@@ -115,8 +116,8 @@ export function FulfillmentDataTable<T>({
       const next = typeof updater === "function" ? updater([]) : updater;
       onSortChange(next as SortingState);
     },
-    getCoreRowModel: createCoreRowModel<TableFeatures, T extends RowData ? T : never>(),
-    getSortedRowModel: createSortedRowModel<TableFeatures, T extends RowData ? T : never>(),
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
     getRowId: getRowId ? (row: any) => getRowId(row) : undefined,
   } as any);
 

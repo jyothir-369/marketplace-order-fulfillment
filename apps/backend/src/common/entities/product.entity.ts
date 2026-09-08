@@ -31,6 +31,10 @@ export class Product {
   @Column({ type: 'int', default: 0, name: 'stock_count' })
   stockCount: number;
 
+  /** Product category for filtering — e.g. Electronics, Apparel, Home & Living, Industrial. */
+  @Column({ type: 'varchar', length: 100, nullable: true, name: 'category' })
+  category: string | null;
+
   @Column({ type: 'boolean', default: true })
   isActive: boolean;
 
