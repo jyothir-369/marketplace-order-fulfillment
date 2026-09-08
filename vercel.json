@@ -1,6 +1,17 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+<<<<<<< HEAD
+  "git": {
+    "deploymentEnabled": {
+      "main": true,
+      "jyothir": false,
+      "*": false
+    }
+  }
+}
+=======
   "buildCommand": "npx turbo run build --filter=@marketplace/frontend...",
   "installCommand": "npm install",
   "framework": "nextjs"
 }
+>>>>>>> origin/main

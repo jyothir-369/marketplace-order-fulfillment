@@ -1,21 +1,58 @@
 import 'reflect-metadata';
+<<<<<<< HEAD
+require('dotenv').config({ path: require('path').join(__dirname, '../../../../.env') });
+=======
+>>>>>>> origin/main
 import { DataSource } from 'typeorm';
 import { Vendor, Product } from '../common/entities';
 
+function parsePostgresUrl(url: string): {
+  host: string;
+  port: number;
+  username: string;
+  password: string;
+  database: string;
+  ssl: boolean;
+} {
+  const parsed = new URL(url);
+  return {
+    host: parsed.hostname,
+    port: parsed.port ? Number(parsed.port) : 5432,
+    username: decodeURIComponent(parsed.username),
+    password: decodeURIComponent(parsed.password),
+    database: parsed.pathname.replace(/^\//, ''),
+    ssl: !parsed.searchParams.get('sslmode')?.includes('disable'),
+  };
+}
+
+const databaseUrl = process.env.DATABASE_URL;
+const parsedUrl = databaseUrl ? parsePostgresUrl(databaseUrl) : null;
+
 const AppDataSource = new DataSource({
   type: 'postgres',
+<<<<<<< HEAD
+  host: parsedUrl?.host ?? (process.env.DB_HOST || 'localhost'),
+  port: parsedUrl?.port ?? parseInt(process.env.DB_PORT || '5433'),
+  username: parsedUrl?.username ?? (process.env.DB_USERNAME || 'postgres'),
+  password: parsedUrl?.password ?? (process.env.DB_PASSWORD || 'postgres'),
+  database: parsedUrl?.database ?? (process.env.DB_DATABASE || 'marketplace'),
+  ssl: parsedUrl ? (parsedUrl.ssl ? { rejectUnauthorized: false } : false) : undefined,
+  entities: Object.values(entities) as Function[],
+=======
   host: process.env.DB_HOST || 'localhost',
   port: parseInt(process.env.DB_PORT || '5432'),
   username: process.env.DB_USERNAME || 'postgres',
   password: process.env.DB_PASSWORD || 'postgres',
   database: process.env.DB_DATABASE || 'marketplace',
   entities: [Vendor, Product],
+>>>>>>> origin/main
   synchronize: true,
   logging: true,
 });
 
 interface VendorSeed {
   name: string;
+  category: string;
   products: Array<{
     name: string;
     price: number;
@@ -26,6 +63,7 @@ interface VendorSeed {
 const vendorSeeds: VendorSeed[] = [
   {
     name: 'Electronics World',
+    category: 'Electronics',
     products: [
       { name: 'Wireless Headphones', price: 79.99, stockCount: 50 },
       { name: 'Bluetooth Speaker', price: 49.99, stockCount: 100 },
@@ -36,6 +74,7 @@ const vendorSeeds: VendorSeed[] = [
   },
   {
     name: 'Home & Kitchen Co',
+    category: 'Home & Living',
     products: [
       { name: 'Coffee Maker', price: 89.99, stockCount: 40 },
       { name: 'Air Fryer', price: 149.99, stockCount: 25 },
@@ -46,6 +85,7 @@ const vendorSeeds: VendorSeed[] = [
   },
   {
     name: 'Sports Gear Inc',
+    category: 'Apparel',
     products: [
       { name: 'Yoga Mat Premium', price: 34.99, stockCount: 120 },
       { name: 'Resistance Bands', price: 19.99, stockCount: 200 },
@@ -56,6 +96,7 @@ const vendorSeeds: VendorSeed[] = [
   },
   {
     name: 'Fashion Forward',
+    category: 'Apparel',
     products: [
       { name: 'Cotton T-Shirt', price: 24.99, stockCount: 500 },
       { name: 'Denim Jeans', price: 59.99, stockCount: 200 },
@@ -66,6 +107,7 @@ const vendorSeeds: VendorSeed[] = [
   },
   {
     name: 'Books & Media',
+    category: 'Books',
     products: [
       { name: 'Bestseller Novel', price: 14.99, stockCount: 300 },
       { name: 'Cookbook Collection', price: 29.99, stockCount: 100 },
@@ -114,6 +156,7 @@ async function seedDatabase(): Promise<void> {
           name: productSeed.name,
           price: productSeed.price,
           stockCount: productSeed.stockCount,
+          category: vendorSeed.category,
           isActive: true,
         });
         const savedProduct = await productRepo.save(product);

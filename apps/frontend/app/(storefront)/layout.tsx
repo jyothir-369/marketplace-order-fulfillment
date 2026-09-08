@@ -15,6 +15,7 @@ import type { Metadata } from "next";
 import { StorefrontHeader } from "@/components/storefront/StorefrontHeader";
 import { StorefrontFooter } from "@/components/storefront/StorefrontFooter";
 import { CartDrawer } from "@/components/storefront/CartDrawer";
+import { CartSyncProvider } from "@/context/CartSyncProvider";
 
 export const metadata: Metadata = {
   title: {
@@ -30,7 +31,7 @@ export default function StorefrontLayout({
   children: React.ReactNode;
 }) {
   return (
-    <>
+    <CartSyncProvider>
       <StorefrontHeader />
       <CartDrawer />
       <main
@@ -40,6 +41,6 @@ export default function StorefrontLayout({
         {children}
       </main>
       <StorefrontFooter />
-    </>
+    </CartSyncProvider>
   );
 }

@@ -4,10 +4,17 @@
 
 ▲ Next.js 16.3.4 (Turbopack)
 - Environments: .env.local
+<<<<<<< HEAD
+✓ Running next.config.mjs took 50ms
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 30.0s
+=======
 ✓ Running next.config.ts took 182ms
 
   Creating an optimized production build ...
 ✓ Compiled successfully in 4.6s
+>>>>>>> origin/main
   Running TypeScript ...
   Finished TypeScript in 5.0s ...
   Collecting page data using 7 workers ...

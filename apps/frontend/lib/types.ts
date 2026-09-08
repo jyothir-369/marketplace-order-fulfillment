@@ -16,6 +16,42 @@ export type IsoDateTime = string;
 export type CorrelationId = string;
 
 // ---------------------------------------------------------------------------
+// Cart (API sync)
+// ---------------------------------------------------------------------------
+
+export interface CartItemApiDto {
+  productId: Uuid;
+  name: string;
+  vendorId: Uuid;
+  vendorName: string;
+  imageUrl?: string;
+  quantity: number;
+  unitPrice: number;
+  maxStock: number;
+}
+
+export interface StockAvailabilityItemDto {
+  productId: Uuid;
+  productName: string;
+  requestedQuantity: number;
+  availableQuantity: number;
+}
+
+export interface CartValidationDto {
+  available: boolean;
+  items: StockAvailabilityItemDto[];
+}
+
+export interface CartResponseDto {
+  buyerId: Uuid;
+  items: CartItemApiDto[];
+  itemCount: number;
+  subtotal: number;
+  validation?: CartValidationDto;
+  updatedAt: IsoDateTime;
+}
+
+// ---------------------------------------------------------------------------
 // Product
 // ---------------------------------------------------------------------------
 

@@ -151,7 +151,7 @@ export function ProductCard({
       {/* 1. Rich Signature Header Banner */}
       <div
         className={cn(
-          "relative h-28 w-full overflow-hidden bg-gradient-to-r",
+          "relative aspect-[4/3] w-full overflow-hidden bg-gradient-to-r",
           gradient
         )}
         aria-hidden
@@ -353,6 +353,7 @@ export function ProductCard({
             onClick={onAdd}
             className={cn(
               "flex h-10 w-full items-center justify-center gap-2 rounded-xl text-sm font-bold",
+          "transition-colors duration-200",
               "transition-all duration-200",
               "border focus:outline-none focus:ring-2 focus:ring-[var(--color-brass)] focus:ring-offset-2",
               isOut

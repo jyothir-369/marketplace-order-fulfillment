@@ -30,6 +30,14 @@ export class CheckoutDto {
   @IsOptional()
   @IsString()
   shippingAddress?: string;
+
+  /**
+   * Client-generated idempotency key. When provided, a retry of the same
+   * checkout key returns the previously created order instead of a duplicate.
+   */
+  @IsOptional()
+  @IsString()
+  idempotencyKey?: string;
 }
 
 export class OrderLineItemResponseDto {

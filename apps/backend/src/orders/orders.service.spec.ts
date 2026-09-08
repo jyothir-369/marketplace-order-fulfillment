@@ -11,13 +11,15 @@ describe('OrdersService', () => {
   let service: OrdersService;
   let vendorQueueService: VendorQueueService;
   let lineItemRepository: any;
+  let orderRepository: any;
 
   beforeEach(async () => {
     lineItemRepository = { update: jest.fn() };
+    orderRepository = { findOne: jest.fn().mockResolvedValue({ id: 'order1', lineItems: [] }) };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OrdersService,
-        { provide: getRepositoryToken(Order), useValue: { findOne: jest.fn().mockResolvedValue({id: 'order1', lineItems: []}) } },
+        { provide: getRepositoryToken(Order), useValue: orderRepository },
         { provide: getRepositoryToken(OrderLineItem), useValue: lineItemRepository },
         { provide: getRepositoryToken(Product), useValue: {
             createQueryBuilder: jest.fn().mockReturnValue({
@@ -39,7 +41,7 @@ describe('OrdersService', () => {
             save: jest.fn().mockImplementation((entity, data) => Promise.resolve(Array.isArray(data) ? data.map(d => ({...d, id: 'item1'})) : ({...data, id: 'order1'}))),
             update: jest.fn(),
         })) } },
-        { provide: InventoryService, useValue: {} },
+        { provide: InventoryService, useValue: { validateStockAvailability: jest.fn().mockResolvedValue({ available: true, items: [] }) } },
         { provide: AuditService, useValue: { logInventoryDecrement: jest.fn(), logOrderCreated: jest.fn() } },
         { provide: VendorQueueService, useValue: { addJobToVendorQueue: jest.fn() } },
       ],
@@ -47,10 +49,39 @@ describe('OrdersService', () => {
 
     service = module.get<OrdersService>(OrdersService);
     vendorQueueService = module.get<VendorQueueService>(VendorQueueService);
+    orderRepository = module.get(getRepositoryToken(Order));
   });
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  it('replays an existing order for the same idempotency key', async () => {
+    orderRepository.findOne.mockResolvedValue({
+      id: 'existing-order',
+      clientReferenceId: 'retry-key-1',
+    });
+    jest.spyOn(service as any, 'getOrderById').mockResolvedValue({
+      id: 'existing-order',
+      buyerId: 'b1',
+      status: 'placed',
+      totalAmount: 0,
+      correlationId: 'corr-1',
+      lineItems: [],
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    const res = await service.checkout(
+      { buyerId: 'b1', items: [{ productId: 'p1', quantity: 2 }], idempotencyKey: 'retry-key-1' } as any,
+      'corr-1',
+    );
+    expect(res.success).toBe(true);
+    expect(res.message).toBe('Order already placed');
+    expect(res.order.id).toBe('existing-order');
+    expect(orderRepository.findOne).toHaveBeenCalledWith({
+      where: { clientReferenceId: 'retry-key-1' },
+    });
   });
 
   it('should enqueue fulfillment jobs on successful checkout', async () => {

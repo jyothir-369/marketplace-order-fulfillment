@@ -67,12 +67,35 @@ jobs:
           retention-days: 7
 
   # ============================================
+<<<<<<< HEAD
+  # Backend Unit + Integration Tests
+  # ============================================
+  backend-tests:
+    name: Backend Tests (unit + integration)
+    runs-on: ubuntu-latest
+    needs: lint
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: marketplace
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+=======
   # Build - Frontend (Vercel Preview)
   # ============================================
   build-frontend:
     name: Build Frontend
     runs-on: ubuntu-latest
     needs: lint-and-typecheck
+>>>>>>> origin/main
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -80,6 +103,31 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+<<<<<<< HEAD
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Backend unit tests
+        working-directory: apps/backend
+        run: npm test -- --runInBand
+      - name: Backend e2e tests
+        working-directory: apps/backend
+        run: npm run test:e2e -- --runInBand
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USERNAME: postgres
+          DB_PASSWORD: postgres
+          DB_DATABASE: marketplace
+          NODE_ENV: test
+          REDIS_HOST: localhost
+      - name: Backend type check
+        working-directory: apps/backend
+        run: npm run type-check
+
+  # ============================================
+  # Docker Build and Push
+=======
           cache: "npm"
       - name: Install dependencies
         run: npm ci
@@ -96,6 +144,7 @@ jobs:
   # ============================================
   # Docker Build & Push - Backend Only
   # Runs only on main branch pushes
+>>>>>>> origin/main
   # ============================================
   docker:
     name: Docker Build & Push
@@ -137,7 +186,49 @@ jobs:
           file: apps/backend/Dockerfile
 
   # ============================================
+<<<<<<< HEAD
+  # Staging Validation + Deploy (gate before prod)
+  # ============================================
+  staging:
+    name: Validate & Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build, backend-tests]
+    if: github.ref == 'refs/heads/develop' || github.event_name == 'push'
+    environment: staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Backend build (smoke: full compile)
+        working-directory: apps/backend
+        run: npm run build
+      - name: Frontend build (production)
+        working-directory: apps/frontend
+        run: npm run build
+      - name: Configure AWS credentials (staging)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: Deploy to staging cluster
+        run: |
+          echo "Staging validation passed — deploy to staging service."
+          echo "In production this step renders the task definition and runs"                "aws-actions/amazon-ecs-render-task-definition + deploy with"                "wait-for-service-stability against the staging service."
+
+  # ============================================
+  # Deploy to ECS (Production)
+=======
   # Deploy Backend to Railway (Production)
+>>>>>>> origin/main
   # ============================================
   deploy-backend:
     name: Deploy Backend to Railway

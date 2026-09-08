@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, FindOptionsRelations } from 'typeorm';
 import { Order, OrderStatus } from '../common/entities/order.entity';
@@ -25,7 +25,39 @@ export class OrdersService {
   ) {}
 
   async checkout(dto: CheckoutDto, correlationId: string): Promise<CheckoutResponseDto> {
+<<<<<<< HEAD
+
+    if (dto.idempotencyKey) {
+      const existing = await this.orderRepository.findOne({
+        where: { clientReferenceId: dto.idempotencyKey },
+      });
+      if (existing) {
+        this.logger.log(
+          `Idempotent checkout replay for key ${dto.idempotencyKey} (order ${existing.id})`,
+          OrdersService.name,
+          correlationId,
+        );
+        return {
+          success: true,
+          order: await this.getOrderById(existing.id, correlationId),
+          message: 'Order already placed',
+          correlationId: correlationId,
+        };
+      }
+    }
+    this.logger.log(
+      `Starting checkout for buyer ${dto.buyerId} with ${dto.items.length} items`,
+      OrdersService.name,
+      correlationId,
+    );
+=======
     this.logger.log('Starting checkout for buyer ' + dto.buyerId + ' with ' + dto.items.length + ' items', OrdersService.name, correlationId);
+>>>>>>> origin/main
+
+    const dedupedIds = new Set(dto.items.map((i) => i.productId));
+    if (dedupedIds.size !== dto.items.length) {
+      throw new BadRequestException('Duplicate product line items are not allowed');
+    }
 
     const productIds = dto.items.map((i) => i.productId);
     const products = await this.productRepository
@@ -57,11 +89,33 @@ export class OrdersService {
         lockedProducts.push(product);
       }
 
+<<<<<<< HEAD
+      // Validate stock availability via shared inventory guard
+      const availability = await this.inventoryService.validateStockAvailability(
+        dto.items.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+        })),
+        correlationId,
+        manager,
+      );
+      if (!availability.available) {
+        const conflicting = availability.items
+          .filter((a) => a.availableQuantity < a.requestedQuantity)
+          .map((a) => a.productId);
+        throw new ConflictException({
+          statusCode: 409,
+          message: 'Insufficient stock for one or more items',
+          error: 'Conflict',
+          conflictingProductIds: conflicting,
+        });
+=======
       for (const item of dto.items) {
         const prod = lockedProducts.find((p) => p.id === item.productId);
         if (prod && prod.stockCount < item.quantity) {
           throw new BadRequestException('Insufficient stock for ' + prod.name + ': requested ' + item.quantity + ', available ' + prod.stockCount);
         }
+>>>>>>> origin/main
       }
 
       for (const item of dto.items) {
@@ -91,7 +145,12 @@ export class OrdersService {
         status: OrderStatus.PLACED,
         correlationId: correlationId,
         totalAmount: 0,
+<<<<<<< HEAD
+        shippingAddress: dto.shippingAddress || null,
+        clientReferenceId: dto.idempotencyKey || null,
+=======
         shippingAddress: dto.shippingAddress || null, // New field from Phase 7
+>>>>>>> origin/main
       });
 
       const savedOrder = await (manager.save as any)(Order, order) as Order;
