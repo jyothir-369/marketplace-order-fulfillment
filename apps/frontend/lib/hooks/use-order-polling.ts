@@ -93,6 +93,7 @@ export function describeOrderStatus(status: string | undefined): {
   token: StatusToken;
   live: boolean;
 } {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy require keeps this module import-free at startup
   const { getStatusToken } = require("@/lib/status-tokens") as typeof import("@/lib/status-tokens");
   const token = getStatusToken(status ?? "UNKNOWN");
   return { token, live: !TERMINAL_ORDER_STATUSES.has(status ?? "") };

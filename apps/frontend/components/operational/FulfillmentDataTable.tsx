@@ -1,5 +1,5 @@
-/**
- * FulfillmentDataTable â€” headless admin data table (Â§4.3).
+﻿/**
+ * FulfillmentDataTable Ã¢â‚¬â€ headless admin data table (Ã‚Â§4.3).
  *
  * Powered by @tanstack/react-table v9. Supports:
  *   - column sorting
@@ -13,6 +13,7 @@
  * `onSortChange` callbacks.
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any -- TanStack Table generics are intentionally loose */
 "use client";
 
 import { useMemo, type ReactNode } from "react";
@@ -100,7 +101,7 @@ export function FulfillmentDataTable<T>({
             return col.cell(row);
           }
           const v = col.accessorKey ? row[col.accessorKey] : undefined;
-          return v === null || v === undefined ? <span className="text-[var(--color-muted-foreground)]">â€”</span> : String(v);
+          return v === null || v === undefined ? <span className="text-[var(--color-muted-foreground)]">Ã¢â‚¬â€</span> : String(v);
         },
       })),
     [columns]

@@ -1,4 +1,4 @@
-# ============================================
+﻿# ============================================
 # GitHub Actions CI/CD Pipeline
 # Multi-workspace monorepo: @marketplace/backend + @marketplace/frontend
 #
@@ -6,6 +6,8 @@
 #   - Keeps the modern job names / Vercel frontend build+deploy from main.
 #   - Keeps the Postgres-backed backend test suite and staging gate from jyothir.
 #   - Fixes the deploy-frontend step indentation that broke YAML parsing.
+#   - Harden dependency install: single root package-lock.json (workspace-safe),
+#     workspace lint/type-check scripts, and no swallowed failures.
 # ============================================
 name: CI/CD Pipeline
 
@@ -16,7 +18,7 @@ on:
     branches: [main]
 
 env:
-  NODE_VERSION: "20"
+  NODE_VERSION: "22"
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
@@ -37,12 +39,20 @@ jobs:
           cache: "npm"
       - name: Install dependencies (monorepo root)
         run: npm ci
+      - name: Verify lockfile is in sync
+        run: npm install --package-lock-only --ignore-scripts --dry-run
+      - name: Lint backend
+        working-directory: apps/backend
+        run: npm run lint
+      - name: Lint frontend
+        working-directory: apps/frontend
+        run: npm run lint
       - name: Type check backend
         working-directory: apps/backend
-        run: npx tsc --noEmit
+        run: npm run type-check
       - name: Type check frontend
         working-directory: apps/frontend
-        run: npx tsc --noEmit || true
+        run: npm run type-check
 
   # ============================================
   # Build - Backend

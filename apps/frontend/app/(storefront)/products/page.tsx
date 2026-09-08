@@ -73,6 +73,7 @@ function ProductsPageInner() {
     }
   }, [category]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void loadProducts(); }, [loadProducts]);
 
   const handleSeed = async () => {
