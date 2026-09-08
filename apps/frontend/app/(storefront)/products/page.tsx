@@ -1,5 +1,5 @@
 /**
- * app/(storefront)/products/page.tsx â€” Luxury Catalog Page (V2 Premium).
+ * app/(storefront)/products/page.tsx ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Luxury Catalog Page (V2 Premium).
  *
  * Upgraded from a plain header to a full luxury editorial hero:
  *   - Midnight navy & brass editorial hero banner with trust badges
@@ -29,23 +29,7 @@ import { useToast, ToastProvider } from "@/components/ui/toast";
 import { editorialEyebrows } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
-// Stable category tab definitions.
-export const CATEGORY_TABS = [
-  { value: "",              label: "All" },
-  { value: "Electronics",  label: "Electronics" },
-  { value: "Apparel",      label: "Apparel" },
-  { value: "Home & Living",label: "Home & Living" },
-  { value: "Industrial",   label: "Industrial" },
-] as const;
-
-/** Client-side sort options. Value maps to URL ?sort= param. */
-export const SORT_OPTIONS = [
-  { value: "",            label: "Featured"          },
-  { value: "price-asc",   label: "Price: Low → High" },
-  { value: "price-desc",  label: "Price: High → Low" },
-  { value: "newest",      label: "Newest"             },
-] as const;
-
+import { CATEGORY_TABS, SORT_OPTIONS } from "@/lib/catalog-options";
 function ProductsPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -114,7 +98,7 @@ function ProductsPageInner() {
     return true;
   });
 
-  // Client-side sort — applied after filtering so sort state is preserved
+  // Client-side sort Ã¢â‚¬â€ applied after filtering so sort state is preserved
   // across filter changes without a server round-trip.
   const sorted = [...filtered].sort((a, b) => {
     if (sort === "price-asc")  return a.price - b.price;
@@ -194,7 +178,7 @@ function ProductsPageInner() {
 
           {/* Tagline */}
           <p className="text-sm text-white/60 leading-relaxed max-w-md">
-            Browse thousands of products across our curated merchant network â€” all backed by
+            Browse thousands of products across our curated merchant network ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â all backed by
             automated multi-carrier fulfillment and buyer protection.
           </p>
 
@@ -409,7 +393,7 @@ function ProductsPageInner() {
 }
 
 // ---------------------------------------------------------------------------
-// Wrapper â€” provides ToastProvider context
+// Wrapper ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â provides ToastProvider context
 // ---------------------------------------------------------------------------
 
 export default function ProductsPage() {
