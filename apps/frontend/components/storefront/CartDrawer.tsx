@@ -1,4 +1,4 @@
-/**
+﻿/**
  * CartDrawer — production-grade slide-over cart (V2 Premium).
  *
  * Accessibility & isolation:
@@ -15,6 +15,7 @@
  *   - Intuitive +/- quantity stepper with stock boundary hints.
  *   - Inline remove with a press-and-hold countdown (no accidental drops).
  *   - Optimistic update feedback: pending state per line, sync banner.
+ *   - Clear cart button with confirmation.
  */
 
 "use client";
@@ -29,6 +30,7 @@ import {
   ArrowRight,
   RefreshCw,
   AlertTriangle,
+  Trash2,
 } from "lucide-react";
 import {
   Dialog,
@@ -46,25 +48,6 @@ import {
 } from "@/context/CartStore";
 import { useCartSync } from "@/context/CartSyncProvider";
 import { formatCurrency, cn } from "@/lib/utils";
-
-function TrashIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="16" height="16" viewBox="0 0 24 24"
-      fill="none" stroke="currentColor"
-      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-      className={className}
-      aria-hidden
-    >
-      <path d="M3 6h18" />
-      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-      <line x1="10" y1="11" x2="10" y2="17" />
-      <line x1="14" y1="11" x2="14" y2="17" />
-    </svg>
-  );
-}
 
 const REMOVE_HOLD_MS = 650;
 
@@ -184,7 +167,7 @@ function CartDrawerItem({
               {armed ? (
                 <span className="text-[10px] font-bold px-1">Hold</span>
               ) : (
-                <TrashIcon className="h-4 w-4" />
+                <Trash2 className="h-4 w-4" aria-hidden />
               )}
             </button>
           </div>
@@ -238,7 +221,18 @@ export function CartDrawer() {
   const removeFromCart = useCartStore((s) => s.removeFromCart);
   const updateQuantity = useCartStore((s) => s.updateQuantity);
   const closeDrawer = useCartStore((s) => s.closeDrawer);
-  const { syncing, error, flushSync } = useCartSync();
+  const { syncing, error, flushSync, clearCart } = useCartSync();
+
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+
+  const handleClearCart = useCallback(async () => {
+    try {
+      await clearCart();
+      setShowClearConfirm(false);
+    } catch {
+      // Error is already handled in clearCart and shown in the error banner
+    }
+  }, [clearCart]);
 
   return (
     <Dialog open={drawerOpen} onOpenChange={(open) => !open && closeDrawer()}>
@@ -342,6 +336,28 @@ export function CartDrawer() {
           </div>
         )}
 
+        {/* Clear cart confirmation */}
+        {showClearConfirm && (
+          <div className="flex items-center gap-2 px-5 py-2 text-xs bg-[var(--color-destructive)]/10 text-[var(--color-destructive)]">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span className="flex-1">Clear all items from cart? This action cannot be undone.</span>
+            <button
+              type="button"
+              onClick={() => setShowClearConfirm(false)}
+              className="px-3 py-1 text-sm font-medium rounded border border-[var(--color-destructive)]/30 hover:bg-[var(--color-destructive)]/10 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleClearCart}
+              className="px-3 py-1 text-sm font-semibold rounded bg-[var(--color-destructive)] text-white hover:opacity-90 transition-opacity"
+            >
+              Clear Cart
+            </button>
+          </div>
+        )}
+
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-5">
           {cart.length === 0 ? (
@@ -396,6 +412,17 @@ export function CartDrawer() {
               Proceed to Checkout
               <ArrowRight className="h-4 w-4" aria-hidden />
             </Link>
+            <button
+              type="button"
+              onClick={() => setShowClearConfirm(true)}
+              className={cn(
+                "text-center text-sm underline underline-offset-2",
+                "text-[var(--color-destructive)] hover:text-[var(--color-destructive)]",
+                "focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)]"
+              )}
+            >
+              Clear cart
+            </button>
             <button
               type="button"
               onClick={closeDrawer}
