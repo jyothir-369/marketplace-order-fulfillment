@@ -20,6 +20,31 @@ import { VendorSyncJob } from './common/entities/vendor-sync-job.entity';
 
 const logger = new Logger('BullModule');
 
+function parsePostgresUrl(url: string): {
+  host: string;
+  port: number;
+  username: string;
+  password: string;
+  database: string;
+} {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== 'postgres:' && parsed.protocol !== 'postgresql:') {
+    return null;
+  }
+  return {
+    host: parsed.hostname,
+    port: parsed.port ? Number(parsed.port) : 5432,
+    username: decodeURIComponent(parsed.username),
+    password: decodeURIComponent(parsed.password),
+    database: parsed.pathname.replace(/^\//, ''),
+  };
+}
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -29,16 +54,28 @@ const logger = new Logger('BullModule');
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: function(configService) {
+        const databaseUrl = configService.get('DATABASE_URL') as string | undefined;
+        const parsed = databaseUrl ? parsePostgresUrl(databaseUrl) : null;
         return {
           type: 'postgres',
-          host: configService.get('DB_HOST', 'localhost'),
-          port: configService.get('DB_PORT', 5432),
-          username: configService.get('DB_USERNAME', 'postgres'),
-          password: configService.get('DB_PASSWORD', 'postgres'),
-          database: configService.get('DB_DATABASE', 'marketplace'),
+          host: parsed?.host ?? configService.get('DB_HOST', 'localhost'),
+          port: parsed?.port ?? Number(configService.get('DB_PORT', 5432)),
+          username: parsed?.username ?? configService.get('DB_USERNAME', 'postgres'),
+          password: parsed?.password ?? configService.get('DB_PASSWORD', 'postgres'),
+          database: parsed?.database ?? configService.get('DB_DATABASE', 'marketplace'),
           entities: [Vendor, Order, Product, OrderLineItem, VendorSyncJob, AuditLog],
           synchronize: configService.get('NODE_ENV') !== 'production',
           logging: configService.get('NODE_ENV') === 'development',
+          ...(parsed
+            ? {
+                ssl: databaseUrl?.includes('sslmode=no-verify') ||
+                  databaseUrl?.includes('sslmode=require')
+                  ? { rejectUnauthorized: false }
+                  : databaseUrl?.includes('sslmode=disable')
+                    ? false
+                    : { rejectUnauthorized: false },
+              }
+            : {}),
         };
       },
       inject: [ConfigService],

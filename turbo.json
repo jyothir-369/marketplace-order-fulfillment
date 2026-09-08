@@ -13,7 +13,8 @@
     "REDIS_PORT",
     "REDIS_PASSWORD",
     "API_PORT",
-    "NEXT_PUBLIC_API_BASE_URL"
+    "NEXT_PUBLIC_API_BASE_URL",
+    "NEXT_PUBLIC_API_URL"
   ],
   "tasks": {
     "build": {

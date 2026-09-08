@@ -1,6 +1,8 @@
-﻿/**
+/**
  * lib/api.ts — typed fetch client
  */
+
+import { getApiBaseUrl } from "@/lib/env";
 
 import type {
   ApiErrorBody,
@@ -27,12 +29,14 @@ import type {
 
 // ---------------------------------------------------------------------------
 // Client defaults
+//
+// Double slashes (e.g. //catalog) come from a base URL that has a trailing
+// slash, so the base is normalized once here. See lib/env.ts for resolution.
 // ---------------------------------------------------------------------------
 
-const BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ??
-  process.env.NEXT_PUBLIC_API_URL ??
-  'http://localhost:3001/api';
+
+
+const BASE_URL = getApiBaseUrl();
 
 export const VENDOR_ID = "11111111-1111-1111-1111-111111111111";
 
@@ -44,7 +48,8 @@ async function apiFetch<T>(
   path: string,
   init?: RequestInit & { params?: Record<string, string | number | undefined> }
 ): Promise<T> {
-  let url = `${BASE_URL}${path}`;
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  let url = `${BASE_URL}${normalizedPath}`;
 
   if (init?.params) {
     const qs = new URLSearchParams();
