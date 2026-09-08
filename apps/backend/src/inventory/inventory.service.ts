@@ -23,72 +23,120 @@ export class InventoryService {
     private readonly auditService: AuditService,
   ) {}
 
-  async decrementStock(dto: DecrementStockDto, correlationId: string, orderId?: string): Promise<StockOperationResult> {
-    this.logger.log('Decrementing stock for product ' + dto.productId + ' by ' + dto.quantity, InventoryService.name, correlationId);
+  async decrementStock(
+    dto: DecrementStockDto,
+    correlationId: string,
+    orderId?: string,
+  ): Promise<StockOperationResult> {
+    this.logger.log(
+      'Decrementing stock for product ' + dto.productId + ' by ' + dto.quantity,
+      InventoryService.name,
+      correlationId,
+    );
 
-    var self = this;
-    return this.dataSource.transaction(async function(manager) {
-      return (manager as any).createQueryBuilder(Product, 'product')
+    return this.dataSource.transaction(async (manager) => {
+      // Primary guard: pessimistic write lock (SELECT ... FOR UPDATE)
+      const product = await manager
+        .createQueryBuilder(Product, 'product')
         .setLock('pessimistic_write')
         .where('product.id = :id', { id: dto.productId })
-        .getOne()
-        .then(async function(product) {
-          if (!product) {
-            throw new BadRequestException('Product ' + dto.productId + ' not found');
-          }
+        .getOne();
 
-          if (!product.isActive) {
-            return {
-              success: false,
-              productId: dto.productId,
-              previousStock: product.stockCount,
-              newStock: product.stockCount,
-              requestedQuantity: dto.quantity,
-              message: 'Product is not active',
-            };
-          }
+      if (!product) {
+        throw new BadRequestException('Product ' + dto.productId + ' not found');
+      }
 
-          if (product.stockCount < dto.quantity) {
-            self.logger.warn('Insufficient stock for product ' + dto.productId + ': requested ' + dto.quantity + ', available ' + product.stockCount, InventoryService.name, correlationId);
-            return {
-              success: false,
-              productId: dto.productId,
-              previousStock: product.stockCount,
-              newStock: product.stockCount,
-              requestedQuantity: dto.quantity,
-              message: 'Insufficient stock: requested ' + dto.quantity + ', available ' + product.stockCount,
-            };
-          }
+      if (!product.isActive) {
+        return {
+          success: false,
+          productId: dto.productId,
+          previousStock: product.stockCount,
+          newStock: product.stockCount,
+          requestedQuantity: dto.quantity,
+          message: 'Product is not active',
+        };
+      }
 
-          var previousStock = product.stockCount;
-          var newStock = previousStock - dto.quantity;
+      if (product.stockCount < dto.quantity) {
+        this.logger.warn(
+          'Insufficient stock for product ' +
+            dto.productId +
+            ': requested ' +
+            dto.quantity +
+            ', available ' +
+            product.stockCount,
+          InventoryService.name,
+          correlationId,
+        );
+        return {
+          success: false,
+          productId: dto.productId,
+          previousStock: product.stockCount,
+          newStock: product.stockCount,
+          requestedQuantity: dto.quantity,
+          message:
+            'Insufficient stock: requested ' +
+            dto.quantity +
+            ', available ' +
+            product.stockCount,
+        };
+      }
 
-          return (manager as any).createQueryBuilder()
-            .update(Product)
-            .set({ stockCount: newStock })
-            .where('id = :id', { id: dto.productId })
-            .execute()
-            .then(async function() {
-              self.logger.log('Stock decremented for product ' + dto.productId + ': ' + previousStock + ' -> ' + newStock, InventoryService.name, correlationId);
-              
-              await self.auditService.logInventoryDecrement(
-                correlationId,
-                dto.productId,
-                previousStock,
-                newStock,
-                dto.quantity,
-                orderId,
-              );
-              
-              return {
-                success: true,
-                productId: dto.productId,
-                previousStock: previousStock,
-                newStock: newStock,
-                requestedQuantity: dto.quantity,
-              };
-            });
-        });
+      const previousStock = product.stockCount;
+      const newStock = previousStock - dto.quantity;
+      const previousVersion = product.version;
+
+      // Secondary guard: include version in the UPDATE WHERE clause.
+      // If another transaction modified the row in a way that bypassed the
+      // pessimistic lock (e.g. direct UPDATE via admin tooling), this WHERE
+      // will match 0 rows and we throw a concurrency error.
+      const updateResult = await manager
+        .createQueryBuilder()
+        .update(Product)
+        .set({ stockCount: newStock })
+        .where('id = :id AND version = :version', {
+          id: dto.productId,
+          version: previousVersion,
+        })
+        .execute();
+
+      if ((updateResult.affected ?? 0) === 0) {
+        throw new BadRequestException(
+          `Optimistic lock failed for product ${dto.productId}: ` +
+            `expected version ${previousVersion} but row was modified concurrently`,
+        );
+      }
+
+      this.logger.log(
+        'Stock decremented for product ' +
+          dto.productId +
+          ': ' +
+          previousStock +
+          ' -> ' +
+          newStock +
+          ' (v' +
+          previousVersion +
+          ')',
+        InventoryService.name,
+        correlationId,
+      );
+
+      await this.auditService.logInventoryDecrement(
+        correlationId,
+        dto.productId,
+        previousStock,
+        newStock,
+        dto.quantity,
+        orderId,
+      );
+
+      return {
+        success: true,
+        productId: dto.productId,
+        previousStock: previousStock,
+        newStock: newStock,
+        requestedQuantity: dto.quantity,
+      };
     });
   }
 
@@ -155,7 +203,7 @@ export class InventoryService {
   }
 
   async getStockInfo(productId: string): Promise<StockInfoDto> {
-    var product = await this.productRepository.findOne({ where: { id: productId } });
+    const product = await this.productRepository.findOne({ where: { id: productId } });
     if (!product) {
       throw new BadRequestException('Product ' + productId + ' not found');
     }
@@ -166,49 +214,81 @@ export class InventoryService {
     };
   }
 
-  async restoreStock(productId: string, quantity: number, correlationId: string, reason: string): Promise<StockOperationResult> {
-    this.logger.log('Restoring stock for product ' + productId + ' by ' + quantity, InventoryService.name, correlationId);
+  async restoreStock(
+    productId: string,
+    quantity: number,
+    correlationId: string,
+    reason: string,
+  ): Promise<StockOperationResult> {
+    this.logger.log(
+      'Restoring stock for product ' + productId + ' by ' + quantity,
+      InventoryService.name,
+      correlationId,
+    );
 
-    var self = this;
-    return this.dataSource.transaction(async function(manager) {
-      return (manager as any).createQueryBuilder(Product, 'product')
+    return this.dataSource.transaction(async (manager) => {
+      const product = await manager
+        .createQueryBuilder(Product, 'product')
         .setLock('pessimistic_write')
         .where('product.id = :id', { id: productId })
-        .getOne()
-        .then(async function(product) {
-          if (!product) {
-            throw new BadRequestException('Product ' + productId + ' not found');
-          }
+        .getOne();
 
-          var previousStock = product.stockCount;
-          var newStock = previousStock + quantity;
+      if (!product) {
+        throw new BadRequestException('Product ' + productId + ' not found');
+      }
 
-          return (manager as any).createQueryBuilder()
-            .update(Product)
-            .set({ stockCount: newStock })
-            .where('id = :id', { id: productId })
-            .execute()
-            .then(async function() {
-              self.logger.log('Stock restored for product ' + productId + ': ' + previousStock + ' -> ' + newStock, InventoryService.name, correlationId);
-              
-              await self.auditService.logInventoryRestore(
-                correlationId,
-                productId,
-                previousStock,
-                newStock,
-                quantity,
-                reason,
-              );
-              
-              return {
-                success: true,
-                productId: productId,
-                previousStock: previousStock,
-                newStock: newStock,
-                requestedQuantity: quantity,
-              };
-            });
-        });
+      const previousStock = product.stockCount;
+      const newStock = previousStock + quantity;
+      const previousVersion = product.version;
+
+      // Secondary optimistic lock guard on restore
+      const updateResult = await manager
+        .createQueryBuilder()
+        .update(Product)
+        .set({ stockCount: newStock })
+        .where('id = :id AND version = :version', {
+          id: productId,
+          version: previousVersion,
+        })
+        .execute();
+
+      if ((updateResult.affected ?? 0) === 0) {
+        throw new BadRequestException(
+          `Optimistic lock failed for product ${productId}: ` +
+            `expected version ${previousVersion} but row was modified concurrently`,
+        );
+      }
+
+      this.logger.log(
+        'Stock restored for product ' +
+          productId +
+          ': ' +
+          previousStock +
+          ' -> ' +
+          newStock +
+          ' (v' +
+          previousVersion +
+          ')',
+        InventoryService.name,
+        correlationId,
+      );
+
+      await this.auditService.logInventoryRestore(
+        correlationId,
+        productId,
+        previousStock,
+        newStock,
+        quantity,
+        reason,
+      );
+
+      return {
+        success: true,
+        productId: productId,
+        previousStock: previousStock,
+        newStock: newStock,
+        requestedQuantity: quantity,
+      };
     });
   }
 }

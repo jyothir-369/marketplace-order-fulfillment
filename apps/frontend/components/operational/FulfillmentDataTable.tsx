@@ -20,10 +20,10 @@ import { ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight } fro
 import {
   type SortingState,
   flexRender,
-  createCoreRowModel,
-  createSortedRowModel,
-  useTable,
-  type TableFeatures,
+  getCoreRowModel,
+  getSortedRowModel,
+  useReactTable,
+  type Table,
   type RowData,
 } from "@tanstack/react-table";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -106,7 +106,7 @@ export function FulfillmentDataTable<T>({
     [columns]
   );
 
-  const table = useTable<TableFeatures, T extends RowData ? T : never>({
+  const table = useReactTable<T extends RowData ? T : never>({
     data: data as T[],
     columns: tanstackColumns as any,
     state: { sorting: [] as SortingState },
@@ -115,8 +115,8 @@ export function FulfillmentDataTable<T>({
       const next = typeof updater === "function" ? updater([]) : updater;
       onSortChange(next as SortingState);
     },
-    getCoreRowModel: createCoreRowModel<TableFeatures, T extends RowData ? T : never>(),
-    getSortedRowModel: createSortedRowModel<TableFeatures, T extends RowData ? T : never>(),
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
     getRowId: getRowId ? (row: any) => getRowId(row) : undefined,
   } as any);
 

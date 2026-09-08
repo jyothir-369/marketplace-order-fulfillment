@@ -1,6 +1,11 @@
 # ============================================
 # GitHub Actions CI/CD Pipeline
 # Multi-workspace monorepo: @marketplace/backend + @marketplace/frontend
+#
+# RESOLVED from jyothir <-> main merge:
+#   - Keeps the modern job names / Vercel frontend build+deploy from main.
+#   - Keeps the Postgres-backed backend test suite and staging gate from jyothir.
+#   - Fixes the deploy-frontend step indentation that broke YAML parsing.
 # ============================================
 name: CI/CD Pipeline
 
@@ -67,13 +72,39 @@ jobs:
           retention-days: 7
 
   # ============================================
-<<<<<<< HEAD
-  # Backend Unit + Integration Tests
+  # Build - Frontend
+  # ============================================
+  build-frontend:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+    needs: lint-and-typecheck
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+      - name: Install dependencies
+        run: npm ci
+      - name: Build frontend
+        working-directory: apps/frontend
+        run: npm run build
+      - name: Upload frontend build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-next
+          path: apps/frontend/.next/
+          retention-days: 7
+
+  # ============================================
+  # Backend Unit + Integration Tests (Postgres)
   # ============================================
   backend-tests:
     name: Backend Tests (unit + integration)
     runs-on: ubuntu-latest
-    needs: lint
+    needs: lint-and-typecheck
     services:
       postgres:
         image: postgres:16
@@ -88,14 +119,6 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-=======
-  # Build - Frontend (Vercel Preview)
-  # ============================================
-  build-frontend:
-    name: Build Frontend
-    runs-on: ubuntu-latest
-    needs: lint-and-typecheck
->>>>>>> origin/main
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -103,8 +126,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-<<<<<<< HEAD
-          cache: 'npm'
+          cache: "npm"
       - name: Install dependencies
         run: npm ci
       - name: Backend unit tests
@@ -126,25 +148,8 @@ jobs:
         run: npm run type-check
 
   # ============================================
-  # Docker Build and Push
-=======
-          cache: "npm"
-      - name: Install dependencies
-        run: npm ci
-      - name: Build frontend
-        working-directory: apps/frontend
-        run: npm run build
-      - name: Upload frontend build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-next
-          path: apps/frontend/.next/
-          retention-days: 7
-
-  # ============================================
   # Docker Build & Push - Backend Only
   # Runs only on main branch pushes
->>>>>>> origin/main
   # ============================================
   docker:
     name: Docker Build & Push
@@ -186,14 +191,13 @@ jobs:
           file: apps/backend/Dockerfile
 
   # ============================================
-<<<<<<< HEAD
-  # Staging Validation + Deploy (gate before prod)
+  # Staging Validation (gate before prod)
   # ============================================
   staging:
     name: Validate & Deploy to Staging
     runs-on: ubuntu-latest
-    needs: [build, backend-tests]
-    if: github.ref == 'refs/heads/develop' || github.event_name == 'push'
+    needs: [build-backend, build-frontend, backend-tests]
+    if: github.ref == 'refs/heads/develop'
     environment: staging
     steps:
       - name: Checkout code
@@ -202,10 +206,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          cache: "npm"
       - name: Install dependencies
         run: npm ci
-      - name: Backend build (smoke: full compile)
+      - name: "Backend build (smoke: full compile)"
         working-directory: apps/backend
         run: npm run build
       - name: Frontend build (production)
@@ -221,14 +225,11 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
       - name: Deploy to staging cluster
         run: |
-          echo "Staging validation passed — deploy to staging service."
-          echo "In production this step renders the task definition and runs"                "aws-actions/amazon-ecs-render-task-definition + deploy with"                "wait-for-service-stability against the staging service."
+          echo "Staging validation passed - deploy to staging service."
+          echo "In production this step renders the task definition and runs AWS ECS deploy with wait-for-service-stability against the staging service."
 
   # ============================================
-  # Deploy to ECS (Production)
-=======
   # Deploy Backend to Railway (Production)
->>>>>>> origin/main
   # ============================================
   deploy-backend:
     name: Deploy Backend to Railway
@@ -260,9 +261,7 @@ jobs:
         uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
-            vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_FRONTEND_PROJECT_ID }}
           vercel-args: --prod
           working-directory: apps/frontend
-
-

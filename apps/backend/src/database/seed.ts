@@ -1,8 +1,5 @@
 import 'reflect-metadata';
-<<<<<<< HEAD
 require('dotenv').config({ path: require('path').join(__dirname, '../../../../.env') });
-=======
->>>>>>> origin/main
 import { DataSource } from 'typeorm';
 import { Vendor, Product } from '../common/entities';
 
@@ -30,22 +27,13 @@ const parsedUrl = databaseUrl ? parsePostgresUrl(databaseUrl) : null;
 
 const AppDataSource = new DataSource({
   type: 'postgres',
-<<<<<<< HEAD
   host: parsedUrl?.host ?? (process.env.DB_HOST || 'localhost'),
   port: parsedUrl?.port ?? parseInt(process.env.DB_PORT || '5433'),
   username: parsedUrl?.username ?? (process.env.DB_USERNAME || 'postgres'),
   password: parsedUrl?.password ?? (process.env.DB_PASSWORD || 'postgres'),
   database: parsedUrl?.database ?? (process.env.DB_DATABASE || 'marketplace'),
   ssl: parsedUrl ? (parsedUrl.ssl ? { rejectUnauthorized: false } : false) : undefined,
-  entities: Object.values(entities) as Function[],
-=======
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  username: process.env.DB_USERNAME || 'postgres',
-  password: process.env.DB_PASSWORD || 'postgres',
-  database: process.env.DB_DATABASE || 'marketplace',
   entities: [Vendor, Product],
->>>>>>> origin/main
   synchronize: true,
   logging: true,
 });
