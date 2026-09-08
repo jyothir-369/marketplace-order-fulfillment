@@ -1,4 +1,4 @@
-/**
+﻿/**
  * CartSyncProvider
  *
  * Synchronizes the Zustand cart with the NestJS cart endpoints:
@@ -7,8 +7,8 @@
  *     the latest snapshot; interleaved updates coalesce into one request.
  *   - On 409 (inventory conflict) the local cart rolls back to the last
  *     server-confirmed snapshot and the conflicting ids are surfaced for UX.
- *   - On hydration completion, the persisted local cart merges with the server
- *     snapshot so a returning session restores its cart even offline.
+ *   - On hydration completion, the server snapshot is the source of truth.
+ *     Local items not present on the server are discarded (they were removed).
  */
 
 "use client";
@@ -28,6 +28,7 @@ import {
   getRemoteCart,
   syncRemoteCart,
   validateRemoteCart,
+  clearRemoteCart,
 } from "@/lib/api";
 
 export type CartSyncError =
@@ -40,6 +41,7 @@ interface CartSyncContextValue {
   error: CartSyncError | null;
   validateBeforeCheckout: () => Promise<{ ok: boolean; conflicts: string[] }>;
   flushSync: () => Promise<void>;
+  clearCart: () => Promise<void>;
 }
 
 const CartSyncContext = createContext<CartSyncContextValue | null>(null);
@@ -62,7 +64,7 @@ export function CartSyncProvider({ children }: { children: ReactNode }) {
   const cart = useCartStore((s) => s.cart);
   const hydrated = useCartStore((s) => s.hydrated);
   const setCart = useCartStore((s) => s.setCart);
-
+  const clearCart = useCartStore((s) => s.clearCart);
 
   const cartRef = useRef<CartItem[]>([]);
   const lastServerSnapshotRef = useRef<CartItem[]>([]);
@@ -70,8 +72,6 @@ export function CartSyncProvider({ children }: { children: ReactNode }) {
   const inFlightRef = useRef(false);
   const pendingRef = useRef(false);
   const mergedOnceRef = useRef(false);
-
-
 
   const toApiItems = (items: CartItem[]) =>
     items.map((i) => ({
@@ -193,6 +193,7 @@ export function CartSyncProvider({ children }: { children: ReactNode }) {
   }, [cart]);
 
   // Hydration merge — exactly once, after the persisted store rehydrates.
+  // SERVER IS SOURCE OF TRUTH: local items not on server are discarded (they were removed).
   const hydrateFromServer = useCallback(async () => {
     if (mergedOnceRef.current) return;
     mergedOnceRef.current = true;
@@ -207,34 +208,11 @@ export function CartSyncProvider({ children }: { children: ReactNode }) {
         vendorId: r.vendorId,
         vendorName: r.vendorName,
       }));
-      const localItems = cartRef.current;
 
-      const byId = new Map(remoteItems.map((r) => [r.productId, r]));
-      const merged: CartItem[] = [];
-      const seen = new Set<string>();
-      for (const local of localItems) {
-        seen.add(local.productId);
-        const remote = byId.get(local.productId);
-        if (remote) {
-          merged.push({
-            ...local,
-            price: remote.price,
-            maxStock: remote.maxStock,
-            quantity: Math.min(
-              Math.max(local.quantity, remote.quantity),
-              remote.maxStock,
-            ),
-          });
-        } else {
-          merged.push(local);
-        }
-      }
-      for (const remote of remoteItems) {
-        if (!seen.has(remote.productId)) merged.push(remote);
-      }
-
-      lastServerSnapshotRef.current = merged;
-      setCart(merged);
+      // Server is source of truth. Only keep items that exist on the server.
+      // Local items not present on server were removed and should not be restored.
+      lastServerSnapshotRef.current = remoteItems;
+      setCart(remoteItems);
       void flushSync();
     } catch {
       // Backend offline / unreachable — keep the persisted cart and sync later.
@@ -255,6 +233,22 @@ export function CartSyncProvider({ children }: { children: ReactNode }) {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, [cart, hydrated, scheduleSync]);
+
+  const clearCartSync = useCallback(async () => {
+    try {
+      await clearRemoteCart();
+      clearCart();
+      lastServerSnapshotRef.current = [];
+      setError(null);
+    } catch (err) {
+      const anyErr = err as { message?: string };
+      setError({
+        kind: "network",
+        message: anyErr?.message ?? "Could not clear cart. Please try again.",
+      });
+      throw err;
+    }
+  }, [clearCart]);
 
   const validateBeforeCheckout = useCallback(async () => {
     try {
@@ -291,7 +285,7 @@ export function CartSyncProvider({ children }: { children: ReactNode }) {
 
   return (
     <CartSyncContext.Provider
-      value={{ syncing, error, validateBeforeCheckout, flushSync }}
+      value={{ syncing, error, validateBeforeCheckout, flushSync, clearCart: clearCartSync }}
     >
       {children}
     </CartSyncContext.Provider>
