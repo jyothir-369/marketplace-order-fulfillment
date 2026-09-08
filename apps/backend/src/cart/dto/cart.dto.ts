@@ -1,4 +1,4 @@
-import { IsUUID, IsArray, ValidateNested, ArrayMinSize, IsString, IsOptional } from 'class-validator';
+﻿import { IsUUID, IsArray, ValidateNested, ArrayMinSize, IsString, IsOptional, IsNumber, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { StockAvailabilityItem } from '../../inventory/dto/inventory.dto';
 
@@ -19,10 +19,16 @@ export class CartItemDto {
   @IsString()
   imageUrl?: string;
 
+  @IsNumber()
+  @Min(1)
   quantity: number;
 
+  @IsNumber()
+  @Min(0)
   unitPrice: number;
 
+  @IsNumber()
+  @Min(1)
   maxStock: number;
 }
 
@@ -55,9 +61,15 @@ export class CartItemResponseDto {
   vendorId: string;
   vendorName: string;
   imageUrl?: string;
+  @IsNumber()
+  @Min(1)
   quantity: number;
+  @IsNumber()
+  @Min(0)
   unitPrice: number;
   lineTotal: number;
+  @IsNumber()
+  @Min(1)
   maxStock: number;
 }
 
