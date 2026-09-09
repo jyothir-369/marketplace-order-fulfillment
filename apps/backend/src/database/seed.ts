@@ -1,15 +1,43 @@
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
-import { Vendor, Product } from '../common/entities';
+import { Vendor, Product, Order, OrderLineItem, VendorSyncJob } from '../common/entities';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
 
+// Load root .env file
+const envPath = path.resolve(__dirname, '../../../../.env');
+console.log('Loading .env from:', envPath);
+dotenv.config({ path: envPath });
+console.log('DATABASE_URL after load:', process.env.DATABASE_URL ? 'SET' : 'NOT SET');
+
+// Parse DATABASE_URL from root .env (same logic as app.module.ts)
+function parseDatabaseUrl(): any {
+  const dbUrl = process.env.DATABASE_URL;
+  const isCloudDb = dbUrl && (dbUrl.includes('supabase.co') || dbUrl.includes('sslmode=require'));
+
+  if (dbUrl && dbUrl.trim() !== '') {
+    return {
+      type: 'postgres',
+      url: dbUrl,
+      ssl: isCloudDb ? { rejectUnauthorized: false } : false,
+    };
+  }
+
+  return {
+    type: 'postgres',
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT || '5432'),
+    username: process.env.DB_USERNAME || 'postgres',
+    password: process.env.DB_PASSWORD || 'postgres',
+    database: process.env.DB_DATABASE || 'marketplace',
+    ssl: false,
+  };
+}
+
+const dbConfig = parseDatabaseUrl();
 const AppDataSource = new DataSource({
-  type: 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  username: process.env.DB_USERNAME || 'postgres',
-  password: process.env.DB_PASSWORD || 'postgres',
-  database: process.env.DB_DATABASE || 'marketplace',
-  entities: [Vendor, Product],
+  ...dbConfig,
+  entities: [Vendor, Product, Order, OrderLineItem, VendorSyncJob],
   synchronize: true,
   logging: true,
 });
@@ -84,13 +112,14 @@ async function seedDatabase(): Promise<void> {
 
   try {
     console.log('Initializing database connection...');
+    console.log('DATABASE_URL:', process.env.DATABASE_URL ? 'SET' : 'NOT SET');
     await AppDataSource.initialize();
     console.log('Database connection established');
     console.log('');
 
     console.log('Clearing existing data...');
-    await AppDataSource.getRepository(Product).delete({});
-    await AppDataSource.getRepository(Vendor).delete({});
+    // Use raw query to truncate tables (cascade handles FK constraints)
+    await AppDataSource.query('TRUNCATE TABLE products, vendors, order_line_items, orders, vendor_sync_jobs RESTART IDENTITY CASCADE');
     console.log('Existing data cleared');
     console.log('');
 
