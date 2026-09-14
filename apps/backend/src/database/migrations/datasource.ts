@@ -3,6 +3,7 @@ import { AddShippingAddressToOrders1710000000001 } from './1710000000001-AddShip
 import { BackfillShippingAddress1710000000002 } from './1710000000002-BackfillShippingAddress';
 import { AddOrderNumber1710000000003 } from './1710000000003-AddOrderNumber';
 import { AddUsersAndRefreshTokens1710000000004 } from './1710000000004-AddUsersAndRefreshTokens';
+import { CategoriesAndCatalogContract1710000000005 } from './1710000000005-CategoriesAndCatalogContract';
 
 export const migrationDataSource = new DataSource({
   type: 'postgres',
@@ -17,6 +18,7 @@ export const migrationDataSource = new DataSource({
     BackfillShippingAddress1710000000002,
     AddOrderNumber1710000000003,
     AddUsersAndRefreshTokens1710000000004,
+    CategoriesAndCatalogContract1710000000005,
   ],
   synchronize: false,
   logging: true,

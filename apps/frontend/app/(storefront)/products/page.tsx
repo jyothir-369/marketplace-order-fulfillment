@@ -1,11 +1,9 @@
 /**
- * app/(storefront)/products/page.tsx â€” Luxury Catalog Page (V2 Premium).
+ * app/(storefront)/products/page.tsx — Luxury Catalog Page (V2 Premium).
  *
- * Upgraded from a plain header to a full luxury editorial hero:
- *   - Midnight navy & brass editorial hero banner with trust badges
- *   - Marketplace performance metrics ribbon
- *   - Live search & category filter chips
- *   - Balanced 3-column responsive showcase grid
+ * Server-driven filtering: all filters (q, category, vendor, price, sort, page)
+ * are sent as query params to GET /api/catalog on every URL change.
+ * Category pills show live counts from GET /api/catalog/categories.
  */
 
 "use client";
@@ -21,22 +19,25 @@ import {
   Sparkles,
   ShoppingBag,
 } from "lucide-react";
-import { getCatalog, type Product } from "@/lib/api";
+import {
+  getCatalogPage,
+  getCategories,
+  getVendors,
+  type Product,
+} from "@/lib/api";
+import type {
+  CatalogListResponse,
+  CategorySummaryDto,
+  VendorResponseDto,
+  CatalogSort,
+} from "@/lib/types";
 import { useCartStore } from "@/context/CartStore";
 import { CatalogGrid } from "@/components/storefront/CatalogGrid";
 import { CatalogGridSkeleton } from "@/components/ui/skeleton";
+import { Pagination } from "@/components/ui/Pagination";
 import { useToast, ToastProvider } from "@/components/ui/toast";
 import { editorialEyebrows } from "@/lib/theme";
 import { cn } from "@/lib/utils";
-
-// Stable category tab definitions.
-const CATEGORY_TABS = [
-  { value: "",              label: "All" },
-  { value: "Electronics",  label: "Electronics" },
-  { value: "Apparel",      label: "Apparel" },
-  { value: "Home & Living",label: "Home & Living" },
-  { value: "Industrial",   label: "Industrial" },
-] as const;
 
 /** Client-side sort options. Value maps to URL ?sort= param. */
 const SORT_OPTIONS = [
@@ -44,7 +45,18 @@ const SORT_OPTIONS = [
   { value: "price-asc",   label: "Price: Low → High" },
   { value: "price-desc",  label: "Price: High → Low" },
   { value: "newest",      label: "Newest"             },
+  { value: "name-asc",    label: "Name: A → Z"       },
+  { value: "name-desc",   label: "Name: Z → A"       },
 ] as const;
+
+/** Seed categories shown while the live count request is in-flight. */
+const PLACEHOLDER_TABS: CategorySummaryDto[] = [
+  { name: "Electronics",      slug: "electronics",      productCount: 0, activeProductCount: 0, totalStock: 0 },
+  { name: "Home & Kitchen",   slug: "home-kitchen",     productCount: 0, activeProductCount: 0, totalStock: 0 },
+  { name: "Sports & Outdoors",slug: "sports-outdoors",  productCount: 0, activeProductCount: 0, totalStock: 0 },
+  { name: "Apparel",          slug: "apparel",          productCount: 0, activeProductCount: 0, totalStock: 0 },
+  { name: "Books & Media",    slug: "books-media",      productCount: 0, activeProductCount: 0, totalStock: 0 },
+];
 
 function ProductsPageInner() {
   const router = useRouter();
@@ -52,9 +64,10 @@ function ProductsPageInner() {
   const { push: toast } = useToast();
   const addToCart = useCartStore((s) => s.addToCart);
 
-  const [products, setProducts] = useState<Product[]>([]);
+  const [response, setResponse] = useState<CatalogListResponse | null>(null);
+  const [categories, setCategories] = useState<CategorySummaryDto[]>(PLACEHOLDER_TABS);
+  const [vendors, setVendors] = useState<VendorResponseDto[]>([]);
   const [loading, setLoading] = useState(true);
-  /** True once the first fetch has completed successfully. */
   const [hasLoaded, setHasLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
@@ -66,20 +79,43 @@ function ProductsPageInner() {
   const category = searchParams.get("category") ?? "";
   const maxPriceParam = searchParams.get("maxPrice");
   const maxPrice = maxPriceParam ? Number(maxPriceParam) : undefined;
-  const sort = searchParams.get("sort") ?? "";
+  const sort = (searchParams.get("sort") ?? "") as CatalogSort | "";
+  const pageParam = searchParams.get("page");
+  const currentPage = pageParam ? Math.max(1, Number(pageParam)) : 1;
 
-  const vendors = Array.from(
-    new Map(products.map((p) => [p.vendorId, p.vendorName])).entries()
-  ).map(([id, name]) => ({ id, name }));
+  const products = response?.items ?? [];
+  const total = response?.total ?? 0;
+  const totalPages = response?.totalPages ?? 1;
 
+  // Load vendors once (small, static list)
+  useEffect(() => {
+    getVendors().then(setVendors).catch(() => {});
+  }, []);
+
+  // Load categories with live counts whenever search params change
+  useEffect(() => {
+    getCategories()
+      .then(setCategories)
+      .catch(() => {});
+  }, [q, vendor, maxPrice]);
+
+  // Load products via server-side query whenever any search param changes
   const loadProducts = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await getCatalog({ category: category || undefined });
-      setProducts(data.filter((p) => p.isActive));
+      const res = await getCatalogPage({
+        q: q || undefined,
+        category: category || undefined,
+        vendor: vendor || undefined,
+        maxPrice,
+        sort: sort || undefined,
+        page: currentPage,
+        pageSize: 24,
+      });
+      setResponse(res);
       const init: Record<string, number> = {};
-      data.forEach((p) => { init[p.id] = 1; });
+      res.items.forEach((p) => { init[p.id] = 1; });
       setQuantities(init);
       setHasLoaded(true);
     } catch (err) {
@@ -87,27 +123,9 @@ function ProductsPageInner() {
     } finally {
       setLoading(false);
     }
-  }, [category]);
+  }, [q, category, vendor, maxPrice, sort, currentPage]);
 
   useEffect(() => { void loadProducts(); }, [loadProducts]);
-
-  // Client-side filter
-  const filtered = products.filter((p) => {
-    if (q && !p.name.toLowerCase().includes(q.toLowerCase())) return false;
-    if (vendor && p.vendorId !== vendor) return false;
-    if (category && p.category !== category) return false;
-    if (maxPrice !== undefined && p.price > maxPrice) return false;
-    return true;
-  });
-
-  // Client-side sort — applied after filtering so sort state is preserved
-  // across filter changes without a server round-trip.
-  const sorted = [...filtered].sort((a, b) => {
-    if (sort === "price-asc")  return a.price - b.price;
-    if (sort === "price-desc") return b.price - a.price;
-    // "Featured" (default) and "newest" both retain catalog insertion order.
-    return 0;
-  });
 
   const setQty = (productId: string, n: number) =>
     setQuantities((prev) => ({ ...prev, [productId]: Math.max(1, n) }));
@@ -142,11 +160,14 @@ function ProductsPageInner() {
     } else {
       params.delete(key);
     }
+    // Reset to page 1 when any filter changes (except when explicitly changing page)
+    if (key !== "page") params.delete("page");
     router.push(`/products?${params.toString()}`, { scroll: false });
   };
 
   const clearFilters = () => router.push("/products", { scroll: false });
-  const hasFilters = Boolean(q || vendor || maxPrice !== undefined);
+  const hasFilters = Boolean(q || vendor || maxPrice !== undefined || category);
+  const facetCategories = response?.facets?.categories ?? categories;
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-10 space-y-8" id="catalog-panel">
@@ -180,7 +201,7 @@ function ProductsPageInner() {
 
           {/* Tagline */}
           <p className="text-sm text-white/60 leading-relaxed max-w-md">
-            Browse thousands of products across our curated merchant network â€” all backed by
+            Browse thousands of products across our curated merchant network — all backed by
             automated multi-carrier fulfillment and buyer protection.
           </p>
 
@@ -232,10 +253,10 @@ function ProductsPageInner() {
           )}
         >
           {[
-            { label: "Products", value: products.length, icon: <Package className="h-4 w-4" /> },
+            { label: "Products", value: total, icon: <Package className="h-4 w-4" /> },
             { label: "Verified Sellers", value: vendors.length, icon: <ShieldCheck className="h-4 w-4" /> },
-            { label: "Showing", value: sorted.length, icon: <Sparkles className="h-4 w-4" /> },
-            { label: "Categories", value: CATEGORY_TABS.length - 1, icon: <ShoppingBag className="h-4 w-4" /> },
+            { label: "Showing", value: products.length, icon: <Sparkles className="h-4 w-4" /> },
+            { label: "Categories", value: facetCategories.length, icon: <ShoppingBag className="h-4 w-4" /> },
           ].map(({ label, value, icon }) => (
             <div key={label} className="flex items-center gap-2.5 px-3 py-2">
               <span className="text-[var(--color-brass)]">{icon}</span>
@@ -254,31 +275,60 @@ function ProductsPageInner() {
 
       {/* 3. Category Pills & Vendor + Price Filters */}
       <section className="space-y-4">
-        {/* Category pills */}
+        {/* Category pills — live counts from server facets */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-          {CATEGORY_TABS.map((tab) => {
-            const isActive = category === tab.value;
-            return (
-              <button
-                key={tab.value}
-                type="button"
-                onClick={() => updateFilter("category", tab.value)}
-                className={cn(
-                  "shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-200",
-                  "focus:outline-none focus:ring-2 focus:ring-[var(--color-brass)] focus:ring-offset-2",
-                  isActive
-                    ? "bg-[var(--color-ink-navy)] text-white shadow-xs ring-2 ring-[var(--color-brass)]/70"
-                    : "bg-[var(--color-cream)]/70 text-[var(--color-warm-muted)] border border-[var(--color-warm-border)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-cream)]"
-                )}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
+          {/* "All" pill */}
+          <button
+            type="button"
+            onClick={() => updateFilter("category", "")}
+            className={cn(
+              "shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-200",
+              "focus:outline-none focus:ring-2 focus:ring-[var(--color-brass)] focus:ring-offset-2",
+              !category
+                ? "bg-[var(--color-ink-navy)] text-white shadow-xs ring-2 ring-[var(--color-brass)]/70"
+                : "bg-[var(--color-cream)]/70 text-[var(--color-warm-muted)] border border-[var(--color-warm-border)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-cream)]"
+            )}
+          >
+            All
+            <span className={cn(
+              "ml-1.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full px-1",
+              "text-[9px] font-bold tabular-nums",
+              !category
+                ? "bg-white/20 text-white"
+                : "bg-[var(--color-warm-border)]/50 text-[var(--color-warm-muted)]",
+            )}>
+              {total}
+            </span>
+          </button>
 
-          </div>
+          {facetCategories.map((cat) => (
+            <button
+              key={cat.name}
+              type="button"
+              onClick={() => updateFilter("category", category === cat.name ? "" : cat.name)}
+              className={cn(
+                "shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-200",
+                "focus:outline-none focus:ring-2 focus:ring-[var(--color-brass)] focus:ring-offset-2",
+                category === cat.name
+                  ? "bg-[var(--color-ink-navy)] text-white shadow-xs ring-2 ring-[var(--color-brass)]/70"
+                  : "bg-[var(--color-cream)]/70 text-[var(--color-warm-muted)] border border-[var(--color-warm-border)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-cream)]"
+              )}
+            >
+              {cat.name}
+              <span className={cn(
+                "ml-1.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full px-1",
+                "text-[9px] font-bold tabular-nums",
+                category === cat.name
+                  ? "bg-white/20 text-white"
+                  : "bg-[var(--color-warm-border)]/50 text-[var(--color-warm-muted)]",
+              )}>
+                {cat.activeProductCount}
+              </span>
+            </button>
+          ))}
+        </div>
 
-        {/* Vendor + Sort + Max price + clear */}
+        {/* Sort + Vendor + Max price + clear */}
         <div className="flex flex-wrap items-center gap-3">
           <label className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-warm-muted)]">
             <span>Sort by</span>
@@ -347,8 +397,8 @@ function ProductsPageInner() {
 
           {/* Live count */}
           <span className="ml-auto text-xs text-[var(--color-warm-muted)] tabular-nums">
-            Showing <strong className="text-[var(--color-foreground)]">{sorted.length}</strong>
-            {hasFilters && " of "}{hasFilters && products.length} products
+            Showing <strong className="text-[var(--color-foreground)]">{products.length}</strong>
+            {hasFilters && " of "}{hasFilters && total} products
           </span>
         </div>
       </section>
@@ -366,7 +416,7 @@ function ProductsPageInner() {
       {/* 5. Product Catalog Grid */}
       <section aria-label="Product catalog">
         <CatalogGrid
-          products={sorted}
+          products={products}
           loading={loading}
           quantities={quantities}
           onQuantityChange={setQty}
@@ -374,12 +424,19 @@ function ProductsPageInner() {
           addedIds={addedIds}
         />
       </section>
+
+      {/* 6. Pagination */}
+      <Pagination
+        page={currentPage}
+        totalPages={totalPages}
+        onPageChange={(p) => updateFilter("page", p > 1 ? String(p) : "")}
+      />
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Wrapper â€” provides ToastProvider context
+// Wrapper — provides ToastProvider context
 // ---------------------------------------------------------------------------
 
 export default function ProductsPage() {

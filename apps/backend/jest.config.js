@@ -28,9 +28,10 @@ module.exports = {
   rootDir: '.',
   testMatch: ['<rootDir>/src/**/*.spec.ts'],
   testPathIgnorePatterns: [
-    // Specs for not-yet-implemented features (see comment header). Restore when the methods land.
+    // Spec for not-yet-implemented feature (see comment header). Restore when the method lands.
     '<rootDir>/src/admin/admin.service.spec.ts',
-    '<rootDir>/src/orders/orders.service.lifecycle.spec.ts',
+    // NOTE: orders.service.lifecycle.spec.ts is now restored — transitionOrder + getOrdersByVendor
+    // were implemented in Phase 2.
   ],
   transform: {
     '^.+\\.(t|j)s$': 'ts-jest',

@@ -4,13 +4,21 @@ import { Repository, DataSource, FindOptionsRelations } from 'typeorm';
 import { Order, OrderStatus } from '../common/entities/order.entity';
 import { OrderLineItem, FulfillmentStatus } from '../common/entities/order-line-item.entity';
 import { Product } from '../common/entities/product.entity';
-import { CheckoutDto, CheckoutResponseDto, OrderResponseDto, OrderLineItemResponseDto } from './dto/orders.dto';
+import { CheckoutDto, CheckoutResponseDto, OrderResponseDto, OrderLineItemResponseDto, TransitionOrderDto, OrderTransitionAction } from './dto/orders.dto';
 import { InventoryService } from '../inventory/inventory.service';
 import { AuditService } from '../common/audit';
 
 @Injectable()
 export class OrdersService {
   private readonly logger = new Logger(OrdersService.name);
+
+  /** Valid source -> target status map for each transition action. */
+  private readonly allowedTransitions: Record<OrderTransitionAction, Partial<Record<OrderStatus, OrderStatus>>> = {
+    CONFIRM: { [OrderStatus.PLACED]: OrderStatus.CONFIRMED },
+    FULFILL: { [OrderStatus.CONFIRMED]: OrderStatus.FULFILLING },
+    SHIP:    { [OrderStatus.FULFILLING]: OrderStatus.FULFILLED },
+    CANCEL:  {},
+  };
 
   constructor(
     @InjectRepository(Order)
@@ -163,6 +171,83 @@ export class OrdersService {
     return orders.map((o) => this.toOrderResponseDto(o));
   }
 
+  /** Orders placed by the AUTHENTICATED buyer (Phase 2 — `GET /orders/me`). */
+  async getOrdersForCurrentUser(userId: string): Promise<OrderResponseDto[]> {
+    const relations: FindOptionsRelations<Order> = { lineItems: { product: true, vendor: true } };
+    const orders = await this.orderRepository.find({
+      where: { buyerUserId: userId },
+      relations: relations,
+      order: { createdAt: 'DESC' },
+    });
+
+    return orders.map((o) => this.toOrderResponseDto(o));
+  }
+
+  /** All orders containing a line item from the given vendor (Phase 2). */
+  async getOrdersByVendor(vendorId: string): Promise<OrderResponseDto[]> {
+    const rows = await this.lineItemRepository
+      .createQueryBuilder('lineItem')
+      .select('DISTINCT lineItem.orderId', 'orderId')
+      .where('lineItem.vendorId = :vendorId', { vendorId })
+      .getRawMany();
+
+    if (!rows || rows.length === 0) {
+      return [];
+    }
+
+    const orderIds = rows.map((r) => r.orderId);
+    const relations: FindOptionsRelations<Order> = { lineItems: { product: true, vendor: true } };
+    const orders = await this.orderRepository.find({
+      where: orderIds.map((id) => ({ id })),
+      relations: relations,
+      order: { createdAt: 'DESC' },
+    });
+
+    return orders.map((o) => this.toOrderResponseDto(o));
+  }
+
+  /**
+   * Advance an order along the lifecycle (Phase 2 — vendor/ops actions).
+   *
+   * Valid transitions:
+   *   CONFIRM  placed -> confirmed
+   *   FULFILL  confirmed -> fulfilling
+   *   SHIP     fulfilling -> fulfilled
+   *   CANCEL   (any non-final status) -> cancelled, via cancelOrder() stock restore.
+   *
+   * `actorId` (the authenticated user) is recorded on the status-change audit.
+   */
+  async transitionOrder(
+    orderId: string,
+    dto: TransitionOrderDto,
+    correlationId: string,
+    actorId?: string,
+  ): Promise<OrderResponseDto> {
+    this.logger.log('Transitioning order ' + orderId + ' with action ' + dto.action, OrdersService.name, correlationId);
+
+    // CANCEL reuses the full cancel flow (inventory restore + line-item failed).
+    if (dto.action === 'CANCEL') {
+      const cancelled = await this.cancelOrder(orderId, correlationId);
+      return cancelled;
+    }
+
+    const order = await this.orderRepository.findOne({ where: { id: orderId } });
+    if (!order) {
+      throw new NotFoundException('Order missing not found');
+    }
+
+    const nextStatus = this.allowedTransitions[dto.action][order.status];
+    if (!nextStatus) {
+      throw new BadRequestException('Illegal transition ' + dto.action + ' from current status ' + order.status);
+    }
+
+    await this.orderRepository.update(orderId, { status: nextStatus });
+    await this.auditService.logOrderStatusChange(correlationId, orderId, order.status, nextStatus, actorId);
+
+    this.logger.log('Order ' + orderId + ' transitioned ' + order.status + ' -> ' + nextStatus, OrdersService.name, correlationId);
+    return this.getOrderById(orderId, correlationId);
+  }
+
   async cancelOrder(orderId: string, correlationId: string): Promise<OrderResponseDto> {
     this.logger.log('Cancelling order ' + orderId, OrdersService.name, correlationId);
 
@@ -176,7 +261,7 @@ export class OrdersService {
     }
 
     if (order.status === OrderStatus.FULFILLED) {
-      throw new BadRequestException('Cannot cancel a fulfilled order');
+      throw new BadRequestException('Cannot cancel order in status: fulfilled');
     }
 
     if (order.status === OrderStatus.CANCELLED) {

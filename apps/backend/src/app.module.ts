@@ -13,6 +13,7 @@ import { AuditModule } from './common/audit/audit.module';
 import { AuditLog } from './common/audit/audit-log.entity';
 import { HealthModule } from './health/health.module';
 import { Vendor } from './common/entities/vendor.entity';
+import { Category } from './common/entities/category.entity';
 import { Product } from './common/entities/product.entity';
 import { Order } from './common/entities/order.entity';
 import { OrderLineItem } from './common/entities/order-line-item.entity';
@@ -43,7 +44,7 @@ const logger = new Logger('BullModule');
           return {
             type: 'postgres',
             url: dbUrl,
-            entities: [Vendor, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken],
+            entities: [Vendor, Category, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken],
             synchronize: configService.get('NODE_ENV') !== 'production',
             logging: configService.get('NODE_ENV') === 'development',
             ssl: isCloudDb ? { rejectUnauthorized: false } : false,

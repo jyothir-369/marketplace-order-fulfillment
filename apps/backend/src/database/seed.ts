@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
-import { Vendor, Product, Order, OrderLineItem, VendorSyncJob, User, UserRole } from '../common/entities';
+import { Vendor, Product, Order, OrderLineItem, VendorSyncJob, User, UserRole, Category } from '../common/entities';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 import * as bcrypt from 'bcryptjs';
@@ -38,13 +38,14 @@ function parseDatabaseUrl(): any {
 const dbConfig = parseDatabaseUrl();
 const AppDataSource = new DataSource({
   ...dbConfig,
-  entities: [Vendor, Product, Order, OrderLineItem, VendorSyncJob, User],
+  entities: [Vendor, Category, Product, Order, OrderLineItem, VendorSyncJob, User],
   synchronize: true,
   logging: true,
 });
 
 interface VendorSeed {
   name: string;
+  category: string;
   products: Array<{
     name: string;
     price: number;
@@ -52,9 +53,18 @@ interface VendorSeed {
   }>;
 }
 
+function slugify(value: string): string {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 const vendorSeeds: VendorSeed[] = [
   {
     name: 'Electronics World',
+    category: 'Electronics',
     products: [
       { name: 'Wireless Headphones', price: 79.99, stockCount: 50 },
       { name: 'Bluetooth Speaker', price: 49.99, stockCount: 100 },
@@ -65,6 +75,7 @@ const vendorSeeds: VendorSeed[] = [
   },
   {
     name: 'Home & Kitchen Co',
+    category: 'Home & Kitchen',
     products: [
       { name: 'Coffee Maker', price: 89.99, stockCount: 40 },
       { name: 'Air Fryer', price: 149.99, stockCount: 25 },
@@ -75,6 +86,7 @@ const vendorSeeds: VendorSeed[] = [
   },
   {
     name: 'Sports Gear Inc',
+    category: 'Sports & Outdoors',
     products: [
       { name: 'Yoga Mat Premium', price: 34.99, stockCount: 120 },
       { name: 'Resistance Bands', price: 19.99, stockCount: 200 },
@@ -85,6 +97,7 @@ const vendorSeeds: VendorSeed[] = [
   },
   {
     name: 'Fashion Forward',
+    category: 'Apparel',
     products: [
       { name: 'Cotton T-Shirt', price: 24.99, stockCount: 500 },
       { name: 'Denim Jeans', price: 59.99, stockCount: 200 },
@@ -95,6 +108,7 @@ const vendorSeeds: VendorSeed[] = [
   },
   {
     name: 'Books & Media',
+    category: 'Books & Media',
     products: [
       { name: 'Bestseller Novel', price: 14.99, stockCount: 300 },
       { name: 'Cookbook Collection', price: 29.99, stockCount: 100 },
@@ -120,8 +134,24 @@ async function seedDatabase(): Promise<void> {
 
     console.log('Clearing existing data...');
     // Use raw query to truncate tables (cascade handles FK constraints)
-    await AppDataSource.query('TRUNCATE TABLE refresh_tokens, users, products, vendors, order_line_items, orders, vendor_sync_jobs RESTART IDENTITY CASCADE');
+    await AppDataSource.query('TRUNCATE TABLE refresh_tokens, users, products, categories, vendors, order_line_items, orders, vendor_sync_jobs RESTART IDENTITY CASCADE');
     console.log('Existing data cleared');
+    console.log('');
+
+    // ── Seed categories (Phase 2) ──────────────────────────────────────────────
+    const categoryRepo = AppDataSource.getRepository(Category);
+    const defaultCategories: Array<{ name: string; slug: string; description: string }> = [
+      { name: 'Electronics', slug: 'electronics', description: 'Gadgets, devices, and accessories' },
+      { name: 'Apparel', slug: 'apparel', description: 'Clothing, shoes, and fashion accessories' },
+      { name: 'Home & Kitchen', slug: 'home-kitchen', description: 'Furniture, appliances, and home goods' },
+      { name: 'Sports & Outdoors', slug: 'sports-outdoors', description: 'Fitness gear and outdoor equipment' },
+      { name: 'Books & Media', slug: 'books-media', description: 'Books, music, and digital media' },
+    ];
+    for (const c of defaultCategories) {
+      const cat = categoryRepo.create(c);
+      await categoryRepo.save(cat);
+      console.log('  + Category: ' + c.name + ' (' + c.slug + ')');
+    }
     console.log('');
 
     let totalProducts = 0;
@@ -139,9 +169,13 @@ async function seedDatabase(): Promise<void> {
 
       const products: Product[] = [];
       for (const productSeed of vendorSeed.products) {
+        const baseSlug = slugify(productSeed.name);
+        const uniqueSuffix = Math.random().toString(36).slice(2, 8);
         const product = productRepo.create({
           vendorId: savedVendor.id,
           name: productSeed.name,
+          slug: baseSlug + '-' + uniqueSuffix,
+          category: vendorSeed.category,
           price: productSeed.price,
           stockCount: productSeed.stockCount,
           isActive: true,
@@ -149,7 +183,7 @@ async function seedDatabase(): Promise<void> {
         const savedProduct = await productRepo.save(product);
         products.push(savedProduct);
         totalProducts++;
-        console.log('    + ' + productSeed.name + ' (Stock: ' + productSeed.stockCount + ', Price: $' + productSeed.price + ')');
+        console.log('    + ' + productSeed.name + ' [' + vendorSeed.category + '] (Stock: ' + productSeed.stockCount + ', Price: $' + productSeed.price + ')');
       }
 
       vendorMap.set(savedVendor.id, { vendor: savedVendor, products });

@@ -26,6 +26,15 @@ export class Order {
   @Column({ type: 'uuid', name: 'buyer_id' })
   buyerId: string;
 
+  /**
+   * The authenticated buyer user (users.id) that placed the order, when the
+   * checkout was performed by a signed-in user. Nullable — legacy/anonymous
+   * checkouts keep only `buyerId`. Powers `GET /api/orders/me` (Phase 2).
+   */
+  @Index()
+  @Column({ type: 'uuid', nullable: true, name: 'buyer_user_id' })
+  buyerUserId: string | null;
+
   @Column({
     type: 'enum',
     enum: OrderStatus,

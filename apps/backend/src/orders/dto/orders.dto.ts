@@ -1,4 +1,4 @@
-﻿import { IsUUID, IsNumber, IsArray, ValidateNested, Min, ArrayMinSize, IsOptional, IsString } from 'class-validator';
+﻿import { IsUUID, IsNumber, IsArray, ValidateNested, Min, ArrayMinSize, IsOptional, IsString, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
 import { OrderStatus } from '../../common/entities/order.entity';
 import { FulfillmentStatus } from '../../common/entities/order-line-item.entity';
@@ -69,4 +69,18 @@ export class CheckoutResponseDto {
   order?: OrderResponseDto;
   message: string;
   correlationId: string;
+}
+
+/** Transition actions along the order lifecycle (Phase 2 — vendor/ops routes). */
+export type OrderTransitionAction = 'CONFIRM' | 'FULFILL' | 'SHIP' | 'CANCEL';
+
+export const ORDER_TRANSITION_ACTIONS: OrderTransitionAction[] = ['CONFIRM', 'FULFILL', 'SHIP', 'CANCEL'];
+
+export class TransitionOrderDto {
+  @IsIn(ORDER_TRANSITION_ACTIONS)
+  action: OrderTransitionAction;
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
 }

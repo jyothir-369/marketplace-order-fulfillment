@@ -22,11 +22,13 @@ export type CorrelationId = string;
 export interface ProductDto {
   id: Uuid;
   name: string;
+  /** URL-friendly slug derived from product name (Phase 2). */
+  slug: string | null;
   price: number;
   stockCount: number;
   vendorId: Uuid;
   vendorName: string;
-  /** Optional product category (e.g. Electronics, Apparel, Home & Living, Industrial). */
+  /** Optional product category (e.g. Electronics, Apparel, Home & Kitchen). */
   category: string | null;
   isActive: boolean;
 }
@@ -332,9 +334,44 @@ export interface VendorDashboardDto {
 
 export interface CategorySummaryDto {
   name: string;
+  slug: string | null;
   productCount: number;
   activeProductCount: number;
   totalStock: number;
+}
+
+// ---------------------------------------------------------------------------
+// Catalog query + paginated response (Phase 2)
+// ---------------------------------------------------------------------------
+
+export type CatalogSort = 'newest' | 'price-asc' | 'price-desc' | 'name-asc' | 'name-desc';
+
+export interface CatalogQuery {
+  q?: string;
+  category?: string;
+  vendor?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  sort?: CatalogSort;
+  page?: number;
+  pageSize?: number;
+  includeInactive?: boolean;
+}
+
+export interface CatalogFacets {
+  categories: CategorySummaryDto[];
+  totalProducts: number;
+  minPrice: number;
+  maxPrice: number;
+}
+
+export interface CatalogListResponse {
+  items: ProductDto[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  facets: CatalogFacets;
 }
 
 export interface VendorResponseDto {

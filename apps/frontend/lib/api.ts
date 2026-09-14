@@ -27,6 +27,8 @@ import type {
   UserDto,
   RegisterDto,
   LoginDto,
+  CatalogQuery,
+  CatalogListResponse,
 } from "@/lib/types";
 import { getAccessToken } from "@/lib/auth-token";
 
@@ -116,14 +118,39 @@ function parseOrder(order: unknown): OrderResponseDto {
 // Catalog / products
 // ---------------------------------------------------------------------------
 
-/** GET /api/catalog */
-export async function getProducts(filter: { category?: string } = {}): Promise<ProductDto[]> {
-  return apiFetch<ProductDto[]>("/catalog", {
-    params: { category: filter.category },
+/** Server-side paginated catalog query (Phase 2). GET /api/catalog with query params. */
+export async function getCatalogPage(query: CatalogQuery = {}): Promise<CatalogListResponse> {
+  return apiFetch<CatalogListResponse>("/catalog", {
+    params: {
+      q: query.q,
+      category: query.category,
+      vendor: query.vendor,
+      minPrice: query.minPrice,
+      maxPrice: query.maxPrice,
+      sort: query.sort,
+      page: query.page,
+      pageSize: query.pageSize,
+      includeInactive: query.includeInactive ? "true" : undefined,
+    },
   });
 }
 
+/**
+ * Legacy helper — returns an unpaged array of products.
+ * Calls the paged endpoint with pageSize 1000 and unwraps `.items`
+ * so existing callers (deals page, vendor detail page) keep working.
+ */
+export async function getProducts(filter: { category?: string } = {}): Promise<ProductDto[]> {
+  const res = await getCatalogPage({ category: filter.category, pageSize: 1000 });
+  return res.items;
+}
+
 export const getCatalog = getProducts;
+
+/** Soft-delete a product (vendor/admin). DELETE /api/catalog/:id */
+export async function deleteProduct(id: string): Promise<{ message: string }> {
+  return apiFetch<{ message: string }>(`/catalog/${id}`, { method: "DELETE" });
+}
 
 /** GET /api/catalog/:id */
 export async function getProductById(id: string): Promise<ProductDto> {
@@ -270,10 +297,19 @@ export async function getVendorDashboard(
 }
 
 // ---------------------------------------------------------------------------
+// Categories (public storefront + admin)
+// ---------------------------------------------------------------------------
+
+/** GET /api/catalog/categories — live category counts for storefront tabs. */
+export async function getCategories(): Promise<CategorySummaryDto[]> {
+  return apiFetch<CategorySummaryDto[]>("/catalog/categories");
+}
+
+// ---------------------------------------------------------------------------
 // Admin: categories
 // ---------------------------------------------------------------------------
 
-/** GET /api/catalog/categories */
+/** GET /api/catalog/categories (admin alias — same endpoint) */
 export async function getAdminCategories(): Promise<CategorySummaryDto[]> {
   return apiFetch<CategorySummaryDto[]>("/catalog/categories");
 }
