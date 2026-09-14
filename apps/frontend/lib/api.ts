@@ -118,18 +118,6 @@ export async function getProductById(id: string): Promise<ProductDto> {
   return apiFetch<ProductDto>(`/catalog/${id}`);
 }
 
-/** POST /api/catalog/seed — returns HTTP 201 */
-export async function seedCatalog(): Promise<{
-  message: string;
-  productsCreated: number;
-  vendorsCreated: number;
-}> {
-  return apiFetch<{ message: string; productsCreated: number; vendorsCreated: number }>(
-    "/catalog/seed",
-    { method: "POST" }
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Vendor directory
 // ---------------------------------------------------------------------------

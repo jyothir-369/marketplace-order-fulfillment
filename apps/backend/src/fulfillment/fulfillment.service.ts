@@ -267,6 +267,13 @@ export class FulfillmentService {
     if (allConfirmed) {
       const order = await this.orderRepository.findOne({ where: { id: orderId } });
       if (order) {
+        // Phase 0 hardening: never flip a terminal order back to an active
+        // status. A cancelled or fulfilled order must stay terminal even if
+        // every line item later reads as confirmed/failed.
+        if (order.status === OrderStatus.FULFILLED || order.status === OrderStatus.CANCELLED) {
+          return;
+        }
+
         const previousStatus = order.status;
         const newStatus = anyDeadLetter ? OrderStatus.FULFILLING : OrderStatus.FULFILLED;
         await this.orderRepository.update(orderId, { status: newStatus });

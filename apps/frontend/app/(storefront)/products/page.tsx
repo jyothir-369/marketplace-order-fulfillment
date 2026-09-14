@@ -91,20 +91,6 @@ function ProductsPageInner() {
 
   useEffect(() => { void loadProducts(); }, [loadProducts]);
 
-  const handleSeed = async () => {
-    try {
-      const { seedCatalog } = await import("@/lib/api");
-      const result = await seedCatalog();
-      toast(
-        `Seeded ${result.productsCreated} products (${result.vendorsCreated} vendors).`,
-        "success"
-      );
-      void loadProducts();
-    } catch {
-      toast("Failed to seed catalog.", "error");
-    }
-  };
-
   // Client-side filter
   const filtered = products.filter((p) => {
     if (q && !p.name.toLowerCase().includes(q.toLowerCase())) return false;
@@ -290,23 +276,7 @@ function ProductsPageInner() {
             );
           })}
 
-          {/* Seed button */}
-          <button
-            type="button"
-            onClick={handleSeed}
-            className={cn(
-              "shrink-0 ml-auto px-3 py-1.5 rounded-full text-xs font-semibold",
-              "border border-[var(--color-brass)]/40 text-[var(--color-brass)]",
-              "hover:bg-[var(--color-brass)] hover:text-white",
-              "transition-all duration-200"
-            )}
-          >
-            <span className="flex items-center gap-1.5">
-              <Sparkles className="h-3 w-3" aria-hidden />
-              Seed catalog
-            </span>
-          </button>
-        </div>
+          </div>
 
         {/* Vendor + Sort + Max price + clear */}
         <div className="flex flex-wrap items-center gap-3">

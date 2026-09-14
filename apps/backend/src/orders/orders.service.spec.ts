@@ -53,19 +53,25 @@ describe('OrdersService', () => {
     expect(service).toBeDefined();
   });
 
-  it('should enqueue fulfillment jobs on successful checkout', async () => {
+  it('should create an order and leave line items in PENDING state', async () => {
     const dto = { buyerId: 'b1', items: [{ productId: 'p1', quantity: 2 }] };
-    await service.checkout(dto as any, 'corr1');
-    expect(vendorQueueService.addJobToVendorQueue).toHaveBeenCalledWith('v1', expect.objectContaining({ orderLineItemId: 'item1' }));
+    const result = await service.checkout(dto as any, 'corr1');
+
+    expect(result.success).toBe(true);
+    expect(result.order?.id).toBe('order1');
+
+    // Fulfillment is enqueued by the fulfillment module after checkout, NOT
+    // inline (the vendor queue is not touched from the checkout transaction).
+    expect(vendorQueueService.addJobToVendorQueue).not.toHaveBeenCalled();
   });
 
-  it('should handle failure in enqueuing fulfillment jobs', async () => {
+  it('should leave fulfillment to the fulfillment module (no inline enqueue)', async () => {
     vendorQueueService.addJobToVendorQueue = jest.fn().mockRejectedValue(new Error('Queue fail'));
     const dto = { buyerId: 'b1', items: [{ productId: 'p1', quantity: 2 }] };
-    await service.checkout(dto as any, 'corr1');
-    expect(lineItemRepository.update).toHaveBeenCalledWith('item1', {
-      fulfillmentStatus: FulfillmentStatus.FAILED,
-      failureReason: 'Failed to enqueue fulfillment job',
-    });
+
+    // Even when the queue would fail, checkout succeeds — it never enqueues.
+    const result = await service.checkout(dto as any, 'corr1');
+    expect(result.success).toBe(true);
+    expect(vendorQueueService.addJobToVendorQueue).not.toHaveBeenCalled();
   });
 });

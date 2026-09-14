@@ -40,6 +40,26 @@ jobs:
         run: npx tsc --noEmit || true
 
   # ============================================
+  # Unit Tests - Backend
+  # ============================================
+  test-backend:
+    name: Unit Tests (Backend)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+      - name: Install dependencies
+        run: npm ci
+      - name: Run backend unit tests
+        working-directory: apps/backend
+        run: npm test
+
+  # ============================================
   # Build - Backend
   # ============================================
   build-backend:
@@ -169,9 +189,8 @@ jobs:
         uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
-            vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_FRONTEND_PROJECT_ID }}
           vercel-args: --prod
           working-directory: apps/frontend
-
 

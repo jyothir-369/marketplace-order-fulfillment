@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Body,
   Param,
   Query,
@@ -10,7 +11,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { CatalogService } from './catalog.service';
-import { CreateProductDto, ProductResponseDto } from './dto/catalog.dto';
+import { CreateProductDto, UpdateProductDto, ProductResponseDto } from './dto/catalog.dto';
 import { CorrelationId } from '../common/decorators/correlation-id.decorator';
 
 @Controller('catalog')
@@ -44,5 +45,14 @@ export class CatalogController {
     @CorrelationId() correlationId: string,
   ): Promise<ProductResponseDto> {
     return this.catalogService.createProduct(dto, correlationId);
+  }
+
+  @Patch(':id')
+  async updateProduct(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateProductDto,
+    @CorrelationId() correlationId: string,
+  ): Promise<ProductResponseDto> {
+    return this.catalogService.updateProduct(id, dto, correlationId);
   }
 }
