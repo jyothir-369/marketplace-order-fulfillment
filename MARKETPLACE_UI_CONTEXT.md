@@ -275,7 +275,53 @@ Apply via `data-density="compact"` on the `<html>` tag or any layout wrapper.
 
 ---
 
-## 16. Error Handling Architecture
+## 16. Auth & RBAC (Phase 1)
+
+### 16.1 Auth API (backend `apps/backend/src/auth/`)
+
+| Method | Route | Auth | Purpose |
+|---|---|---|---|
+| POST | `/api/auth/register` | public | Creates a **BUYER** account only (no role field accepted — no privilege escalation) |
+| POST | `/api/auth/login` | public | Verifies credentials, returns `{ accessToken, refreshToken, expiresIn, user... }` |
+| POST | `/api/auth/refresh` | refresh token | Rotates the refresh token, returns a fresh access/refresh pair |
+| POST | `/api/auth/logout` | refresh token | Revokes the presented refresh token (idempotent) |
+| GET | `/api/auth/me` | access token | Returns the current authenticated user |
+
+Roles: `buyer` | `vendor` | `admin` | `operations`. Access tokens default to 15 min
+(`JWT_EXPIRES_IN`), refresh tokens 14 days (`REFRESH_TOKEN_TTL_DAYS`), stored
+server-side as SHA-256 hashes.
+
+Backend gating: `AuthGuard` (bearer JWT) + `RolesGuard` (`@Roles(...)`). Gated today —
+admin controller (`ADMIN`/`OPERATIONS`), catalog create/update (`VENDOR`/`ADMIN`),
+fulfillment vendor config + vendor-mock configure (`VENDOR`/`ADMIN`/`OPERATIONS`).
+
+### 16.2 Frontend auth architecture
+
+- `lib/auth-token.ts` — SSR-safe localStorage access/refresh token store.
+- `lib/auth-context.tsx` — `<AuthProvider>` at the app root + `useAuth()`; restores a
+  session on mount (`/me`, falls back to `/refresh`), exposes `login/register/logout`,
+  and swaps an expired access token silently via `refreshSession()`.
+- `lib/hooks/use-role-guard.ts` — reads the **real** auth context (no more
+  `window.__SESSION__`); redirects unauthenticated users to `/login?redirect=<path>`.
+- `components/auth/RequireRole.tsx` — client gate wrapping operational layouts.
+- `components/auth/LoginForm.tsx | RegisterForm.tsx | AccountMenu.tsx` — sign-in /
+  registration surfaces + the storefront header account dropdown.
+
+Routes: `/login` and `/register` live in the `(auth)` route group (centered card,
+no storefront chrome). Sign in / Create account links appear in the storefront
+header when logged out; the account menu shows **My Orders**, a **Vendor Portal**
+link for `vendor` users, an **Admin Console** link for `admin`/`operations`, and
+**Sign out** when authenticated.
+
+### 16.3 Demo accounts (seeded)
+
+Run `npm run seed`. All passwords are `DemoPass2024!`:
+`buyer@marketplace.dev`, `vendor@marketplace.dev`, `admin@marketplace.dev`,
+`operations@marketplace.dev`.
+
+---
+
+## 17. Error Handling Architecture
 
 - Route segment errors → `error.tsx` at each route level (Next.js App Router convention)
 - Client render errors → `ErrorBoundary` component wrapping layout subtrees
@@ -285,7 +331,7 @@ Apply via `data-density="compact"` on the `<html>` tag or any layout wrapper.
 
 ---
 
-## 17. Key Design Rules
+## 18. Key Design Rules
 
 1. **Never use hardcoded hex colors.** Always use `hsl(var(--color-*))`.
 2. **Never use Tailwind palette colors directly** (e.g. `bg-zinc-900`, `text-red-500`). Use design tokens.
@@ -298,7 +344,7 @@ Apply via `data-density="compact"` on the `<html>` tag or any layout wrapper.
 
 ---
 
-## 18. How to Use This Document for ChatGPT
+## 19. How to Use This Document for ChatGPT
 
 When prompting ChatGPT to design UI, include this document and reference:
 - The **exact token names** (e.g. `hsl(var(--color-primary))`) instead of describing colors

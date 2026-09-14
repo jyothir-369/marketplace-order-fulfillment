@@ -1,70 +1,63 @@
-﻿/**
- * use-role-guard — client-side role guard hook (§4.3).
+/**
+ * use-role-guard — client-side role gate backed by the REAL auth context (§4.3).
  *
- * Reads the current user role from a (placeholder) auth context and
- * redirects to /products if the user lacks the required role.
+ * Reads the authenticated user from `useAuth()` (Phase 1 — no more
+ * `window.__SESSION__` placeholder) and returns the guard state:
  *
- * The real auth implementation is out of scope for Phase 1 — this hook
- * currently assumes a session cookie / context value set by middleware.
+ *   - `loading`: session restore still in flight — render a placeholder.
+ *   - `allowed`: the user holds one of the required roles.
+ *   - otherwise the hook redirects: unauthenticated users go to
+ *     `/login?redirect=<current path>`, authenticated-but-wrong-role users
+ *     go back to `/products`.
  *
  * Usage:
- *   const guard = useRoleGuard("admin");
- *   if (!guard.allowed) return null;  // useEffect will redirect
- *
- * For now, the role comes from `window.__SESSION__` (set by middleware in
- * later phases); Phase 1 defaults to "buyer" when no role is available so
- * the build keeps compiling.
+ *   const guard = useRoleGuard(["admin", "operations"]);
+ *   if (guard.loading) return <Loading />;
+ *   if (!guard.allowed) return null; // redirect handled by the hook
  */
 
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
 
-export type Role = "buyer" | "vendor" | "admin";
-
-interface SessionShape {
-  role?: Role;
-  userId?: string;
-}
-
-declare global {
-  interface Window {
-    __SESSION__?: SessionShape;
-  }
-}
+export type Role = "buyer" | "vendor" | "admin" | "operations";
 
 interface UseRoleGuardResult {
   role: Role | null;
   allowed: boolean;
-  ready: boolean;
+  loading: boolean; // true while the session restore is in flight
 }
 
-/** Resolves the current session role from window globals. */
-function readSessionRole(): Role | null {
-  if (typeof window === "undefined") return null;
-  return window.__SESSION__?.role ?? null;
-}
-
-export function useRoleGuard(required: Role): UseRoleGuardResult {
+export function useRoleGuard(required: readonly Role[]): UseRoleGuardResult {
+  const { user, status } = useAuth();
   const router = useRouter();
-  const [role, setRole] = useState<Role | null>(null);
-  const [ready, setReady] = useState(false);
+  const pathname = usePathname();
+
+  const loading = status === "idle" || status === "loading";
 
   useEffect(() => {
-    const current = readSessionRole();
-    setRole(current);
-    setReady(true);
+    if (loading) return;
 
-    if (current !== required) {
-      // Per DoD §6.3: redirect (not 403 page) when role is wrong.
+    if (!user) {
+      // Unauthenticated → send to the login page, preserving the destination.
+      const redirect = encodeURIComponent(pathname);
+      router.replace(`/login?redirect=${redirect}`);
+      return;
+    }
+
+    if (!required.includes(user.role as Role)) {
       router.replace("/products");
     }
-  }, [required, router]);
+  }, [loading, user, required, router, pathname]);
 
-  return {
-    role,
-    allowed: role === required,
-    ready,
-  };
+  const role = (user ? (user.role as Role) : null) as Role | null;
+
+  const allowed = useMemo(
+    () => Boolean(user && role && required.includes(role)),
+    [user, role, required],
+  );
+
+  return { role, allowed, loading };
 }

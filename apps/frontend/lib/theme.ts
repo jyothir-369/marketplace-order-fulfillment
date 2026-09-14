@@ -169,6 +169,7 @@ export const v2Hex = {
  * ---------------------------------------------------------------- */
 export const editorialEyebrows = {
   catalog:  "SHOP THE FULL CATALOG",
+  deals:    "CURATED SAVINGS",
   product:  "PRODUCT DETAIL",
   cart:     "YOUR CART",
   checkout: "CHECKOUT",

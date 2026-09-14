@@ -17,6 +17,9 @@ import { Product } from './common/entities/product.entity';
 import { Order } from './common/entities/order.entity';
 import { OrderLineItem } from './common/entities/order-line-item.entity';
 import { VendorSyncJob } from './common/entities/vendor-sync-job.entity';
+import { User } from './common/entities/user.entity';
+import { RefreshToken } from './common/entities/refresh-token.entity';
+import { AuthModule } from './auth/auth.module';
 
 const logger = new Logger('BullModule');
 
@@ -40,7 +43,7 @@ const logger = new Logger('BullModule');
           return {
             type: 'postgres',
             url: dbUrl,
-            entities: [Vendor, Order, Product, OrderLineItem, VendorSyncJob, AuditLog],
+            entities: [Vendor, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken],
             synchronize: configService.get('NODE_ENV') !== 'production',
             logging: configService.get('NODE_ENV') === 'development',
             ssl: isCloudDb ? { rejectUnauthorized: false } : false,
@@ -54,7 +57,7 @@ const logger = new Logger('BullModule');
           username: configService.get('DB_USERNAME', 'postgres'),
           password: configService.get('DB_PASSWORD', 'postgres'),
           database: configService.get('DB_DATABASE', 'marketplace'),
-          entities: [Vendor, Order, Product, OrderLineItem, VendorSyncJob, AuditLog],
+          entities: [Vendor, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken],
           synchronize: configService.get('NODE_ENV') !== 'production',
           logging: configService.get('NODE_ENV') === 'development',
           ssl: false,
@@ -82,6 +85,7 @@ const logger = new Logger('BullModule');
       },
       inject: [ConfigService],
     }),
+    AuthModule,
     AuditModule,
     VendorMockModule,
     CatalogModule,

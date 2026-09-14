@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body, Query, ParseUUIDPipe } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Query, ParseUUIDPipe, UseGuards } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { FulfillmentService } from './fulfillment.service';
@@ -7,6 +7,10 @@ import { VendorSyncJobData, VENDOR_SYNC_QUEUE } from './vendor-sync.processor';
 import { VendorQueueService } from './vendor-queue.service';
 import { ReconciliationResultDto } from './dto/fulfillment.dto';
 import { CorrelationId } from '../common/decorators/correlation-id.decorator';
+import { AuthGuard } from '../auth/auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+import { UserRole } from '../common/entities/user.entity';
 
 @Controller('fulfillment')
 export class FulfillmentController {
@@ -82,7 +86,10 @@ export class FulfillmentController {
     };
   }
 
+  // Ops/config surface — gated to authenticated vendors/admins (Phase 1 RBAC gate).
   @Post('vendor/:vendorId/configure')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(UserRole.VENDOR, UserRole.ADMIN, UserRole.OPERATIONS)
   async configureVendor(
     @Param('vendorId') vendorId: string,
     @Body() body: { concurrency?: number },

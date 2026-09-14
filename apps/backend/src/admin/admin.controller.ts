@@ -1,11 +1,17 @@
-import { Controller, Get, Post, Param, Body, Query, ParseUUIDPipe } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Query, ParseUUIDPipe, UseGuards } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { AdminResolveDto, AdminDashboardDto, StuckOrdersResponseDto, AdminAuditLogResponseDto } from './dto/admin.dto';
 import { VendorSyncJob } from '../common/entities/vendor-sync-job.entity';
 import { CorrelationId } from '../common/decorators/correlation-id.decorator';
 import { AuditEntityType, AuditAction } from '../common/audit';
+import { AuthGuard } from '../auth/auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+import { UserRole } from '../common/entities/user.entity';
 
 @Controller('admin')
+@UseGuards(AuthGuard, RolesGuard)
+@Roles(UserRole.ADMIN, UserRole.OPERATIONS)
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 

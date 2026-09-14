@@ -23,7 +23,12 @@ import type {
   CategorySummaryDto,
   VendorDetailDto,
   VendorResponseDto,
+  AuthTokensDto,
+  UserDto,
+  RegisterDto,
+  LoginDto,
 } from "@/lib/types";
+import { getAccessToken } from "@/lib/auth-token";
 
 // ---------------------------------------------------------------------------
 // Client defaults
@@ -57,8 +62,15 @@ async function apiFetch<T>(
 
   const { params: _params, ...fetchInit } = init ?? {};
 
+  // Attach the bearer token when present (Phase 1 auth). SSR-safe: reads are
+  // no-ops without `window`, and authenticated calls only run in the browser.
+  const accessToken = getAccessToken();
+  const authHeaders: Record<string, string> = accessToken
+    ? { Authorization: `Bearer ${accessToken}` }
+    : {};
+
   const res = await fetch(url, {
-    headers: { "Content-Type": "application/json", ...fetchInit?.headers },
+    headers: { "Content-Type": "application/json", ...authHeaders, ...fetchInit?.headers },
     ...fetchInit,
   });
 
@@ -403,3 +415,50 @@ export type AdminAuditLogFilter = { correlationId?: string; entityType?: string;
 export type AdminResolvePayload = AdminResolveLineItemDto;
 export type DeadLetterJob = DeadLetterJobDto;
 export type HealthStatus = HealthStatusDto;
+
+// ---------------------------------------------------------------------------
+// Auth (Phase 1)
+// ---------------------------------------------------------------------------
+
+/** POST /api/auth/register — always provisions a BUYER role account. */
+export async function registerAccount(payload: RegisterDto): Promise<UserDto> {
+  return apiFetch<UserDto>("/auth/register", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export const register = registerAccount;
+
+/** POST /api/auth/login — returns access + refresh tokens. */
+export async function loginAccount(payload: LoginDto): Promise<AuthTokensDto> {
+  return apiFetch<AuthTokensDto>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export const login = loginAccount;
+
+/** POST /api/auth/refresh — rotates the refresh token, returns a fresh pair. */
+export async function refreshAccessToken(refreshToken: string): Promise<AuthTokensDto> {
+  return apiFetch<AuthTokensDto>("/auth/refresh", {
+    method: "POST",
+    body: JSON.stringify({ refreshToken }),
+  });
+}
+
+/** POST /api/auth/logout — revokes the presented refresh token. */
+export async function logoutAccount(refreshToken: string): Promise<{ message: string }> {
+  return apiFetch<{ message: string }>("/auth/logout", {
+    method: "POST",
+    body: JSON.stringify({ refreshToken }),
+  });
+}
+
+export const logout = logoutAccount;
+
+/** GET /api/auth/me — current authenticated user (requires a valid access token). */
+export async function getMe(): Promise<UserDto> {
+  return apiFetch<UserDto>("/auth/me");
+}

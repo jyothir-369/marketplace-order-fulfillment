@@ -23,6 +23,7 @@ import {
   selectTotalItems,
 } from "@/context/CartStore";
 import { useCartHydration } from "@/lib/hooks/use-cart-hydration";
+import { AccountMenu } from "@/components/auth/AccountMenu";
 import { cn } from "@/lib/utils";
 
 const NAV_LINKS: Array<{
@@ -186,17 +187,8 @@ export function StorefrontHeader() {
             })}
           </nav>
 
-          {/* Account link */}
-          <Link
-            href="/orders"
-            className={cn(
-              "hidden sm:inline-flex items-center text-sm font-medium",
-              "text-[var(--color-foreground)] hover:text-[var(--color-brass)]",
-              "transition-colors duration-150"
-            )}
-          >
-            Account
-          </Link>
+          {/* Account menu (Phase 1: sign-in state + role-aware portal links) */}
+          <AccountMenu />
 
           {/* Cart drawer trigger */}
           <button

@@ -9,10 +9,15 @@ import {
   ParseUUIDPipe,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 import { CatalogService } from './catalog.service';
 import { CreateProductDto, UpdateProductDto, ProductResponseDto } from './dto/catalog.dto';
 import { CorrelationId } from '../common/decorators/correlation-id.decorator';
+import { AuthGuard } from '../auth/auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+import { UserRole } from '../common/entities/user.entity';
 
 @Controller('catalog')
 export class CatalogController {
@@ -38,8 +43,12 @@ export class CatalogController {
     return this.catalogService.findByVendor(vendorId, activeOnly);
   }
 
+  // Vendor-scoped writes: requiring an authenticated VENDOR or ADMIN stops
+  // anonymous catalog mutation. (Phase 10 deepens scoping to the exact vendor.)
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(UserRole.VENDOR, UserRole.ADMIN)
   async createProduct(
     @Body() dto: CreateProductDto,
     @CorrelationId() correlationId: string,
@@ -48,6 +57,8 @@ export class CatalogController {
   }
 
   @Patch(':id')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(UserRole.VENDOR, UserRole.ADMIN)
   async updateProduct(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateProductDto,

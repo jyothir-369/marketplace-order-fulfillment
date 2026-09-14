@@ -344,3 +344,63 @@ export interface VendorResponseDto {
   activeProductCount: number;
   createdAt: IsoDateTime;
 }
+
+// ---------------------------------------------------------------------------
+// Auth + RBAC (Phase 1)
+// ---------------------------------------------------------------------------
+
+export type UserRole = "buyer" | "vendor" | "admin" | "operations";
+
+export interface UserDto {
+  id: Uuid;
+  email: string;
+  role: UserRole;
+  displayName: string | null;
+  vendorId: Uuid | null;
+}
+
+export interface AuthTokensDto {
+  id: Uuid;
+  email: string;
+  role: UserRole;
+  displayName: string | null;
+  vendorId: Uuid | null;
+  accessToken: string;
+  refreshToken: string;
+  /** Access token lifetime in seconds (drives proactive re-auth). */
+  expiresIn: number;
+}
+
+export interface RegisterDto {
+  email: string;
+  password: string;
+  displayName?: string;
+}
+
+export interface LoginDto {
+  email: string;
+  password: string;
+}
+
+export interface DashboardOverviewData {
+  stats: {
+    outstanding_cents: number;
+    overdue_cents: number;
+    paid_this_month_cents: number;
+    paid_this_month_delta_pct: number | null;
+    total_customers: number;
+  };
+  recent_invoices: Array<{
+    id: string;
+    number: string;
+    customer_name: string;
+    status: string;
+    total_cents: number;
+    due_date: string;
+  }>;
+  recent_activity: Array<{
+    entity_id: string;
+    timestamp: string;
+    label: string;
+  }>;
+}

@@ -15,14 +15,15 @@
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { BadgePercent, Sparkles, ArrowDown, Wand2 } from "lucide-react";
 import { getCatalog, type Product } from "@/lib/api";
+import { useCartStore } from "@/context/CartStore";
 import { CatalogGrid } from "@/components/storefront/CatalogGrid";
 import { CatalogGridSkeleton } from "@/components/ui/skeleton";
 import { ToastProvider, useToast } from "@/components/ui/toast";
-import { catalogGridSkeleton, editorialEyebrows } from "@/lib/theme";
+import { editorialEyebrows } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
 const DEAL_CURATION = ["{deal}"]; // placeholder — replaced below with real ids
@@ -30,8 +31,11 @@ const DEAL_CURATION = ["{deal}"]; // placeholder — replaced below with real id
 function DealsPageInner() {
   const searchParams = useSearchParams();
   const { push: toast } = useToast();
+  const addToCart = useCartStore((s) => s.addToCart);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
 
   const sort = searchParams.get("sort") ?? "price-asc";
 
@@ -43,6 +47,9 @@ function DealsPageInner() {
         if (cancelled) return;
         const active = data.filter((p) => p.isActive);
         setProducts(active);
+        const init: Record<string, number> = {};
+        active.forEach((p) => { init[p.id] = 1; });
+        setQuantities(init);
       })
       .catch(() => {
         if (!cancelled) toast("Couldn’t load the deals feed.", "error");
@@ -70,6 +77,31 @@ function DealsPageInner() {
     () => sorted.slice(0, Math.max(3, Math.ceil(sorted.length / 3))),
     [sorted]
   );
+
+  const setQty = (productId: string, n: number) =>
+    setQuantities((prev) => ({ ...prev, [productId]: Math.max(1, n) }));
+
+  const handleAdd = (product: Product) => {
+    const qty = quantities[product.id] ?? 1;
+    addToCart({
+      productId: product.id,
+      name: product.name,
+      price: product.price,
+      quantity: qty,
+      maxStock: product.stockCount,
+      vendorId: product.vendorId,
+      vendorName: product.vendorName,
+    });
+    setAddedIds((prev) => new Set([...prev, product.id]));
+    toast(`Added ${product.name} to cart.`, "success");
+    setTimeout(() => {
+      setAddedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(product.id);
+        return next;
+      });
+    }, 2000);
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-10 space-y-8">
@@ -136,7 +168,14 @@ function DealsPageInner() {
         {loading ? (
           <CatalogGridSkeleton />
         ) : (
-          <CatalogGrid products={deals} loading={false} />
+          <CatalogGrid
+            products={deals}
+            loading={false}
+            quantities={quantities}
+            onQuantityChange={setQty}
+            onAdd={handleAdd}
+            addedIds={addedIds}
+          />
         )}
       </section>
     </div>
@@ -146,7 +185,10 @@ function DealsPageInner() {
 export default function DealsPage() {
   return (
     <ToastProvider>
-      <DealsPageInner />
+      {/* useSearchParams requires a Suspense boundary (CSR bailout). */}
+      <Suspense fallback={<CatalogGridSkeleton count={6} />}>
+        <DealsPageInner />
+      </Suspense>
     </ToastProvider>
   );
 }

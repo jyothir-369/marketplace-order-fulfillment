@@ -1,8 +1,9 @@
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
-import { Vendor, Product, Order, OrderLineItem, VendorSyncJob } from '../common/entities';
+import { Vendor, Product, Order, OrderLineItem, VendorSyncJob, User, UserRole } from '../common/entities';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
+import * as bcrypt from 'bcryptjs';
 
 // Load root .env file
 const envPath = path.resolve(__dirname, '../../../../.env');
@@ -37,7 +38,7 @@ function parseDatabaseUrl(): any {
 const dbConfig = parseDatabaseUrl();
 const AppDataSource = new DataSource({
   ...dbConfig,
-  entities: [Vendor, Product, Order, OrderLineItem, VendorSyncJob],
+  entities: [Vendor, Product, Order, OrderLineItem, VendorSyncJob, User],
   synchronize: true,
   logging: true,
 });
@@ -119,7 +120,7 @@ async function seedDatabase(): Promise<void> {
 
     console.log('Clearing existing data...');
     // Use raw query to truncate tables (cascade handles FK constraints)
-    await AppDataSource.query('TRUNCATE TABLE products, vendors, order_line_items, orders, vendor_sync_jobs RESTART IDENTITY CASCADE');
+    await AppDataSource.query('TRUNCATE TABLE refresh_tokens, users, products, vendors, order_line_items, orders, vendor_sync_jobs RESTART IDENTITY CASCADE');
     console.log('Existing data cleared');
     console.log('');
 
@@ -154,6 +155,43 @@ async function seedDatabase(): Promise<void> {
       vendorMap.set(savedVendor.id, { vendor: savedVendor, products });
       console.log('');
     }
+
+    // ─────────────────────────────────────────────────────────────
+    // Phase 1 — demo users (one per role). The vendor user is tied
+    // to the first seeded vendor so RBAC tenant scoping is testable.
+    // ─────────────────────────────────────────────────────────────
+    const userRepo = AppDataSource.getRepository(User);
+    const passwordHash = await bcrypt.hash('DemoPass2024!', 10);
+    const firstVendorId = vendorMap.keys().next().value as string;
+
+    const demoUsers: Array<{
+      email: string;
+      role: UserRole;
+      displayName: string;
+      vendorId: string | null;
+    }> = [
+      { email: 'buyer@marketplace.dev', role: UserRole.BUYER, displayName: 'Demo Buyer', vendorId: null },
+      { email: 'vendor@marketplace.dev', role: UserRole.VENDOR, displayName: 'Demo Vendor', vendorId: firstVendorId },
+      { email: 'admin@marketplace.dev', role: UserRole.ADMIN, displayName: 'Demo Admin', vendorId: null },
+      { email: 'operations@marketplace.dev', role: UserRole.OPERATIONS, displayName: 'Demo Ops', vendorId: null },
+    ];
+
+    console.log('='.repeat(60));
+    console.log('SEED USERS (Phase 1 auth/RBAC)');
+    console.log('='.repeat(60));
+    for (const u of demoUsers) {
+      const user = userRepo.create({
+        email: u.email,
+        passwordHash,
+        role: u.role,
+        displayName: u.displayName,
+        vendorId: u.vendorId,
+      });
+      const saved = await userRepo.save(user);
+      console.log(`  + ${saved.email} (${saved.role})${saved.vendorId ? ' -> vendor ' + saved.vendorId : ''} - ID: ${saved.id}`);
+    }
+    console.log('  Common password for all demo users: DemoPass2024!');
+    console.log('');
 
     console.log('='.repeat(60));
     console.log('SEED SUMMARY');

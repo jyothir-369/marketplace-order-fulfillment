@@ -1,10 +1,14 @@
 import { migrationDataSource } from './datasource';
 import { AddShippingAddressToOrders1710000000001 } from './1710000000001-AddShippingAddressToOrders';
 import { BackfillShippingAddress1710000000002 } from './1710000000002-BackfillShippingAddress';
+import { AddOrderNumber1710000000003 } from './1710000000003-AddOrderNumber';
+import { AddUsersAndRefreshTokens1710000000004 } from './1710000000004-AddUsersAndRefreshTokens';
 
 const migrations = [
   AddShippingAddressToOrders1710000000001,
   BackfillShippingAddress1710000000002,
+  AddOrderNumber1710000000003,
+  AddUsersAndRefreshTokens1710000000004,
 ];
 
 async function runMigrations() {
