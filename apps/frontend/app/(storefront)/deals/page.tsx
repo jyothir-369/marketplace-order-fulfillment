@@ -117,7 +117,30 @@ function DealsPageInner() {
         <div className="absolute -right-10 -bottom-14 select-none opacity-10 text-[var(--color-brass)] pointer-events-none">
           <BadgePercent className="h-48 w-48" strokeWidth={0.8} />
         </div>
-        <div className="relative z-10 max-w-2xl space-y-4">
+        <div className="max-w-2xl space-y-4">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--color-brass)]">
+            {editorialEyebrows.deals}
+          </p>
+          <h1 className="font-display text-4xl sm:text-5xl font-bold leading-[1.1]">
+            The Deals Room
+          </h1>
+          <p className="text-sm text-white/60 leading-relaxed max-w-md">
+            Flash deals, biggest discounts, and ending-soon promotions — all driven by real backend promotion data.
+          </p>
+        </div>
+        {/* Phase 9 — Coupon banner */}
+        <section className="relative z-10 mt-4 rounded-2xl bg-[var(--color-card)] border border-[var(--color-brass)]/30 shadow-v2 p-5 max-w-md space-y-3">
+          <div className="flex items-center gap-2 text-[var(--color-brass)]">
+            <BadgePercent className="h-5 w-5" />
+            <span className="text-[11px] font-bold uppercase tracking-[0.16em]">Flash Deal</span>
+          </div>
+          <h3 className="font-display text-xl font-bold">{PROMO_BANNER.title}</h3>
+          <p className="text-xs text-[var(--color-warm-muted)]">{PROMO_BANNER.description}</p>
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--color-ink-navy)] text-white text-xs font-bold tracking-wider border border-[var(--color-brass)]/40 shadow-sm">{PROMO_BANNER.code}</span>
+            <span className="text-[10px] font-semibold text-[var(--color-forest)]">{PROMO_BANNER.expires}</span>
+          </div>
+        </section>
           <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--color-brass)]">
             {editorialEyebrows.deals}
           </p>
