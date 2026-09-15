@@ -346,6 +346,13 @@ export async function getVendorDetail(vendorId: string): Promise<VendorDetailDto
 // Admin
 // ---------------------------------------------------------------------------
 
+/** Phase 4 — Autocomplete endpoint for SearchBar typeahead. */
+export async function getAutocomplete(q?: string): Promise<{ products: string[]; vendors: string[]; categories: string[] }> {
+  return apiFetch<{ products: string[]; vendors: string[]; categories: string[] }>("/catalog/autocomplete", {
+    params: { q: q || undefined },
+  });
+}
+
 /** GET /api/admin/dashboard */
 export async function getAdminDashboard(): Promise<AdminDashboardDto> {
   return apiFetch<AdminDashboardDto>("/admin/dashboard");

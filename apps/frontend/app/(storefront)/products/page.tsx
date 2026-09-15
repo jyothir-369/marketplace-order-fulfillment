@@ -23,8 +23,12 @@ import {
   getCatalogPage,
   getCategories,
   getVendors,
+  getAutocomplete,
   type Product,
 } from "@/lib/api";
+import { SearchBar } from "@/components/ui/search-bar";
+import { FacetSidebar } from "@/components/ui/facet-sidebar";
+import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
 import type {
   CatalogListResponse,
   CategorySummaryDto,

@@ -110,3 +110,19 @@ export class CatalogController {
     return this.catalogService.deleteProduct(id, correlationId);
   }
 }
+  /** Phase 4 — Autocomplete endpoint for SearchBar typeahead. */
+  @Get('autocomplete')
+  async autocomplete(@Query('q') q?: string): Promise<{ products: string[]; vendors: string[]; categories: string[] }> {
+    // Lightweight search over product names + vendor names + categories
+    const qb = this.catalogService['productRepository'].createQueryBuilder('p');
+    if (q) {
+      qb.andWhere('p.name ILIKE :q OR p.slug ILIKE :q', { q: `%${q}%` });
+    }
+    qb.select('p.name').limit(5);
+    const products = (await qb.getRawMany()).map((r: { name: string }) => r.name);
+
+    const cats = await this.catalogService.getCategories();
+    const categories = cats.filter((c) => !q || c.name.toLowerCase().includes(q.toLowerCase())).slice(0, 5).map((c) => c.name);
+
+    return { products, vendors: [], categories };
+  }
