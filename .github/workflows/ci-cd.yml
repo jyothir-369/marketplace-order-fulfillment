@@ -194,3 +194,11 @@ jobs:
           vercel-args: --prod
           working-directory: apps/frontend
 
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run build --workspaces --if-present
