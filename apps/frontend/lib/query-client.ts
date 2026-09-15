@@ -23,7 +23,7 @@ export const QUERY_CLIENT_CONFIG = {
       Math.min(1_000 * 2 ** attemptIndex, 30_000),
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
-    staleTime: 5 * 60 * 1_000,
+    staleTime: 5 * 60 * 1_000, // 5 min catalog / order cache (Phase 13)
     gcTime: 10 * 60 * 1_000,
     refetchIntervalInBackground: false,
   },
