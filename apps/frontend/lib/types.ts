@@ -22,15 +22,15 @@ export type CorrelationId = string;
 export interface ProductDto {
   id: Uuid;
   name: string;
-  /** URL-friendly slug derived from product name (Phase 2). */
   slug: string | null;
   price: number;
   stockCount: number;
   vendorId: Uuid;
   vendorName: string;
-  /** Optional product category (e.g. Electronics, Apparel, Home & Kitchen). */
   category: string | null;
   isActive: boolean;
+  description?: string | null;
+  images?: string[] | null;
 }
 
 export interface CreateProductDto {

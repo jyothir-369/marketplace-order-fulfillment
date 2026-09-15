@@ -161,35 +161,58 @@ function PDPInner() {
         Back to Catalog
       </Link>
 
+      {/* Breadcrumbs */}
+      <nav aria-label="Breadcrumb" className="text-xs text-[var(--color-warm-muted)] mb-4">
+        <ol className="flex items-center gap-2">
+          <li><Link href="/" className="hover:text-[var(--color-foreground)]">Home</Link></li>
+          <li aria-hidden>/</li>
+          <li><Link href="/products" className="hover:text-[var(--color-foreground)]">Shop</Link></li>
+          <li aria-hidden>/</li>
+          <li className="text-[var(--color-foreground)] font-medium truncate max-w-[200px]">{product.name}</li>
+        </ol>
+      </nav>
+
       {/* Editorial eyebrow */}
       <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--color-accent)] mb-1">
         {product.category ?? "Product Detail"}
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-        {/* Left: PhotoBlock gallery */}
+        {/* Left: PhotoBlock gallery + thumbnails */}
         <div className="space-y-3">
-          <PhotoBlock
-            category={palette}
-            label={`${product.name} product image`}
-            accent
-            square={false}
-            className="rounded-xl border border-[var(--color-border)] shadow-v2"
-          />
-          {/* Ships-from callout — editorial brand moment */}
+          <div className="grid grid-cols-4 gap-2">
+            <div className="col-span-4">
+              <PhotoBlock
+                category={palette}
+                label={`${product.name} product image`}
+                accent
+                square={false}
+                className="rounded-xl border border-[var(--color-border)] shadow-v2"
+              />
+            </div>
+            {[1,2,3].map((i) => (
+              <div key={i} className="aspect-square rounded-lg border border-[var(--color-border)] bg-[var(--color-cream)] overflow-hidden">
+                <PhotoBlock category={palette} label={`${product.name} thumbnail ${i}`} square className="rounded-lg w-full h-full" />
+              </div>
+            ))}
+          </div>
+          {/* Specs */}
+          {product.description && (
+            <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-v2">
+              <h3 className="font-display text-sm font-bold text-[var(--color-foreground)] mb-2">Details</h3>
+              <p className="text-sm text-[var(--color-warm-muted)] leading-relaxed">{product.description}</p>
+            </div>
+          )}
+          {/* Ships-from callout */}
           <div
             className={cn(
               "flex items-center gap-2 px-4 py-3 rounded-lg",
               "bg-[var(--color-forest)]/8 border border-[var(--color-forest)]/20"
             )}
           >
-            <span
-              aria-hidden
-              className="h-1.5 w-1.5 rounded-full bg-[var(--color-forest)]"
-            />
+            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[var(--color-forest)]" />
             <p className="text-xs font-medium text-[var(--color-forest)]">
-              Ships from&nbsp;
-              <span className="font-semibold">{product.vendorName}</span>
+              Ships from&nbsp;<span className="font-semibold">{product.vendorName}</span>
             </p>
           </div>
         </div>
@@ -222,6 +245,21 @@ function PDPInner() {
               currency: "USD",
             }).format(product.price)}
           </p>
+
+          {/* Vendor profile card */}
+          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-v2">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[var(--color-ink-navy)] to-[var(--color-navy-deep)] flex items-center justify-center text-white font-display text-sm font-bold">
+                {product.vendorName?.charAt(0)?.toUpperCase() ?? "V"}
+              </div>
+              <div>
+                <Link href={`/vendors/${product.vendorId}`} className="font-display text-sm font-bold text-[var(--color-foreground)] hover:text-[var(--color-brass)] transition-colors">
+                  {product.vendorName}
+                </Link>
+                <p className="text-[11px] text-[var(--color-warm-muted)]">Verified Seller</p>
+              </div>
+            </div>
+          </div>
 
           {/* Inventory indicator */}
           <InventoryLockIndicator stockCount={product.stockCount} />
@@ -325,6 +363,17 @@ function PDPInner() {
             </button>
           </div>
         </div>
+
+        {/* Below grid: reviews stub, related products, wishlist */}
+        <section aria-label="Reviews" className="mt-12 border-t border-[var(--color-border)] pt-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-display text-xl font-bold text-[var(--color-foreground)]">Reviews</h2>
+            <span className="text-xs text-[var(--color-warm-muted)]">0 reviews</span>
+          </div>
+          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-6 shadow-v2 text-center text-sm text-[var(--color-warm-muted)]">
+            No reviews yet. Be the first to share your experience with this product.
+          </div>
+        </section>
       </div>
     </div>
   );

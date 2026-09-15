@@ -202,4 +202,6 @@ export class ProductResponseDto {
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
+  description?: string | null;
+  images?: string[] | null;
 }

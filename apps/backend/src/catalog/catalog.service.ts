@@ -479,6 +479,8 @@ export class CatalogService {
       isActive: product.isActive,
       createdAt: product.createdAt,
       updatedAt: product.updatedAt,
+      description: (product as any).description ?? null,
+      images: (product as any).images ?? null,
     };
   }
 
