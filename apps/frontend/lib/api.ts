@@ -501,6 +501,25 @@ export async function logoutAccount(refreshToken: string): Promise<{ message: st
 
 export const logout = logoutAccount;
 
+/** POST /api/orders/checkout (idempotency + price conflict 409 handling — Phase 7) */
+export async function checkoutWithIdempotency(payload: CheckoutDto & { idempotencyKey?: string }): Promise<CheckoutResponseDto> {
+  return apiFetch<CheckoutResponseDto>("/orders/checkout", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }).then((res) => {
+    if (res.order) res.order = parseOrder(res.order);
+    return res;
+  });
+}
+
+/** Phase 7 — coupon validation stub */
+export async function validateCoupon(code: string, orderTotal?: number): Promise<{ valid: boolean; discount?: number; message?: string }> {
+  return apiFetch<{ valid: boolean; discount?: number; message?: string }>("/coupons/validate", {
+    method: "POST",
+    body: JSON.stringify({ code, orderTotal }),
+  }).catch(() => ({ valid: false, message: "Invalid coupon" }));
+}
+
 /** GET /api/auth/me — current authenticated user (requires a valid access token). */
 export async function getMe(): Promise<UserDto> {
   return apiFetch<UserDto>("/auth/me");
