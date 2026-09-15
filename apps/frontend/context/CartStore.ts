@@ -89,6 +89,11 @@ export const useCartStore = create<CartState>()(
           };
         }),
 
+      // Price/stock validation guard: refuse to add if out of stock (Phase 6)
+      if (item.maxStock <= 0) {
+        return state;
+      }
+
       removeFromCart: (productId) =>
         set((state) => ({
           cart: state.cart.filter((i) => i.productId !== productId),
