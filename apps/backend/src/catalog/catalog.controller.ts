@@ -109,8 +109,6 @@ export class CatalogController {
   ): Promise<{ message: string }> {
     return this.catalogService.deleteProduct(id, correlationId);
   }
-}
-  /** Phase 4 — Autocomplete endpoint for SearchBar typeahead. */
   @Get('autocomplete')
   async autocomplete(@Query('q') q?: string): Promise<{ products: string[]; vendors: string[]; categories: string[] }> {
     // Lightweight search over product names + vendor names + categories
@@ -126,3 +124,4 @@ export class CatalogController {
 
     return { products, vendors: [], categories };
   }
+} /* close class */
