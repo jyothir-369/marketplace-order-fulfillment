@@ -1,4 +1,4 @@
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, UnauthorizedException, InternalServerErrorException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { AuthJwtPayload, AuthenticatedUser } from './auth.types';
@@ -26,6 +26,9 @@ export class AuthGuard implements CanActivate {
     private readonly configService: ConfigService,
   ) {}
 
+  /** Muted when a prod deploy ships without JWT_SECRET — never fall back to a dev token silently. */
+  private readonly logger = new Logger(AuthGuard.name);
+
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request & { user?: AuthenticatedUser }>();
     const authHeader = request.headers['authorization'];
@@ -40,9 +43,18 @@ export class AuthGuard implements CanActivate {
     }
 
     let payload: AuthJwtPayload;
+    const secret = this.configService.get<string>('JWT_SECRET');
+    if (!secret) {
+      if (this.configService.get('NODE_ENV') === 'production') {
+        // Fail fast: a prod deploy must never accept tokens signed with the
+        // well-known dev secret below. Misconfiguration should 500, not 401.
+        throw new InternalServerErrorException('JWT_SECRET is not configured');
+      }
+      this.logger.warn('JWT_SECRET missing — using insecure dev fallback. Do not use in production.');
+    }
     try {
       payload = await this.jwtService.verifyAsync<AuthJwtPayload>(token, {
-        secret: this.configService.get<string>('JWT_SECRET') ?? 'dev-only-insecure-jwt-secret-change-me',
+        secret: secret ?? 'dev-only-insecure-jwt-secret-change-me',
       });
     } catch {
       throw new UnauthorizedException('Invalid or expired token');

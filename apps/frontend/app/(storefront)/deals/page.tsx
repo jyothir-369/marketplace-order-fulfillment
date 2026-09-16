@@ -17,7 +17,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { BadgePercent, Sparkles, ArrowDown, Wand2 } from "lucide-react";
+import { BadgePercent, Sparkles, Wand2 } from "lucide-react";
 import { getCatalog, type Product } from "@/lib/api";
 import { useCartStore } from "@/context/CartStore";
 import { CatalogGrid } from "@/components/storefront/CatalogGrid";
@@ -127,40 +127,10 @@ function DealsPageInner() {
           <p className="text-sm text-white/60 leading-relaxed max-w-md">
             Flash deals, biggest discounts, and ending-soon promotions — all driven by real backend promotion data.
           </p>
-        </div>
-        {/* Phase 9 — Coupon banner */}
-        <section className="relative z-10 mt-4 rounded-2xl bg-[var(--color-card)] border border-[var(--color-brass)]/30 shadow-v2 p-5 max-w-md space-y-3">
-          <div className="flex items-center gap-2 text-[var(--color-brass)]">
-            <BadgePercent className="h-5 w-5" />
-            <span className="text-[11px] font-bold uppercase tracking-[0.16em]">Flash Deal</span>
-          </div>
-          <h3 className="font-display text-xl font-bold">{PROMO_BANNER.title}</h3>
-          <p className="text-xs text-[var(--color-warm-muted)]">{PROMO_BANNER.description}</p>
-          <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--color-ink-navy)] text-white text-xs font-bold tracking-wider border border-[var(--color-brass)]/40 shadow-sm">{PROMO_BANNER.code}</span>
-            <span className="text-[10px] font-semibold text-[var(--color-forest)]">{PROMO_BANNER.expires}</span>
-          </div>
-        </section>
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--color-brass)]">
-            {editorialEyebrows.deals}
-          </p>
-          <h1 className="font-display text-4xl sm:text-5xl font-bold leading-[1.1]">
-            The Deals Room
-          </h1>
-          <p className="text-sm text-white/60 leading-relaxed max-w-md">
-            Automatically picked from live catalog data for value buyers —
-            verified sellers, no markdown theatrics.
-          </p>
-          <div className="flex flex-wrap gap-5 pt-1 text-xs text-white/70">
-            <span className="inline-flex items-center gap-1.5">
-              <Sparkles className="h-3.5 w-3.5 text-[var(--color-brass)]" />
-              {deals.length} hand-curated picks
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <ArrowDown className="h-3.5 w-3.5 text-[var(--color-brass)]" />
-              Sorted low → high
-            </span>
-          </div>
+          <span className="inline-flex items-center gap-1.5 text-xs text-white/70">
+            <Sparkles className="h-3.5 w-3.5 text-[var(--color-brass)]" />
+            {deals.length} hand-curated picks · sorted low → high
+          </span>
         </div>
       </section>
 

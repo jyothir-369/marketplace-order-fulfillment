@@ -20,8 +20,11 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useState } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AlertTriangle } from "lucide-react";
 import { useOrderPolling } from "@/lib/hooks/use-order-polling";
+import { QUERY_CLIENT_CONFIG } from "@/lib/query-client";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PollingIndicator } from "@/components/order/PollingIndicator";
 import { OrderDetailSkeleton } from "@/components/ui/skeleton";
@@ -39,7 +42,7 @@ function hasAmbiguousLineItem(lineItems: { fulfillmentStatus: string }[]): boole
   return lineItems.some((li) => AMBIGUOUS_STATUSES.has(li.fulfillmentStatus));
 }
 
-export default function OrderConfirmationPage() {
+function OrderConfirmationPageInner() {
   const params = useParams<{ id: string }>();
   const orderId = params?.id ?? "";
 
@@ -259,5 +262,21 @@ export default function OrderConfirmationPage() {
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * useOrderPolling relies on TanStack Query — without a QueryClientProvider the
+ * page throws during SSR. A fresh client per render avoids sharing cache across
+ * requests (one order viewer must never see another's cached order).
+ */
+export default function OrderConfirmationPage() {
+  const [client] = useState(
+    () => new QueryClient({ defaultOptions: QUERY_CLIENT_CONFIG })
+  );
+  return (
+    <QueryClientProvider client={client}>
+      <OrderConfirmationPageInner />
+    </QueryClientProvider>
   );
 }

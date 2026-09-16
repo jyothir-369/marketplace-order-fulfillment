@@ -111,8 +111,6 @@ export const useCartStore = create<CartState>()(
             .filter((i) => i.quantity > 0),
         })),
 
-      clearCart: () => set({ cart: [] }),
-
       openDrawer: () => set({ drawerOpen: true }),
       closeDrawer: () => set({ drawerOpen: false }),
       toggleDrawer: () => set((state) => ({ drawerOpen: !state.drawerOpen })),
