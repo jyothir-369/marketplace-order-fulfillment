@@ -168,8 +168,10 @@ export class CatalogController {
   async createProduct(
     @Body() dto: CreateProductDto,
     @CorrelationId() correlationId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<ProductResponseDto> {
-    return this.catalogService.createProduct(dto, correlationId);
+    // Phase 3.1: the service forces VENDOR creators onto their own tenant.
+    return this.catalogService.createProduct(dto, correlationId, user);
   }
 
   @Patch(':id')
@@ -179,8 +181,9 @@ export class CatalogController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateProductDto,
     @CorrelationId() correlationId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<ProductResponseDto> {
-    return this.catalogService.updateProduct(id, dto, correlationId);
+    return this.catalogService.updateProduct(id, dto, correlationId, user);
   }
 
   @Delete(':id')
@@ -190,7 +193,8 @@ export class CatalogController {
   async deleteProduct(
     @Param('id', ParseUUIDPipe) id: string,
     @CorrelationId() correlationId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<{ message: string }> {
-    return this.catalogService.deleteProduct(id, correlationId);
+    return this.catalogService.deleteProduct(id, correlationId, user);
   }
 } /* close class */

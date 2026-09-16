@@ -7,6 +7,8 @@ import { Category } from '../common/entities/category.entity';
 import { Vendor } from '../common/entities/vendor.entity';
 import { Order } from '../common/entities/order.entity';
 import { OrderLineItem } from '../common/entities/order-line-item.entity';
+import { UserRole } from '../common/entities/user.entity';
+import type { AuthenticatedUser } from '../auth/auth.types';
 import { CatalogQueryDto, CatalogSort } from './dto/catalog.dto';
 
 // ---------------------------------------------------------------------------
@@ -51,6 +53,16 @@ function makeProduct(overrides: Partial<Product> = {}): Product {
     orderLineItems: [],
     ...overrides,
   } as Product;
+}
+
+/** ADMINS bypass ownership checks (Phase 3.1). */
+function adminUser(): AuthenticatedUser {
+  return { id: 'u-admin', email: 'admin@marketplace.dev', role: UserRole.ADMIN, vendorId: null };
+}
+
+/** A vendor tenant user, scoped to their own vendorId (Phase 3.1). */
+function vendorUser(vendorId: string): AuthenticatedUser {
+  return { id: 'u-vendor', email: 'vendor@marketplace.dev', role: UserRole.VENDOR, vendorId };
 }
 
 // ---------------------------------------------------------------------------
@@ -267,7 +279,7 @@ describe('CatalogService', () => {
     it('soft-deletes an existing product', async () => {
       productRepo.findOne.mockResolvedValue(makeProduct());
 
-      const result = await service.deleteProduct('id-1', 'corr-1');
+      const result = await service.deleteProduct('id-1', 'corr-1', adminUser());
 
       expect(result).toEqual({ message: 'Product deactivated' });
       expect(productRepo.update).toHaveBeenCalledWith('id-1', { isActive: false });
@@ -276,7 +288,30 @@ describe('CatalogService', () => {
     it('throws NotFoundException for unknown product', async () => {
       productRepo.findOne.mockResolvedValue(null);
 
-      await expect(service.deleteProduct('nope', 'corr-1')).rejects.toThrow('not found');
+      await expect(service.deleteProduct('nope', 'corr-1', adminUser())).rejects.toThrow('not found');
+    });
+
+    it('forbids a VENDOR deactivating another vendor\'s product (Phase 3.1)', async () => {
+      // makeProduct() vendorId is ...099; the caller owns ...123.
+      productRepo.findOne.mockResolvedValue(makeProduct());
+
+      await expect(
+        service.deleteProduct('id-1', 'corr-1', vendorUser('00000000-0000-0000-0000-000000000123')),
+      ).rejects.toThrow('You do not own this product');
+      expect(productRepo.update).not.toHaveBeenCalled();
+    });
+
+    it('allows a VENDOR deactivating their own product (Phase 3.1)', async () => {
+      productRepo.findOne.mockResolvedValue(makeProduct());
+
+      const result = await service.deleteProduct(
+        'id-1',
+        'corr-1',
+        vendorUser('00000000-0000-0000-0000-000000000099'),
+      );
+
+      expect(result).toEqual({ message: 'Product deactivated' });
+      expect(productRepo.update).toHaveBeenCalledWith('id-1', { isActive: false });
     });
   });
 
@@ -293,6 +328,7 @@ describe('CatalogService', () => {
         'id-1',
         { name: 'Renamed', price: 59.99, description: 'New blurb', images: ['img1.jpg'] },
         'corr-1',
+        adminUser(),
       );
 
       expect(result.name).toBe('Renamed');
@@ -308,7 +344,7 @@ describe('CatalogService', () => {
     it('throws NotFoundException for unknown product', async () => {
       productRepo.findOne.mockResolvedValue(null);
 
-      await expect(service.updateProduct('nope', { name: 'X' }, 'corr-1')).rejects.toThrow('not found');
+      await expect(service.updateProduct('nope', { name: 'X' }, 'corr-1', adminUser())).rejects.toThrow('not found');
     });
 
     it('maps an optimistic lock mismatch to a 409 Conflict (Phase 2.5)', async () => {
@@ -318,7 +354,7 @@ describe('CatalogService', () => {
       );
 
       await expect(
-        service.updateProduct('id-1', { name: 'Concurrent edit' }, 'corr-1'),
+        service.updateProduct('id-1', { name: 'Concurrent edit' }, 'corr-1', adminUser()),
       ).rejects.toThrow('This product was modified by someone else. Please refresh and try again.');
     });
 
@@ -328,8 +364,89 @@ describe('CatalogService', () => {
       productRepo.save.mockRejectedValue(dbError);
 
       await expect(
-        service.updateProduct('id-1', { name: 'Broken' }, 'corr-1'),
+        service.updateProduct('id-1', { name: 'Broken' }, 'corr-1', adminUser()),
       ).rejects.toThrow('connection dropped');
+    });
+
+    it('forbids a VENDOR updating another vendor\'s product (Phase 3.1)', async () => {
+      // makeProduct() vendorId is ...099; the caller owns ...123.
+      productRepo.findOne.mockResolvedValue(makeProduct());
+
+      await expect(
+        service.updateProduct(
+          'id-1',
+          { name: 'Hijacked' },
+          'corr-1',
+          vendorUser('00000000-0000-0000-0000-000000000123'),
+        ),
+      ).rejects.toThrow('You do not own this product');
+      expect(productRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('allows a VENDOR updating their own product (Phase 3.1)', async () => {
+      productRepo.findOne.mockResolvedValue(makeProduct());
+      productRepo.save.mockImplementation(async (p) => ({ ...p, version: 2 }));
+
+      const result = await service.updateProduct(
+        'id-1',
+        { name: 'Own product edit' },
+        'corr-1',
+        vendorUser('00000000-0000-0000-0000-000000000099'),
+      );
+
+      expect(result.name).toBe('Own product edit');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // createProduct()
+  // ---------------------------------------------------------------------------
+
+  describe('createProduct()', () => {
+    it('creates a product for an ADMIN under the supplied vendor', async () => {
+      vendorRepo.findOne.mockResolvedValue({ id: 'v-1', name: 'Vendor A' });
+      productRepo.save.mockImplementation(async (p) => ({ ...p, id: 'saved-id' }));
+
+      const result = await service.createProduct(
+        { vendorId: 'v-1', name: 'New Widget', price: 12.5, stockCount: 3, description: 'd', images: ['i.jpg'] },
+        'corr-1',
+        adminUser(),
+      );
+
+      expect(result.vendorName).toBe('Vendor A');
+      expect(result.name).toBe('New Widget');
+      expect(productRepo.create).toHaveBeenCalledWith(expect.objectContaining({ vendorId: 'v-1' }));
+    });
+
+    it('forces a VENDOR creator onto their own tenant, ignoring dto.vendorId (Phase 3.1)', async () => {
+      const ownVendorId = '00000000-0000-0000-0000-000000000099';
+      vendorRepo.findOne.mockResolvedValue({ id: ownVendorId, name: 'Own Vendor' });
+      productRepo.save.mockImplementation(async (p) => ({ ...p, id: 'saved-id' }));
+
+      await service.createProduct(
+        { vendorId: 'v-other', name: 'Sneaky', price: 10, stockCount: 4 },
+        'corr-1',
+        vendorUser(ownVendorId),
+      );
+
+      // The vendor lookup + the created product both resolve to the CALLER'S
+      // vendorId — a vendor can never write into another tenant.
+      expect(vendorRepo.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: ownVendorId } }),
+      );
+      expect(productRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ vendorId: ownVendorId }),
+      );
+    });
+
+    it('forbids a VENDOR with no linked vendor from creating products (Phase 3.1)', async () => {
+      await expect(
+        service.createProduct(
+          { vendorId: 'v-1', name: 'X', price: 1, stockCount: 1 },
+          'corr-1',
+          { id: 'u1', email: 'x@y.z', role: UserRole.VENDOR, vendorId: null },
+        ),
+      ).rejects.toThrow('must be linked to a vendor');
     });
   });
 

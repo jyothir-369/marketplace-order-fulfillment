@@ -17,6 +17,7 @@ import { OptionalAuthGuard } from '../auth/optional-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { ForbiddenException } from '@nestjs/common';
 import { UserRole } from '../common/entities/user.entity';
 import type { AuthenticatedUser } from '../auth/auth.types';
 
@@ -38,18 +39,33 @@ export class OrdersController {
   // NOTE: static paths MUST precede :id — Express matches in declaration order,
   // so "buyer/:buyerId", "vendor/:vendorId", and "me" come first.
 
+  /**
+   * Support-only lookup. Buyers see their own orders via `GET /orders/me`
+   * (resolves the identity from the bearer token, not a client-supplied id);
+   * this path stays admin/operations for investigating arbitrary buyers.
+   * (Phase 3.2 — was public and enumerable.)
+   */
   @Get('buyer/:buyerId')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.OPERATIONS)
   async getOrdersByBuyer(
     @Param('buyerId', ParseUUIDPipe) buyerId: string,
   ): Promise<OrderResponseDto[]> {
     return this.ordersService.getOrdersByBuyer(buyerId);
   }
 
-  /** Orders touching the vendor's line items. */
+  /** Orders touching the vendor's line items. VENDORs are scoped to their own tenant. */
   @Get('vendor/:vendorId')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(UserRole.VENDOR, UserRole.ADMIN, UserRole.OPERATIONS)
   async getOrdersByVendor(
     @Param('vendorId', ParseUUIDPipe) vendorId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<OrderResponseDto[]> {
+    // Phase 3.2: VENDORs may only read their own tenant's orders.
+    if (user.role === UserRole.VENDOR && user.vendorId !== vendorId) {
+      throw new ForbiddenException('You do not have access to this vendor');
+    }
     return this.ordersService.getOrdersByVendor(vendorId);
   }
 

@@ -4,10 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pause, Play, RefreshCw } from "lucide-react";
 import {
   Order,
-  VENDOR_ID,
   getVendorOrders,
   transitionOrder,
 } from "@/lib/api";
+import { useVendorId } from "@/lib/hooks/use-vendor-id";
 import { ToastProvider, useToast } from "@/components/ui/toast";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -20,6 +20,9 @@ const TERMINAL_ORDER_STATUSES = new Set<string>(["FULFILLED", "CANCELLED", "FAIL
 
 function VendorOrdersInner() {
   const { push: toast } = useToast();
+  // Phase 3.2: the vendor's tenant comes from the session — the backend rejects
+  // requests for any other vendorId, and hardcoded ids never match a seeded user.
+  const vendorId = useVendorId();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [actingId, setActingId] = useState<string | null>(null);
@@ -28,19 +31,21 @@ function VendorOrdersInner() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const fetchOrders = useCallback(async () => {
+    if (!vendorId) return;
     try {
-      const data = await getVendorOrders(VENDOR_ID);
+      const data = await getVendorOrders(vendorId);
       setOrders(data);
       setLastUpdated(new Date());
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to load orders";
       setErrorBanner(msg);
     }
-  }, []);
+  }, [vendorId]);
 
   useEffect(() => {
+    if (!vendorId) return;
     void fetchOrders().finally(() => setLoading(false));
-  }, [fetchOrders]);
+  }, [fetchOrders, vendorId]);
 
   const hasNonTerminal = useMemo(
     () => orders.some((o) => !TERMINAL_ORDER_STATUSES.has(o.status)),
@@ -231,7 +236,7 @@ function VendorOrdersInner() {
                 const actions = actionsFor(order.status);
                 const isTerminal = TERMINAL_ORDER_STATUSES.has(order.status);
                 const vendorItems = order.lineItems.filter(
-                  (li) => li.vendorId === VENDOR_ID
+                  (li) => li.vendorId === vendorId
                 );
                 return (
                   <tr

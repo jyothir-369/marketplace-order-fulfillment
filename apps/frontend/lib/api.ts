@@ -259,11 +259,16 @@ export async function cancelOrder(
   }).then(parseOrder);
 }
 
-/** GET /api/orders/buyer/:buyerId */
-export async function getOrdersForBuyer(
-  buyerId: string = "00000000-0000-0000-0000-000000000001"
-): Promise<OrderResponseDto[]> {
-  return apiFetch<OrderResponseDto[]>(`/orders/buyer/${buyerId}`).then((orders) =>
+/**
+ * GET /api/orders/me — the currently authenticated buyer's own order history.
+ *
+ * Phase 3.2: `/orders/buyer/:buyerId` was public (anyone could enumerate any
+ * buyer's orders) and is now ADMIN/OPERATIONS support-only. The buyer-facing
+ * route resolves the identity from the bearer token instead of a client-
+ * supplied id.
+ */
+export async function getOrdersForBuyer(): Promise<OrderResponseDto[]> {
+  return apiFetch<OrderResponseDto[]>(`/orders/me`).then((orders) =>
     orders.map(parseOrder)
   );
 }

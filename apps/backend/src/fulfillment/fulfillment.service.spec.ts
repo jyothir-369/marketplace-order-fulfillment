@@ -8,6 +8,18 @@ import { VendorMockService } from '../integrations/vendor-mock/vendor-mock.servi
 import { AuditService } from '../common/audit';
 import { VendorResponseType } from '../integrations/vendor-mock/dto/vendor-mock.dto';
 
+/** Lightweight SelectQueryBuilder mock for Phase 3.3 scoped-job reads. */
+function mockSyncQb() {
+  const qb: any = {
+    leftJoinAndSelect: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    andWhere: jest.fn().mockReturnThis(),
+    orderBy: jest.fn().mockReturnThis(),
+    getMany: jest.fn().mockResolvedValue([]),
+  };
+  return qb;
+}
+
 describe('FulfillmentService - Reconciliation', () => {
   let service: FulfillmentService;
   let syncJobRepositoryMock: any;
@@ -19,6 +31,7 @@ describe('FulfillmentService - Reconciliation', () => {
     syncJobRepositoryMock = {
       find: jest.fn(),
       update: jest.fn(),
+      createQueryBuilder: jest.fn().mockReturnValue(mockSyncQb()),
     };
     lineItemRepositoryMock = {
       update: jest.fn(),
@@ -103,6 +116,39 @@ describe('FulfillmentService - Reconciliation', () => {
 
     expect(lineItemRepositoryMock.update).toHaveBeenCalledWith('li1', expect.objectContaining({ fulfillmentStatus: FulfillmentStatus.CONFIRMED }));
     expect(syncJobRepositoryMock.update).toHaveBeenCalledWith('job1', expect.objectContaining({ status: SyncJobStatus.COMPLETED }));
+  });
+
+  it('dead-letter with no vendorId fetches all jobs (admin/ops, Phase 3.3)', async () => {
+    const qb = mockSyncQb();
+    syncJobRepositoryMock.createQueryBuilder.mockReturnValue(qb);
+    qb.getMany.mockResolvedValue([
+      { id: 'job1', status: SyncJobStatus.DEAD_LETTER, orderLineItem: { vendorId: 'v1' } },
+    ]);
+
+    const result = await service.getDeadLetterJobs();
+
+    expect(result).toHaveLength(1);
+    expect(qb.andWhere).not.toHaveBeenCalled();
+  });
+
+  it('dead-letter with a vendorId filters to that tenant only (Phase 3.3)', async () => {
+    const qb = mockSyncQb();
+    syncJobRepositoryMock.createQueryBuilder.mockReturnValue(qb);
+
+    await service.getDeadLetterJobs('v42');
+
+    expect(qb.where).toHaveBeenCalledWith('job.status = :status', { status: SyncJobStatus.DEAD_LETTER });
+    expect(qb.andWhere).toHaveBeenCalledWith('lineItem.vendorId = :vendorId', { vendorId: 'v42' });
+  });
+
+  it('ambiguous with a vendorId filters to that tenant only (Phase 3.3)', async () => {
+    const qb = mockSyncQb();
+    syncJobRepositoryMock.createQueryBuilder.mockReturnValue(qb);
+
+    await service.getAmbiguousJobs('v42');
+
+    expect(qb.where).toHaveBeenCalledWith('job.status = :status', { status: SyncJobStatus.AMBIGUOUS });
+    expect(qb.andWhere).toHaveBeenCalledWith('lineItem.vendorId = :vendorId', { vendorId: 'v42' });
   });
 
   it.todo('should throw error on invalid manual state transition');

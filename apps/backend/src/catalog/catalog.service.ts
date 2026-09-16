@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, ForbiddenException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, SelectQueryBuilder, OptimisticLockVersionMismatchError } from 'typeorm';
 import { Product } from '../common/entities/product.entity';
@@ -6,6 +6,8 @@ import { Category } from '../common/entities/category.entity';
 import { Vendor } from '../common/entities/vendor.entity';
 import { Order } from '../common/entities/order.entity';
 import { OrderLineItem } from '../common/entities/order-line-item.entity';
+import { UserRole } from '../common/entities/user.entity';
+import type { AuthenticatedUser } from '../auth/auth.types';
 import {
   CreateProductDto,
   UpdateProductDto,
@@ -62,16 +64,28 @@ export class CatalogService {
   // CRUD
   // ---------------------------------------------------------------------------
 
-  async createProduct(dto: CreateProductDto, correlationId: string): Promise<ProductResponseDto> {
+  async createProduct(
+    dto: CreateProductDto,
+    correlationId: string,
+    currentUser: AuthenticatedUser,
+  ): Promise<ProductResponseDto> {
     this.logger.log('Creating product: ' + dto.name, CatalogService.name, correlationId);
 
-    const vendor = await this.vendorRepository.findOne({ where: { id: dto.vendorId } });
+    // Phase 3.1: a VENDOR may only create products under their own tenant —
+    // the client-supplied vendorId is ignored for vendors (no cross-tenant writes).
+    const effectiveVendorId =
+      currentUser.role === UserRole.VENDOR ? currentUser.vendorId : dto.vendorId;
+    if (!effectiveVendorId) {
+      throw new ForbiddenException('A vendor account must be linked to a vendor to create products');
+    }
+
+    const vendor = await this.vendorRepository.findOne({ where: { id: effectiveVendorId } });
     if (!vendor) {
-      throw new NotFoundException('Vendor with ID ' + dto.vendorId + ' not found');
+      throw new NotFoundException('Vendor with ID ' + effectiveVendorId + ' not found');
     }
 
     const product = this.productRepository.create({
-      vendorId: dto.vendorId,
+      vendorId: effectiveVendorId,
       name: dto.name,
       slug: dto.slug ?? this.slugify(dto.name),
       category: dto.category ?? null,
@@ -88,7 +102,12 @@ export class CatalogService {
     return this.toResponseDto(saved, vendor.name);
   }
 
-  async updateProduct(id: string, dto: UpdateProductDto, correlationId: string): Promise<ProductResponseDto> {
+  async updateProduct(
+    id: string,
+    dto: UpdateProductDto,
+    correlationId: string,
+    currentUser: AuthenticatedUser,
+  ): Promise<ProductResponseDto> {
     this.logger.log('Updating product: ' + id, CatalogService.name, correlationId);
 
     const product = await this.productRepository.findOne({
@@ -99,6 +118,9 @@ export class CatalogService {
     if (!product) {
       throw new NotFoundException('Product with ID ' + id + ' not found');
     }
+
+    // Phase 3.1: VENDORs may only modify their own products.
+    this.assertVendorOwnsProduct(product.vendorId, currentUser);
 
     if (dto.name !== undefined) { product.name = dto.name; }
     if (dto.slug !== undefined) { product.slug = dto.slug; }
@@ -132,11 +154,17 @@ export class CatalogService {
    * existing order_line_items. `GET /catalog?vendor=&includeInactive=true`
    * still surfaces it to admin/inventory surfaces.
    */
-  async deleteProduct(id: string, correlationId: string): Promise<{ message: string }> {
+  async deleteProduct(
+    id: string,
+    correlationId: string,
+    currentUser: AuthenticatedUser,
+  ): Promise<{ message: string }> {
     const product = await this.productRepository.findOne({ where: { id } });
     if (!product) {
       throw new NotFoundException('Product with ID ' + id + ' not found');
     }
+    // Phase 3.1: VENDORs may only deactivate their own products.
+    this.assertVendorOwnsProduct(product.vendorId, currentUser);
     await this.productRepository.update(id, { isActive: false });
     this.logger.log('Product deactivated (soft delete): ' + id, CatalogService.name, correlationId);
     return { message: 'Product deactivated' };
@@ -659,6 +687,21 @@ export class CatalogService {
       productsCreated,
       categoriesCreated,
     };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Tenant authorization (Phase 3.1)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * A VENDOR may only write to products under their own vendor tenant.
+   * ADMIN/OPERATIONS bypass ownership (ADMIN is already the only non-vendor
+   * role allowed on these write routes, so this in practice only gates vendors).
+   */
+  private assertVendorOwnsProduct(vendorId: string, currentUser: AuthenticatedUser): void {
+    if (currentUser.role === UserRole.VENDOR && currentUser.vendorId !== vendorId) {
+      throw new ForbiddenException('You do not own this product');
+    }
   }
 
   // ---------------------------------------------------------------------------

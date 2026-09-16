@@ -284,19 +284,33 @@ export class FulfillmentService {
     }
   }
 
-  async getDeadLetterJobs(): Promise<VendorSyncJob[]> {
-    return this.syncJobRepository.find({
-      where: { status: SyncJobStatus.DEAD_LETTER },
-      relations: { orderLineItem: true },
-      order: { createdAt: 'DESC' },
-    });
+  async getDeadLetterJobs(vendorId?: string): Promise<VendorSyncJob[]> {
+    // Phase 3.3: a VENDOR caller sees only their own tenant's jobs; admin/ops
+    // (no vendorId) see everything.
+    const qb = this.syncJobRepository
+      .createQueryBuilder('job')
+      .leftJoinAndSelect('job.orderLineItem', 'lineItem')
+      .where('job.status = :status', { status: SyncJobStatus.DEAD_LETTER })
+      .orderBy('job.createdAt', 'DESC');
+
+    if (vendorId) {
+      qb.andWhere('lineItem.vendorId = :vendorId', { vendorId });
+    }
+
+    return qb.getMany();
   }
 
-  async getAmbiguousJobs(): Promise<VendorSyncJob[]> {
-    return this.syncJobRepository.find({
-      where: { status: SyncJobStatus.AMBIGUOUS },
-      relations: { orderLineItem: true },
-      order: { createdAt: 'DESC' },
-    });
+  async getAmbiguousJobs(vendorId?: string): Promise<VendorSyncJob[]> {
+    const qb = this.syncJobRepository
+      .createQueryBuilder('job')
+      .leftJoinAndSelect('job.orderLineItem', 'lineItem')
+      .where('job.status = :status', { status: SyncJobStatus.AMBIGUOUS })
+      .orderBy('job.createdAt', 'DESC');
+
+    if (vendorId) {
+      qb.andWhere('lineItem.vendorId = :vendorId', { vendorId });
+    }
+
+    return qb.getMany();
   }
 }

@@ -10,7 +10,9 @@ import { CorrelationId } from '../common/decorators/correlation-id.decorator';
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { UserRole } from '../common/entities/user.entity';
+import type { AuthenticatedUser } from '../auth/auth.types';
 
 @Controller('fulfillment')
 export class FulfillmentController {
@@ -118,13 +120,30 @@ export class FulfillmentController {
     return this.vendorQueueService.getAllQueueStats();
   }
 
+  /**
+   * Dead-letter sync jobs. Authenticated VENDOR/ADMIN/OPERATIONS only
+   * (Phase 3.3 — was public); VENDORs are filtered to their own line items.
+   */
   @Get('dead-letter')
-  async getDeadLetterJobs(): Promise<VendorSyncJob[]> {
-    return this.fulfillmentService.getDeadLetterJobs();
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(UserRole.VENDOR, UserRole.ADMIN, UserRole.OPERATIONS)
+  async getDeadLetterJobs(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<VendorSyncJob[]> {
+    return this.fulfillmentService.getDeadLetterJobs(
+      user.role === UserRole.VENDOR ? user.vendorId ?? undefined : undefined,
+    );
   }
 
+  /** Ambiguous-gate sync jobs — same gate as dead-letter (Phase 3.3). */
   @Get('ambiguous')
-  async getAmbiguousJobs(): Promise<VendorSyncJob[]> {
-    return this.fulfillmentService.getAmbiguousJobs();
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(UserRole.VENDOR, UserRole.ADMIN, UserRole.OPERATIONS)
+  async getAmbiguousJobs(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<VendorSyncJob[]> {
+    return this.fulfillmentService.getAmbiguousJobs(
+      user.role === UserRole.VENDOR ? user.vendorId ?? undefined : undefined,
+    );
   }
 }
