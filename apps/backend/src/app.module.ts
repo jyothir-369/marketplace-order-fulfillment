@@ -44,7 +44,8 @@ import { AuthModule } from './auth/auth.module';
             type: 'postgres',
             url: dbUrl,
             entities: [Vendor, Category, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken],
-            synchronize: configService.get('NODE_ENV') !== 'production',
+            // Phase 2.1: migrations own the schema — no more synchronize in any env.
+            synchronize: false,
             logging: configService.get('NODE_ENV') === 'development',
             ssl: isCloudDb ? { rejectUnauthorized: false } : false,
           };
@@ -57,8 +58,10 @@ import { AuthModule } from './auth/auth.module';
           username: configService.get('DB_USERNAME', 'postgres'),
           password: configService.get('DB_PASSWORD', 'postgres'),
           database: configService.get('DB_DATABASE', 'marketplace'),
-          entities: [Vendor, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken],
-          synchronize: configService.get('NODE_ENV') !== 'production',
+          // Fixed a latent drift: the fallback branch was missing Category from
+          // entities, so `sync:true` would have silently dropped categories.
+          entities: [Vendor, Category, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken],
+          synchronize: false,
           logging: configService.get('NODE_ENV') === 'development',
           ssl: false,
         };

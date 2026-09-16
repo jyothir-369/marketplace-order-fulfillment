@@ -42,6 +42,15 @@ export class Order {
   })
   status: OrderStatus;
 
+  /**
+   * Human-facing order reference (`ORD-YYYYMMDD-NNNNNN`), generated inside the
+   * checkout transaction from the `order_number_seq` Postgres sequence.
+   * Column pre-exists from migration 0003 (varchar(20) nullable unique);
+   * migration 0008 adds the backing sequence.
+   */
+  @Column({ type: 'varchar', length: 20, nullable: true, name: 'order_number' })
+  orderNumber: string | null;
+
   @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
   totalAmount: number;
 

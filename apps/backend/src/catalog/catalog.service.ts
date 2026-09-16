@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, SelectQueryBuilder } from 'typeorm';
+import { Repository, SelectQueryBuilder, OptimisticLockVersionMismatchError } from 'typeorm';
 import { Product } from '../common/entities/product.entity';
 import { Category } from '../common/entities/category.entity';
 import { Vendor } from '../common/entities/vendor.entity';
@@ -78,6 +78,8 @@ export class CatalogService {
       price: dto.price,
       stockCount: dto.stockCount,
       isActive: true,
+      description: dto.description ?? null,
+      images: dto.images ?? null,
     });
 
     const saved = await this.productRepository.save(product);
@@ -104,11 +106,25 @@ export class CatalogService {
     if (dto.price !== undefined) { product.price = dto.price; }
     if (dto.stockCount !== undefined) { product.stockCount = dto.stockCount; }
     if (dto.isActive !== undefined) { product.isActive = dto.isActive; }
+    if (dto.description !== undefined) { product.description = dto.description; }
+    if (dto.images !== undefined) { product.images = dto.images; }
 
-    const saved = await this.productRepository.save(product);
+    // Phase 2.5: `save()` with a @VersionColumn throws
+    // OptimisticLockVersionMismatchError on concurrent edits — surface it as a
+    // 409 Conflict instead of an unstyled 500 so the UI can prompt a refresh.
+    let saved: Product;
+    try {
+      saved = (await this.productRepository.save(product)) as Product;
+    } catch (err) {
+      if (err instanceof OptimisticLockVersionMismatchError) {
+        throw new ConflictException('This product was modified by someone else. Please refresh and try again.');
+      }
+      throw err;
+    }
+
     this.logger.log('Product updated: ' + id, CatalogService.name, correlationId);
 
-    return this.toResponseDto(saved as unknown as Product, saved.vendor ? saved.vendor.name : 'Unknown');
+    return this.toResponseDto(saved, saved.vendor ? saved.vendor.name : 'Unknown');
   }
 
   /**
@@ -662,8 +678,9 @@ export class CatalogService {
       isActive: product.isActive,
       createdAt: product.createdAt,
       updatedAt: product.updatedAt,
-      description: (product as any).description ?? null,
-      images: (product as any).images ?? null,
+      // Phase 2.3: real entity columns — no more phantom `as any` reads.
+      description: product.description ?? null,
+      images: product.images ?? null,
     };
   }
 

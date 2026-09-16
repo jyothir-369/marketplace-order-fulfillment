@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository, SelectQueryBuilder } from 'typeorm';
+import { Repository, SelectQueryBuilder, OptimisticLockVersionMismatchError } from 'typeorm';
 import { CatalogService } from './catalog.service';
 import { Product } from '../common/entities/product.entity';
 import { Category } from '../common/entities/category.entity';
@@ -277,6 +277,59 @@ describe('CatalogService', () => {
       productRepo.findOne.mockResolvedValue(null);
 
       await expect(service.deleteProduct('nope', 'corr-1')).rejects.toThrow('not found');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // updateProduct()
+  // ---------------------------------------------------------------------------
+
+  describe('updateProduct()', () => {
+    it('applies provided fields and returns the updated product', async () => {
+      productRepo.findOne.mockResolvedValue(makeProduct());
+      productRepo.save.mockImplementation(async (p) => ({ ...p, version: 2 }));
+
+      const result = await service.updateProduct(
+        'id-1',
+        { name: 'Renamed', price: 59.99, description: 'New blurb', images: ['img1.jpg'] },
+        'corr-1',
+      );
+
+      expect(result.name).toBe('Renamed');
+      expect(result.price).toBe(59.99);
+      expect(result.description).toBe('New blurb');
+      expect(result.images).toEqual(['img1.jpg']);
+      // save() receives the mutated entity including description/images (2.3).
+      expect(productRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ description: 'New blurb', images: ['img1.jpg'] }),
+      );
+    });
+
+    it('throws NotFoundException for unknown product', async () => {
+      productRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.updateProduct('nope', { name: 'X' }, 'corr-1')).rejects.toThrow('not found');
+    });
+
+    it('maps an optimistic lock mismatch to a 409 Conflict (Phase 2.5)', async () => {
+      productRepo.findOne.mockResolvedValue(makeProduct());
+      productRepo.save.mockRejectedValue(
+        new OptimisticLockVersionMismatchError('Product', 1, 2),
+      );
+
+      await expect(
+        service.updateProduct('id-1', { name: 'Concurrent edit' }, 'corr-1'),
+      ).rejects.toThrow('This product was modified by someone else. Please refresh and try again.');
+    });
+
+    it('rethrows non-version errors as-is', async () => {
+      productRepo.findOne.mockResolvedValue(makeProduct());
+      const dbError = new Error('connection dropped');
+      productRepo.save.mockRejectedValue(dbError);
+
+      await expect(
+        service.updateProduct('id-1', { name: 'Broken' }, 'corr-1'),
+      ).rejects.toThrow('connection dropped');
     });
   });
 

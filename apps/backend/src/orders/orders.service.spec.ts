@@ -17,7 +17,16 @@ describe('OrdersService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OrdersService,
-        { provide: getRepositoryToken(Order), useValue: { findOne: jest.fn().mockResolvedValue({id: 'order1', lineItems: []}) } },
+        // getOrderById re-reads the just-created order; mock it to echo the
+        // order_number that checkout generated from the (seq 1) transaction.
+        { provide: getRepositoryToken(Order), useValue: { findOne: jest.fn().mockImplementation(() => {
+            const now = new Date();
+            const yyyymmdd =
+              now.getFullYear().toString() +
+              String(now.getMonth() + 1).padStart(2, '0') +
+              String(now.getDate()).padStart(2, '0');
+            return Promise.resolve({ id: 'order1', orderNumber: 'ORD-' + yyyymmdd + '-000001', lineItems: [] });
+        }) } },
         { provide: getRepositoryToken(OrderLineItem), useValue: lineItemRepository },
         { provide: getRepositoryToken(Product), useValue: {
             createQueryBuilder: jest.fn().mockReturnValue({
@@ -27,6 +36,7 @@ describe('OrdersService', () => {
             }),
         } },
         { provide: DataSource, useValue: { transaction: jest.fn((cb) => cb({
+            query: jest.fn().mockResolvedValue([{ seq: 1 }]), // Phase 2.2 order_number_seq
             createQueryBuilder: jest.fn().mockReturnValue({
                 setLock: jest.fn().mockReturnThis(),
                 where: jest.fn().mockReturnThis(),
@@ -73,5 +83,18 @@ describe('OrdersService', () => {
     const result = await service.checkout(dto as any, 'corr1');
     expect(result.success).toBe(true);
     expect(vendorQueueService.addJobToVendorQueue).not.toHaveBeenCalled();
+  });
+
+  it('generates a human-facing order number from the sequence (Phase 2.2)', async () => {
+    const dto = { buyerId: 'b1', items: [{ productId: 'p1', quantity: 2 }] };
+    const result = await service.checkout(dto as any, 'corr1');
+
+    // seq 1 -> ORD-<YYYYMMDD>-000001
+    const now = new Date();
+    const yyyymmdd =
+      now.getFullYear().toString() +
+      String(now.getMonth() + 1).padStart(2, '0') +
+      String(now.getDate()).padStart(2, '0');
+    expect(result.order?.orderNumber).toBe('ORD-' + yyyymmdd + '-000001');
   });
 });

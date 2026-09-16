@@ -92,6 +92,12 @@ export class OrdersService {
         }
       }
 
+      // Phase 2.2: human-facing order reference from the `order_number_seq`
+      // Postgres sequence (`ORD-YYYYMMDD-NNNNNN`). Read inside the transaction
+      // so the number is unique and committed atomically with the order.
+      const [seqRow] = await manager.query("SELECT nextval('order_number_seq') AS seq");
+      const orderNumber = this.formatOrderNumber(Number(seqRow.seq));
+
       // DUAL-WRITE: Write to new shipping_address field (Phase 7 expand-and-contract)
       // The old field (if any) remains for backward compatibility during transition
       const order = (manager.create as any)(Order, {
@@ -103,6 +109,7 @@ export class OrdersService {
         correlationId: correlationId,
         totalAmount: 0,
         shippingAddress: dto.shippingAddress || null, // New field from Phase 7
+        orderNumber,
       });
 
       const savedOrder = await (manager.save as any)(Order, order) as Order;
@@ -317,9 +324,20 @@ export class OrdersService {
     });
   }
 
+  /** ORD-YYYYMMDD-NNNNNN, human-facing plus sequence (Phase 2.2). */
+  private formatOrderNumber(seq: number): string {
+    const now = new Date();
+    const yyyymmdd =
+      now.getFullYear().toString() +
+      String(now.getMonth() + 1).padStart(2, '0') +
+      String(now.getDate()).padStart(2, '0');
+    return 'ORD-' + yyyymmdd + '-' + String(seq).padStart(6, '0');
+  }
+
   private toOrderResponseDto(order: Order): OrderResponseDto {
     return {
       id: order.id,
+      orderNumber: order.orderNumber ?? null,
       buyerId: order.buyerId,
       status: order.status,
       totalAmount: Number(order.totalAmount),

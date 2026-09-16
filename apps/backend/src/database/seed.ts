@@ -36,10 +36,12 @@ function parseDatabaseUrl(): any {
 }
 
 const dbConfig = parseDatabaseUrl();
+// Phase 2.1: schema now comes from `npm run migration:run`, never synchronize.
+// Run migrations first, then `npm run seed` against the migrated schema.
 const AppDataSource = new DataSource({
   ...dbConfig,
   entities: [Vendor, Category, Product, Order, OrderLineItem, VendorSyncJob, User],
-  synchronize: true,
+  synchronize: false,
   logging: true,
 });
 

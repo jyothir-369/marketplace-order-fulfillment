@@ -17,11 +17,12 @@ export class Product {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'uuid' })
+  /** Phase 2.4: normalised to snake_case to match every other FK in the DB. */
+  @Column({ type: 'uuid', name: 'vendor_id' })
   vendorId: string;
 
   @ManyToOne(() => Vendor, (vendor) => vendor.products)
-  @JoinColumn({ name: 'vendorId' })
+  @JoinColumn({ name: 'vendor_id' })
   vendor: Vendor;
 
   @Column({ type: 'varchar', length: 255 })
@@ -49,6 +50,17 @@ export class Product {
 
   @Column({ type: 'boolean', default: true })
   isActive: boolean;
+
+  /**
+   * Phase 2.3: real product description + images columns (replacing the
+   * phantom `(product as any).description / .images` reads that were always
+   * undefined).
+   */
+  @Column({ type: 'text', nullable: true })
+  description: string | null;
+
+  @Column({ type: 'text', array: true, nullable: true })
+  images: string[] | null;
 
   @VersionColumn()
   version: number;

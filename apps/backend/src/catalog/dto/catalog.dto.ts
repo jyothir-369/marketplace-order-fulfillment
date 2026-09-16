@@ -8,6 +8,7 @@ import {
   Max,
   IsBoolean,
   IsEnum,
+  IsArray,
   MaxLength,
 } from 'class-validator';
 
@@ -46,6 +47,17 @@ export class CreateProductDto {
   @IsString()
   @MaxLength(255)
   slug?: string;
+
+  /** Product description (Phase 2.3). */
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  /** Image URLs (Phase 2.3). */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  images?: string[];
 }
 
 export class UpdateProductDto {
@@ -76,6 +88,17 @@ export class UpdateProductDto {
   @IsString()
   @MaxLength(255)
   slug?: string;
+
+  /** Product description (Phase 2.3). */
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  /** Image URLs (Phase 2.3). */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  images?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -255,6 +278,8 @@ export class ProductResponseDto {
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
-  description?: string | null;
-  images?: string[] | null;
+  /** Real `products.description` column (Phase 2.3) — null when unset. */
+  description: string | null;
+  /** Real `products.images` column (Phase 2.3) — null when unset. */
+  images: string[] | null;
 }

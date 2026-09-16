@@ -48,6 +48,11 @@ export class OrderLineItemResponseDto {
 
 export class OrderResponseDto {
   id: string;
+  /**
+   * Human-facing order reference (Phase 2.2) — null for orders placed before
+   * the order_number sequence was provisioned.
+   */
+  orderNumber: string | null;
   buyerId: string;
   status: OrderStatus;
   totalAmount: number;
