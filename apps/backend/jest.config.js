@@ -7,16 +7,13 @@
  * sources match the testMatch glob, and dist only emits `.js`).
  *
  * Notes (deliberate scope):
- *  - `test/` (concurrency + e2e order lifecycle) requires a database/Redis
- *    harness and is wired in a later phase (Phase 14 hardening).
+ *  - `test/` (e2e order lifecycle) requires a database/Redis harness and is
+ *    wired in a later phase (Phase 14 hardening).
+ *  - The concurrency suite previously lived at `test/concurrency.spec.ts`;
+ *    Phase 4.4 rewrote it against the real pessimistic-lock implementation and
+ *    moved it to `src/inventory/inventory.concurrency.spec.ts` so it runs in CI.
  *  - `tsconfig.json` excludes `test` and `*.spec.ts` from the build; ts-jest
  *    compiles spec files regardless of that exclude, so this is safe.
- *  - Two spec files are excluded because they test methods that are NOT YET
- *    implemented (they fail to compile today). They will be restored to the
- *    suite when the features land:
- *      * src/admin/admin.service.spec.ts        -> AuthService.getOrders (phase 2/11)
- *      * src/orders/orders.service.lifecycle.spec.ts
- *          -> OrdersService.transitionOrder / getOrdersByVendor (phase 8)
  *
  * CAUTION for future authors: do not write a path containing TWO asterisks
  * followed by a forward slash (e.g. a glob like "src" + "slash-star-star-slash"
@@ -28,10 +25,11 @@ module.exports = {
   rootDir: '.',
   testMatch: ['<rootDir>/src/**/*.spec.ts'],
   testPathIgnorePatterns: [
-    // Spec for not-yet-implemented feature (see comment header). Restore when the method lands.
-    '<rootDir>/src/admin/admin.service.spec.ts',
-    // NOTE: orders.service.lifecycle.spec.ts is now restored — transitionOrder + getOrdersByVendor
-    // were implemented in Phase 2.
+    // No exclusions are required anymore:
+    //  - admin.service.spec.ts tests an already-implemented feature (Phase 8
+    //    orders work landed in Phase 2) and now runs in CI (Phase 4.4).
+    //  - orders.service.lifecycle.spec.ts is restored — transitionOrder +
+    //    getOrdersByVendor were implemented in Phase 2.
   ],
   transform: {
     '^.+\\.(t|j)s$': 'ts-jest',

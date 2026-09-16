@@ -12,8 +12,8 @@ import { throttledLog } from '../common/log-throttle';
  * Mirrors `VendorQueueService.getOrCreateVendorQueue`: the first time a vendor
  * queue is touched, this creates a matching `Worker` so a consumer always
  * exists before a job can be enqueued to that queue. This completes the
- * per-vendor concurrency-isolation design — the previous `vendor-sync-isolated`
- * processor listened on a queue nothing ever enqueued to.
+ * per-vendor concurrency-isolation design — the legacy single-queue processor
+ * (removed in Phase 1.2) listened on a queue nothing ever enqueued to.
  *
  * All workers share the same ioredis connection options as the rest of the app
  * (`getBullMQConnectionOptions`) so Redis-down behaviour stays consistent.

@@ -58,7 +58,16 @@ describe('AdminService', () => {
   });
 
   it('should return empty list when no orders found', async () => {
-    const result = await service.getOrders({}, 'c1');
+    // Phase 4.4: this previously called `service.getOrders(...)`, a method
+    // AdminService never had (the reason the spec was excluded from CI).
+    // The implemented order-listing method is getStuckOrders — same contract.
+    lineItemRepositoryMock.createQueryBuilder.mockReturnValue({
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([]),
+    });
+    const result = await service.getStuckOrders('c1');
     expect(result.total).toBe(0);
     expect(result.orders).toEqual([]);
   });
