@@ -13,6 +13,7 @@ import { OrdersService } from './orders.service';
 import { CheckoutDto, CheckoutResponseDto, OrderResponseDto, TransitionOrderDto } from './dto/orders.dto';
 import { CorrelationId } from '../common/decorators/correlation-id.decorator';
 import { AuthGuard } from '../auth/auth.guard';
+import { OptionalAuthGuard } from '../auth/optional-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -25,8 +26,13 @@ export class OrdersController {
 
   @Post('checkout')
   @HttpCode(HttpStatus.CREATED)
-  async checkout(@Body() dto: CheckoutDto, @CorrelationId() correlationId: string): Promise<CheckoutResponseDto> {
-    return this.ordersService.checkout(dto, correlationId);
+  @UseGuards(OptionalAuthGuard)
+  async checkout(
+    @Body() dto: CheckoutDto,
+    @CorrelationId() correlationId: string,
+    @CurrentUser() user?: AuthenticatedUser,
+  ): Promise<CheckoutResponseDto> {
+    return this.ordersService.checkout(dto, correlationId, user?.id);
   }
 
   // NOTE: static paths MUST precede :id — Express matches in declaration order,
@@ -62,6 +68,16 @@ export class OrdersController {
     @CorrelationId() correlationId: string,
   ): Promise<OrderResponseDto> {
     return this.ordersService.getOrderById(id, correlationId);
+  }
+
+  /** Admin/operations audit trail for an order (Phase 1.5). */
+  @Get(':id/audit')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.OPERATIONS)
+  async getOrderAudit(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<{ total: number; logs: unknown[] }> {
+    return this.ordersService.getOrderAudit(id);
   }
 
   @Post(':id/cancel')

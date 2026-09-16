@@ -1,6 +1,10 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
+import { ConfigService } from '@nestjs/config';
 import { Queue, QueueEvents } from 'bullmq';
+import { VendorWorkerRegistryService } from './vendor-worker-registry.service';
+import { getBullMQConnectionOptions } from '../common/config/redis-connection.factory';
+import { throttledLog } from '../common/log-throttle';
 
 export interface VendorQueueJobData {
   jobId: string;
@@ -26,10 +30,22 @@ export class VendorQueueService implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     @InjectQueue('vendor-sync-base') private readonly baseQueue: Queue,
+    private readonly configService: ConfigService,
+    private readonly workerRegistry: VendorWorkerRegistryService,
   ) {}
 
   async onModuleInit(): Promise<void> {
     this.logger.log('VendorQueueService initialized');
+    // Share the same consistent error handling for the base shared queue.
+    this.baseQueue.on('error', (err: Error) => {
+      throttledLog(
+        'base-queue:error',
+        'warn',
+        'Base vendor-sync queue connection error: ' + (err?.message || 'unknown'),
+        30_000,
+        this.logger,
+      );
+    });
   }
 
   async onModuleDestroy(): Promise<void> {
@@ -64,10 +80,7 @@ export class VendorQueueService implements OnModuleInit, OnModuleDestroy {
     this.logger.log('Creating queue for vendor: ' + vendorId + ' with concurrency: ' + effectiveConcurrency);
 
     const queue = new Queue<VendorQueueJobData>(queueName, {
-      connection: {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT || '6379'),
-      },
+      connection: getBullMQConnectionOptions(this.configService),
       defaultJobOptions: {
         attempts: 5,
         backoff: {
@@ -79,12 +92,33 @@ export class VendorQueueService implements OnModuleInit, OnModuleDestroy {
       },
     });
 
-    const queueEvents = new QueueEvents(queueName, {
-      connection: {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT || '6379'),
-      },
+    queue.on('error', (err: Error) => {
+      throttledLog(
+        'vendor-queue:error:' + vendorId,
+        'warn',
+        'Vendor queue ' + queueName + ' connection error: ' + (err?.message || 'unknown'),
+        30_000,
+        this.logger,
+      );
     });
+
+    const queueEvents = new QueueEvents(queueName, {
+      connection: getBullMQConnectionOptions(this.configService),
+    });
+
+    queueEvents.on('error', (err: Error) => {
+      throttledLog(
+        'vendor-events:error:' + vendorId,
+        'warn',
+        'Vendor queue events connection error (' + vendorId + '): ' + (err?.message || 'unknown'),
+        30_000,
+        this.logger,
+      );
+    });
+
+    // Phase 1.2: a worker must exist before any job hits this queue, otherwise
+    // jobs sink silently. Create the matching on-demand worker alongside it.
+    this.workerRegistry.getOrCreateWorker(vendorId, effectiveConcurrency);
 
     this.vendorQueues.set(vendorId, queue);
     this.vendorQueueEvents.set(vendorId, queueEvents);

@@ -1,9 +1,11 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, SelectQueryBuilder } from 'typeorm';
 import { Product } from '../common/entities/product.entity';
 import { Category } from '../common/entities/category.entity';
 import { Vendor } from '../common/entities/vendor.entity';
+import { Order } from '../common/entities/order.entity';
+import { OrderLineItem } from '../common/entities/order-line-item.entity';
 import {
   CreateProductDto,
   UpdateProductDto,
@@ -13,8 +15,21 @@ import {
   CatalogFacetsDto,
   CategorySummaryDto,
   VendorDirectoryDto,
+  CreateCategoryDto,
+  CreateVendorDto,
+  VendorDetailDto,
+  VendorDashboardDto,
   CatalogSort,
 } from './dto/catalog.dto';
+
+/** Operational product aggregates for a single vendor (admin + dashboard). */
+interface ProductStats {
+  productCount: number;
+  activeProductCount: number;
+  totalStock: number;
+  lowStockCount: number;
+  outOfStockCount: number;
+}
 
 /**
  * Catalog service (Phase 2 — categories + catalog contract).
@@ -27,6 +42,9 @@ import {
 export class CatalogService {
   private readonly logger = new Logger(CatalogService.name);
 
+  /** Matches the vendor inventory page: 1..5 units counts as "low stock". */
+  private readonly LOW_STOCK_THRESHOLD = 5;
+
   constructor(
     @InjectRepository(Product)
     private readonly productRepository: Repository<Product>,
@@ -34,6 +52,10 @@ export class CatalogService {
     private readonly vendorRepository: Repository<Vendor>,
     @InjectRepository(Category)
     private readonly categoryRepository: Repository<Category>,
+    @InjectRepository(OrderLineItem)
+    private readonly lineItemRepository: Repository<OrderLineItem>,
+    @InjectRepository(Order)
+    private readonly orderRepository: Repository<Order>,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -330,6 +352,167 @@ export class CatalogService {
       activeProductCount: Number(r.activeCount ?? 0),
       createdAt: new Date(r.createdAt),
     }));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Admin: categories + vendors, vendor detail/dashboard (Phase 1.5)
+  // ---------------------------------------------------------------------------
+
+  private readonly ZERO_STATS: ProductStats = {
+    productCount: 0,
+    activeProductCount: 0,
+    totalStock: 0,
+    lowStockCount: 0,
+    outOfStockCount: 0,
+  };
+
+  /** Per-vendor product aggregates (counts, stock, low/out-of-stock). */
+  private async getProductStatsByVendor(): Promise<Map<string, ProductStats>> {
+    const rows = await this.productRepository
+      .createQueryBuilder('product')
+      .select('product.vendorId', 'vendorId')
+      .addSelect('COUNT(product.id)', 'productCount')
+      .addSelect('SUM(CASE WHEN product.isActive = TRUE THEN 1 ELSE 0 END)', 'activeCount')
+      .addSelect('COALESCE(SUM(product.stockCount), 0)', 'totalStock')
+      .addSelect(
+        'SUM(CASE WHEN product.stockCount > 0 AND product.stockCount <= :lowThreshold THEN 1 ELSE 0 END)',
+        'lowStock',
+      )
+      .addSelect('SUM(CASE WHEN product.stockCount = 0 THEN 1 ELSE 0 END)', 'outOfStock')
+      .setParameter('lowThreshold', this.LOW_STOCK_THRESHOLD)
+      .groupBy('product.vendorId')
+      .getRawMany();
+
+    const map = new Map<string, ProductStats>();
+    for (const r of rows) {
+      map.set(String(r.vendorId), {
+        productCount: Number(r.productCount ?? 0),
+        activeProductCount: Number(r.activeCount ?? 0),
+        totalStock: Number(r.totalStock ?? 0),
+        lowStockCount: Number(r.lowStock ?? 0),
+        outOfStockCount: Number(r.outOfStock ?? 0),
+      });
+    }
+    return map;
+  }
+
+  async createCategory(dto: CreateCategoryDto): Promise<CategorySummaryDto> {
+    const existing = await this.categoryRepository.findOne({ where: { name: dto.name } });
+    if (existing) {
+      throw new ConflictException('Category ' + dto.name + ' already exists');
+    }
+
+    const saved = await this.categoryRepository.save(
+      this.categoryRepository.create({
+        name: dto.name,
+        slug: dto.slug ?? this.slugify(dto.name),
+        description: dto.description ?? null,
+      }),
+    );
+
+    this.logger.log('Category created: ' + saved.name + ' (slug: ' + saved.slug + ')', CatalogService.name);
+    return {
+      name: saved.name,
+      slug: saved.slug,
+      productCount: 0,
+      activeProductCount: 0,
+      totalStock: 0,
+    };
+  }
+
+  async createVendor(dto: CreateVendorDto): Promise<VendorDetailDto> {
+    const vendor = await this.vendorRepository.save(this.vendorRepository.create({ name: dto.name }));
+    this.logger.log('Vendor created: ' + vendor.name + ' (' + vendor.id + ')', CatalogService.name);
+    return this.toVendorDetailDto(vendor, await this.getProductStatsByVendor());
+  }
+
+  /** ADMIN: all vendors with operational product metrics (Phase 1.5). */
+  async getVendorsAdmin(): Promise<VendorDetailDto[]> {
+    const vendors = await this.vendorRepository.find({ order: { name: 'ASC' } });
+    const stats = await this.getProductStatsByVendor();
+    return vendors.map((v) => this.toVendorDetailDto(v, stats));
+  }
+
+  async getVendorDetail(vendorId: string): Promise<VendorDetailDto> {
+    const vendor = await this.vendorRepository.findOne({ where: { id: vendorId } });
+    if (!vendor) {
+      throw new NotFoundException('Vendor with ID ' + vendorId + ' not found');
+    }
+    return this.toVendorDetailDto(vendor, await this.getProductStatsByVendor());
+  }
+
+  /** Vendor-portal aggregate metrics: products + fulfillment + open orders. */
+  async getVendorDashboard(vendorId: string): Promise<VendorDashboardDto> {
+    const vendor = await this.vendorRepository.findOne({ where: { id: vendorId } });
+    if (!vendor) {
+      throw new NotFoundException('Vendor with ID ' + vendorId + ' not found');
+    }
+
+    const [stats, fulfillment, openOrders] = await Promise.all([
+      this.getProductStatsByVendor(),
+      this.getVendorFulfillmentCounts(vendorId),
+      this.countVendorOpenOrders(vendorId),
+    ]);
+
+    const s = stats.get(vendorId) ?? this.ZERO_STATS;
+    return {
+      vendorId: vendor.id,
+      vendorName: vendor.name,
+      productCount: s.productCount,
+      activeProductCount: s.activeProductCount,
+      totalStock: s.totalStock,
+      lowStockCount: s.lowStockCount,
+      outOfStockCount: s.outOfStockCount,
+      pendingSyncJobs: fulfillment.pending,
+      deadLetterJobs: fulfillment.deadLetter,
+      ambiguousJobs: fulfillment.ambiguous,
+      openOrders,
+    };
+  }
+
+  private toVendorDetailDto(vendor: Vendor, stats: Map<string, ProductStats>): VendorDetailDto {
+    const s = stats.get(vendor.id) ?? this.ZERO_STATS;
+    return {
+      id: vendor.id,
+      name: vendor.name,
+      productCount: s.productCount,
+      activeProductCount: s.activeProductCount,
+      totalStock: s.totalStock,
+      lowStockCount: s.lowStockCount,
+      outOfStockCount: s.outOfStockCount,
+      createdAt: vendor.createdAt,
+    };
+  }
+
+  /** Fulfillment-state counts for a vendor's line items (drives the queue stats). */
+  private async getVendorFulfillmentCounts(vendorId: string): Promise<{ pending: number; deadLetter: number; ambiguous: number }> {
+    const row = await this.lineItemRepository
+      .createQueryBuilder('line_item')
+      .select("SUM(CASE WHEN line_item.fulfillment_status IN ('pending', 'syncing') THEN 1 ELSE 0 END)", 'pending')
+      .select("SUM(CASE WHEN line_item.fulfillment_status = 'dead_letter' THEN 1 ELSE 0 END)", 'dead')
+      .select("SUM(CASE WHEN line_item.fulfillment_status = 'ambiguous' THEN 1 ELSE 0 END)", 'amb')
+      .where('line_item.vendor_id = :vendorId', { vendorId })
+      .groupBy('line_item.vendor_id')
+      .getRawOne();
+
+    return {
+      pending: Number(row?.pending ?? 0),
+      deadLetter: Number(row?.dead ?? 0),
+      ambiguous: Number(row?.amb ?? 0),
+    };
+  }
+
+  /** Distinct non-terminal orders containing at least one line item from this vendor. */
+  private async countVendorOpenOrders(vendorId: string): Promise<number> {
+    const row = await this.lineItemRepository
+      .createQueryBuilder('line_item')
+      .leftJoin(Order, 'o', 'o.id = line_item.order_id')
+      .select('COUNT(DISTINCT line_item.order_id)', 'openOrders')
+      .where('line_item.vendor_id = :vendorId', { vendorId })
+      .andWhere("o.status NOT IN ('cancelled', 'fulfilled')")
+      .getRawOne();
+
+    return Number(row?.openOrders ?? 0);
   }
 
   // ---------------------------------------------------------------------------

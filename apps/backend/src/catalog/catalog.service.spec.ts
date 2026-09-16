@@ -5,6 +5,8 @@ import { CatalogService } from './catalog.service';
 import { Product } from '../common/entities/product.entity';
 import { Category } from '../common/entities/category.entity';
 import { Vendor } from '../common/entities/vendor.entity';
+import { Order } from '../common/entities/order.entity';
+import { OrderLineItem } from '../common/entities/order-line-item.entity';
 import { CatalogQueryDto, CatalogSort } from './dto/catalog.dto';
 
 // ---------------------------------------------------------------------------
@@ -83,6 +85,9 @@ describe('CatalogService', () => {
       save: jest.fn(),
       findOne: jest.fn(),
     };
+    // Phase 1.5: new admin/dashboard endpoints query line items + orders.
+    const lineItemRepo = { createQueryBuilder: jest.fn().mockReturnValue(mockQb()) };
+    const orderRepo = {};
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -90,6 +95,8 @@ describe('CatalogService', () => {
         { provide: getRepositoryToken(Product), useValue: productRepo },
         { provide: getRepositoryToken(Vendor), useValue: vendorRepo },
         { provide: getRepositoryToken(Category), useValue: categoryRepo },
+        { provide: getRepositoryToken(OrderLineItem), useValue: lineItemRepo },
+        { provide: getRepositoryToken(Order), useValue: orderRepo },
       ],
     }).compile();
 

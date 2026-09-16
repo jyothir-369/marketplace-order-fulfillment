@@ -1,6 +1,7 @@
 import * as path from 'path';
-import { Module, Logger } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { getBullMQConnectionOptions } from './common/config/redis-connection.factory';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bullmq';
 import { CatalogModule } from './catalog/catalog.module';
@@ -21,8 +22,6 @@ import { VendorSyncJob } from './common/entities/vendor-sync-job.entity';
 import { User } from './common/entities/user.entity';
 import { RefreshToken } from './common/entities/refresh-token.entity';
 import { AuthModule } from './auth/auth.module';
-
-const logger = new Logger('BullModule');
 
 @Module({
   imports: [
@@ -70,18 +69,7 @@ const logger = new Logger('BullModule');
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => {
         return {
-          connection: {
-            host: configService.get('REDIS_HOST', 'localhost'),
-            port: configService.get('REDIS_PORT', 6379),
-            password: configService.get('REDIS_PASSWORD') || undefined,
-            maxRetriesPerRequest: null,
-            enableOfflineQueue: false,
-            lazyConnect: true,
-            retryStrategy: (times: number) => {
-              if (times > 3) return null;
-              return Math.min(times * 200, 1000);
-            },
-          },
+          connection: getBullMQConnectionOptions(configService),
         };
       },
       inject: [ConfigService],

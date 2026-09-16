@@ -16,6 +16,7 @@ describe('OrdersService - Lifecycle', () => {
   let auditMock: any;
   let inventoryMock: any;
   let dataSourceMock: any;
+  let managerMock: any;
 
   beforeEach(async () => {
     orderRepositoryMock = {
@@ -31,7 +32,15 @@ describe('OrdersService - Lifecycle', () => {
         getRawMany: jest.fn().mockResolvedValue([]),
       }),
     };
-    dataSourceMock = {};
+    // cancelOrder runs inside dataSource.transaction() and does every read/write
+    // through the transaction manager (Phase 1.6), so the spec drives managerMock.
+    managerMock = {
+      findOne: jest.fn(),
+      update: jest.fn(),
+    };
+    dataSourceMock = {
+      transaction: jest.fn((cb: (m: any) => any) => cb(managerMock)),
+    };
     auditMock = {
       logOrderStatusChange: jest.fn().mockResolvedValue(undefined),
     };
@@ -56,20 +65,20 @@ describe('OrdersService - Lifecycle', () => {
   });
 
   it('should prevent cancellation of FULFILLED orders', async () => {
-    orderRepositoryMock.findOne.mockResolvedValue({ id: 'ord1', status: OrderStatus.FULFILLED });
+    managerMock.findOne.mockResolvedValue({ id: 'ord1', status: OrderStatus.FULFILLED });
 
     await expect(service.cancelOrder('ord1', 'c1')).rejects.toThrow('Cannot cancel order in status: fulfilled');
   });
 
   it('should allow cancellation of PLACED orders', async () => {
-    orderRepositoryMock.findOne.mockResolvedValue({
+    managerMock.findOne.mockResolvedValue({
       id: 'ord1',
       status: OrderStatus.PLACED,
       lineItems: [],
     });
 
     await service.cancelOrder('ord1', 'c1');
-    expect(orderRepositoryMock.update).toHaveBeenCalledWith('ord1', { status: OrderStatus.CANCELLED });
+    expect(managerMock.update).toHaveBeenCalledWith(Order, { id: 'ord1' }, { status: OrderStatus.CANCELLED });
   });
 
   describe('transitionOrder', () => {
@@ -118,16 +127,9 @@ describe('OrdersService - Lifecycle', () => {
     });
 
     it('CANCEL delegates to cancelOrder and restores inventory for pending items', async () => {
-      orderRepositoryMock.findOne.mockResolvedValue({
-        id: 'ord1',
-        status: OrderStatus.CONFIRMED,
-        lineItems: [
-          { id: 'li1', productId: 'p1', quantity: 2, fulfillmentStatus: FulfillmentStatus.PENDING },
-        ],
-      });
-
-      // Stub the second findOne from getOrderById (post-cancel).
-      orderRepositoryMock.findOne
+      // First manager.findOne is the locked read inside the transaction; second
+      // is the post-cancel refresh for the DTO.
+      managerMock.findOne
         .mockResolvedValueOnce({
           id: 'ord1',
           status: OrderStatus.CONFIRMED,
@@ -145,8 +147,9 @@ describe('OrdersService - Lifecycle', () => {
 
       await service.transitionOrder('ord1', { action: 'CANCEL', reason: 'buyer request' }, 'c1');
 
-      expect(inventoryMock.restoreStock).toHaveBeenCalledWith('p1', 2, 'c1', 'Order cancellation');
-      expect(orderRepositoryMock.update).toHaveBeenCalledWith('ord1', { status: OrderStatus.CANCELLED });
+      // restoreStock now receives the transaction manager as its 5th arg (Phase 1.6).
+      expect(inventoryMock.restoreStock).toHaveBeenCalledWith('p1', 2, 'c1', 'Order cancellation', managerMock);
+      expect(managerMock.update).toHaveBeenCalledWith(Order, { id: 'ord1' }, { status: OrderStatus.CANCELLED });
     });
 
     it('returns 404 for an unknown order id', async () => {

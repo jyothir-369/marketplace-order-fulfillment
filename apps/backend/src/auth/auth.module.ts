@@ -6,6 +6,7 @@ import { RefreshToken } from '../common/entities/refresh-token.entity';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { AuthGuard } from './auth.guard';
+import { OptionalAuthGuard } from './optional-auth.guard';
 import { RolesGuard } from './roles.guard';
 
 /**
@@ -22,7 +23,7 @@ import { RolesGuard } from './roles.guard';
     JwtModule.register({}),
   ],
   controllers: [AuthController],
-  providers: [AuthService, AuthGuard, RolesGuard],
-  exports: [AuthService, AuthGuard, RolesGuard, JwtModule],
+  providers: [AuthService, AuthGuard, OptionalAuthGuard, RolesGuard],
+  exports: [AuthService, AuthGuard, OptionalAuthGuard, RolesGuard, JwtModule],
 })
 export class AuthModule {}

@@ -187,6 +187,59 @@ export class VendorDirectoryDto {
 }
 
 // ---------------------------------------------------------------------------
+// Admin: category & vendor writes (+ vendor admin/detail/dashboard reads)
+// ---------------------------------------------------------------------------
+
+export class CreateCategoryDto {
+  @IsString()
+  @MaxLength(120)
+  name: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  slug?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  description?: string;
+}
+
+export class CreateVendorDto {
+  @IsString()
+  @MaxLength(255)
+  name: string;
+}
+
+/** Admin-facing operational metrics for a vendor (Phase 1.5). */
+export class VendorDetailDto {
+  id: string;
+  name: string;
+  productCount: number;
+  activeProductCount: number;
+  totalStock: number;
+  lowStockCount: number;
+  outOfStockCount: number;
+  createdAt: Date;
+}
+
+/** Vendor-portal aggregate metrics (Phase 1.5). Mirrors the frontend contract. */
+export class VendorDashboardDto {
+  vendorId: string;
+  vendorName: string;
+  productCount: number;
+  activeProductCount: number;
+  totalStock: number;
+  lowStockCount: number;
+  outOfStockCount: number;
+  pendingSyncJobs: number;
+  deadLetterJobs: number;
+  ambiguousJobs: number;
+  openOrders: number;
+}
+
+// ---------------------------------------------------------------------------
 // Product read
 // ---------------------------------------------------------------------------
 

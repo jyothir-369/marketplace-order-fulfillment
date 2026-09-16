@@ -6,7 +6,7 @@ import { OrderLineItem, FulfillmentStatus } from '../common/entities/order-line-
 import { Product } from '../common/entities/product.entity';
 import { CheckoutDto, CheckoutResponseDto, OrderResponseDto, OrderLineItemResponseDto, TransitionOrderDto, OrderTransitionAction } from './dto/orders.dto';
 import { InventoryService } from '../inventory/inventory.service';
-import { AuditService } from '../common/audit';
+import { AuditService, AuditLog, AuditEntityType } from '../common/audit';
 
 @Injectable()
 export class OrdersService {
@@ -32,7 +32,7 @@ export class OrdersService {
     private readonly auditService: AuditService,
   ) {}
 
-  async checkout(dto: CheckoutDto, correlationId: string): Promise<CheckoutResponseDto> {
+  async checkout(dto: CheckoutDto, correlationId: string, buyerUserId?: string): Promise<CheckoutResponseDto> {
     this.logger.log('Starting checkout for buyer ' + dto.buyerId + ' with ' + dto.items.length + ' items', OrdersService.name, correlationId);
 
     const productIds = dto.items.map((i) => i.productId);
@@ -96,6 +96,9 @@ export class OrdersService {
       // The old field (if any) remains for backward compatibility during transition
       const order = (manager.create as any)(Order, {
         buyerId: dto.buyerId,
+        // Phase 1.1: for authenticated checkout, record the users.id so
+        // GET /orders/me can resolve the buyer. NULL for guest checkouts.
+        buyerUserId: buyerUserId ?? null,
         status: OrderStatus.PLACED,
         correlationId: correlationId,
         totalAmount: 0,
@@ -183,6 +186,15 @@ export class OrdersService {
     return orders.map((o) => this.toOrderResponseDto(o));
   }
 
+  /** ADMIN/OPERATIONS audit trail for a single order (Phase 1.5). */
+  async getOrderAudit(orderId: string): Promise<{ total: number; logs: AuditLog[] }> {
+    const { logs, total } = await this.auditService.queryLogs({
+      entityType: AuditEntityType.ORDER,
+      entityId: orderId,
+    });
+    return { total, logs };
+  }
+
   /** All orders containing a line item from the given vendor (Phase 2). */
   async getOrdersByVendor(vendorId: string): Promise<OrderResponseDto[]> {
     const rows = await this.lineItemRepository
@@ -251,43 +263,58 @@ export class OrdersService {
   async cancelOrder(orderId: string, correlationId: string): Promise<OrderResponseDto> {
     this.logger.log('Cancelling order ' + orderId, OrdersService.name, correlationId);
 
-    const order = await this.orderRepository.findOne({
-      where: { id: orderId },
-      relations: { lineItems: true },
-    });
+    return this.dataSource.transaction(async (manager) => {
+      const order = await manager.findOne(Order, {
+        where: { id: orderId },
+        relations: { lineItems: true },
+        lock: { mode: 'pessimistic_write' },
+      });
 
-    if (!order) {
-      throw new NotFoundException('Order ' + orderId + ' not found');
-    }
+      if (!order) {
+        throw new NotFoundException('Order ' + orderId + ' not found');
+      }
 
-    if (order.status === OrderStatus.FULFILLED) {
-      throw new BadRequestException('Cannot cancel order in status: fulfilled');
-    }
+      if (order.status === OrderStatus.FULFILLED) {
+        throw new BadRequestException('Cannot cancel order in status: fulfilled');
+      }
 
-    if (order.status === OrderStatus.CANCELLED) {
-      throw new BadRequestException('Order is already cancelled');
-    }
+      if (order.status === OrderStatus.CANCELLED) {
+        throw new BadRequestException('Order is already cancelled');
+      }
 
-    const previousStatus = order.status;
-    const itemsToRestore = order.lineItems.filter(
-      (item) => item.fulfillmentStatus === FulfillmentStatus.PENDING || item.fulfillmentStatus === FulfillmentStatus.SYNCING,
-    );
-
-    for (const item of itemsToRestore) {
-      await this.inventoryService.restoreStock(
-        item.productId,
-        item.quantity,
-        correlationId,
-        'Order cancellation',
+      const previousStatus = order.status;
+      const itemsToRestore = order.lineItems.filter(
+        (item) => item.fulfillmentStatus === FulfillmentStatus.PENDING || item.fulfillmentStatus === FulfillmentStatus.SYNCING,
       );
-    }
 
-    await this.orderRepository.update(orderId, { status: OrderStatus.CANCELLED });
-    await this.lineItemRepository.update({ orderId }, { fulfillmentStatus: FulfillmentStatus.FAILED, failureReason: 'Order cancelled' });
+      // Phase 1.6: every write below shares ONE transaction. A crash mid-cancel
+      // rolls back all partial stock restores and the status flip together —
+      // previously a failed restore left stock half-restored with the order active.
+      for (const item of itemsToRestore) {
+        await this.inventoryService.restoreStock(
+          item.productId,
+          item.quantity,
+          correlationId,
+          'Order cancellation',
+          manager,
+        );
+      }
 
-    await this.auditService.logOrderStatusChange(correlationId, orderId, previousStatus, OrderStatus.CANCELLED);
+      await manager.update(Order, { id: orderId }, { status: OrderStatus.CANCELLED });
+      await manager.update(
+        OrderLineItem,
+        { orderId },
+        { fulfillmentStatus: FulfillmentStatus.FAILED, failureReason: 'Order cancelled' },
+      );
 
-    return this.getOrderById(orderId, correlationId);
+      await this.auditService.logOrderStatusChange(correlationId, orderId, previousStatus, OrderStatus.CANCELLED);
+
+      const refreshed = await manager.findOne(Order, {
+        where: { id: orderId },
+        relations: { lineItems: { product: true, vendor: true } },
+      });
+      return this.toOrderResponseDto(refreshed as Order);
+    });
   }
 
   private toOrderResponseDto(order: Order): OrderResponseDto {

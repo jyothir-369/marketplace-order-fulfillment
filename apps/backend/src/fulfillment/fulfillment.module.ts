@@ -5,8 +5,8 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { FulfillmentController } from './fulfillment.controller';
 import { FulfillmentService } from './fulfillment.service';
 import { VendorSyncProcessor, VENDOR_SYNC_QUEUE } from './vendor-sync.processor';
-import { VendorSyncIsolatedProcessor } from './vendor-sync-isolated.processor';
 import { VendorQueueService } from './vendor-queue.service';
+import { VendorWorkerRegistryService } from './vendor-worker-registry.service';
 import { ReconciliationScheduler } from './reconciliation.scheduler';
 import { OrderLineItem } from '../common/entities/order-line-item.entity';
 import { VendorSyncJob } from '../common/entities/vendor-sync-job.entity';
@@ -18,7 +18,6 @@ import { AuditModule, AuditLog } from '../common/audit';
     TypeOrmModule.forFeature([OrderLineItem, VendorSyncJob, Order, AuditLog]),
     BullModule.registerQueue({ name: VENDOR_SYNC_QUEUE }),
     BullModule.registerQueue({ name: 'vendor-sync-base' }),
-    BullModule.registerQueue({ name: 'vendor-sync-isolated' }),
     ScheduleModule.forRoot(),
     AuditModule,
   ],
@@ -26,8 +25,8 @@ import { AuditModule, AuditLog } from '../common/audit';
   providers: [
     FulfillmentService,
     VendorSyncProcessor,
-    VendorSyncIsolatedProcessor,
     VendorQueueService,
+    VendorWorkerRegistryService,
     ReconciliationScheduler,
   ],
   exports: [FulfillmentService, VendorQueueService],
