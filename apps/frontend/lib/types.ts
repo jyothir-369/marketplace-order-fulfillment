@@ -102,6 +102,8 @@ export interface CheckoutDto {
   shippingAddress: string;
   /** Optional client-generated idempotency key for safe retries. */
   idempotencyKey?: string;
+  /** Phase 5.1 — mock payment card selection (`mock-success` | `mock-decline`). */
+  paymentMethodToken?: string;
 }
 
 export interface CheckoutResponseDto {

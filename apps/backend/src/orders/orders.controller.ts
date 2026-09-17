@@ -20,6 +20,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { ForbiddenException } from '@nestjs/common';
 import { UserRole } from '../common/entities/user.entity';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import { PaymentAuthorization } from '../common/entities/payment-authorization.entity';
 
 @Controller('orders')
 export class OrdersController {
@@ -103,6 +104,22 @@ export class OrdersController {
     @CorrelationId() correlationId: string,
   ): Promise<OrderResponseDto> {
     return this.ordersService.cancelOrder(id, correlationId);
+  }
+
+  /**
+   * Explicit refund of the order's captured payment (Phase 5.1). Admin/ops
+   * financial reversal; buyer-initiated cancellations already refund inside
+   * the cancel transaction.
+   */
+  @Post(':id/refund')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.OPERATIONS)
+  async refundOrder(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CorrelationId() correlationId: string,
+  ): Promise<PaymentAuthorization | null> {
+    return this.ordersService.refundOrder(id, correlationId);
   }
 
   /** Lifecycle transition: CONFIRM / FULFILL / SHIP / CANCEL. */

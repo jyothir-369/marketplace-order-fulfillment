@@ -2,6 +2,7 @@
 import { Type } from 'class-transformer';
 import { OrderStatus } from '../../common/entities/order.entity';
 import { FulfillmentStatus } from '../../common/entities/order-line-item.entity';
+import { PAYMENT_SUCCESS_TOKEN, PAYMENT_DECLINE_TOKEN } from '../../payments/mock-payment.service';
 
 export class CheckoutItemDto {
   @IsUUID()
@@ -30,6 +31,14 @@ export class CheckoutDto {
   @IsOptional()
   @IsString()
   shippingAddress?: string;
+
+  /**
+   * Phase 5.1 — mock payment selection (`mock-success` | `mock-decline`).
+   * Absent, the mock provider authorizes deterministically.
+   */
+  @IsOptional()
+  @IsIn([PAYMENT_SUCCESS_TOKEN, PAYMENT_DECLINE_TOKEN])
+  paymentMethodToken?: string;
 }
 
 export class OrderLineItemResponseDto {

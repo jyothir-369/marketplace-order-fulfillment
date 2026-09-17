@@ -8,6 +8,7 @@ import { DataSource } from 'typeorm';
 import { InventoryService } from '../inventory/inventory.service';
 import { AuditService } from '../common/audit';
 import { VendorQueueService } from '../fulfillment/vendor-queue.service';
+import { PaymentsService } from '../payments/payments.service';
 
 describe('OrdersService - Lifecycle', () => {
   let service: OrdersService;
@@ -17,6 +18,7 @@ describe('OrdersService - Lifecycle', () => {
   let inventoryMock: any;
   let dataSourceMock: any;
   let managerMock: any;
+  let paymentsMock: any;
 
   beforeEach(async () => {
     orderRepositoryMock = {
@@ -47,6 +49,11 @@ describe('OrdersService - Lifecycle', () => {
     inventoryMock = {
       restoreStock: jest.fn().mockResolvedValue(undefined),
     };
+    // Phase 5.1: cancellation must reverse the captured payment inside the
+    // cancel transaction via paymentsService.refund(orderId, cid, manager).
+    paymentsMock = {
+      refund: jest.fn().mockResolvedValue({ id: 'pay1', status: 'refunded' }),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -58,6 +65,7 @@ describe('OrdersService - Lifecycle', () => {
         { provide: InventoryService, useValue: inventoryMock },
         { provide: AuditService, useValue: auditMock },
         { provide: VendorQueueService, useValue: {} },
+        { provide: PaymentsService, useValue: paymentsMock },
       ],
     }).compile();
 
@@ -79,6 +87,8 @@ describe('OrdersService - Lifecycle', () => {
 
     await service.cancelOrder('ord1', 'c1');
     expect(managerMock.update).toHaveBeenCalledWith(Order, { id: 'ord1' }, { status: OrderStatus.CANCELLED });
+    // Phase 5.1: the captured payment is refunded inside the cancel tx.
+    expect(paymentsMock.refund).toHaveBeenCalledWith('ord1', 'c1', managerMock);
   });
 
   describe('transitionOrder', () => {

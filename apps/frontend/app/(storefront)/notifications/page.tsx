@@ -5,6 +5,7 @@
 
 import { Bell, CheckCircle2 } from "lucide-react";
 import { useState } from "react";
+import { ComingSoon } from "@/components/ui/coming-soon";
 
 export default function NotificationsPage() {
   const [items, setItems] = useState([
@@ -13,7 +14,10 @@ export default function NotificationsPage() {
   ]);
   return (
     <div className="max-w-3xl mx-auto px-6 py-10">
-      <h1 className="font-display text-3xl font-bold flex items-center gap-3 mb-6"><Bell className="h-8 w-8 text-[var(--color-brass)]" /> Notifications</h1>
+      <h1 className="font-display text-3xl font-bold flex items-center gap-3 mb-4"><Bell className="h-8 w-8 text-[var(--color-brass)]" /> Notifications</h1>
+      <div className="mb-4">
+        <ComingSoon note="Notifications are not wired to a backend yet — no subscription or delivery channel exists. The list below is static demo content." />
+      </div>
       <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-card)] shadow-v2 overflow-hidden">
         {items.map((n) => (
           <div key={n.id} className={"flex items-start gap-4 px-5 py-4 border-b border-[var(--color-border)] hover:bg-[var(--color-cream)]/40" + (n.read ? " bg-[var(--color-cream)]/30" : "")}>

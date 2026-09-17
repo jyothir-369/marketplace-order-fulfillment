@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, FindOptionsRelations } from 'typeorm';
 import { Order, OrderStatus } from '../common/entities/order.entity';
@@ -7,6 +7,8 @@ import { Product } from '../common/entities/product.entity';
 import { CheckoutDto, CheckoutResponseDto, OrderResponseDto, OrderLineItemResponseDto, TransitionOrderDto, OrderTransitionAction } from './dto/orders.dto';
 import { InventoryService } from '../inventory/inventory.service';
 import { AuditService, AuditLog, AuditEntityType } from '../common/audit';
+import { PaymentsService } from '../payments/payments.service';
+import { PaymentAuthorization } from '../common/entities/payment-authorization.entity';
 
 @Injectable()
 export class OrdersService {
@@ -30,6 +32,7 @@ export class OrdersService {
     private readonly dataSource: DataSource,
     private readonly inventoryService: InventoryService,
     private readonly auditService: AuditService,
+    private readonly paymentsService: PaymentsService,
   ) {}
 
   async checkout(dto: CheckoutDto, correlationId: string, buyerUserId?: string): Promise<CheckoutResponseDto> {
@@ -49,7 +52,33 @@ export class OrdersService {
     const productMap = new Map<string, Product>();
     products.forEach((p) => productMap.set(p.id, p));
 
+    // Phase 5.1: expected total = sum of price x quantity from the (pre-lock)
+    // product snapshot. Bill this amount BEFORE any stock is decremented so a
+    // decline never touches inventory. The auth row itself is persisted (as
+    // CAPTURED) only after the order exists.
+    const expectedTotal = dto.items.reduce((sum, item) => {
+      const product = productMap.get(item.productId);
+      return sum + Number(product?.price ?? 0) * item.quantity;
+    }, 0);
+
     return this.dataSource.transaction(async (manager) => {
+      const authorization = await this.paymentsService.authorize(expectedTotal, correlationId, dto.paymentMethodToken);
+
+      if (!authorization.success) {
+        // Logged on the audit service's own connection so the decline survives
+        // the checkout rollback (the decline is a real event even though the
+        // order is not persisted).
+        await this.auditService.logPaymentFailed(correlationId, dto.buyerId, expectedTotal, authorization.message);
+        throw new HttpException(
+          {
+            statusCode: HttpStatus.PAYMENT_REQUIRED,
+            error: 'Payment Required',
+            message: authorization.message,
+          },
+          HttpStatus.PAYMENT_REQUIRED,
+        );
+      }
+
       const sortedProductIds = [...productIds].sort();
       const lockedProducts: Product[] = [];
 
@@ -140,6 +169,11 @@ export class OrdersService {
 
       await (manager.save as any)(OrderLineItem, lineItems);
       await manager.update(Order, { id: savedOrder.id }, { totalAmount: totalAmount });
+
+      // Phase 5.1: authorization already succeeded above (before stock moved);
+      // record the capture against the order NOW that the order id exists. Same
+      // transaction, so a crash before commit rolls back inventory + capture.
+      await this.paymentsService.recordCapture(manager, savedOrder.id, totalAmount, authorization, correlationId);
 
       await this.auditService.logOrderCreated(correlationId, savedOrder.id, dto.buyerId, totalAmount);
 
@@ -314,6 +348,11 @@ export class OrdersService {
         { fulfillmentStatus: FulfillmentStatus.FAILED, failureReason: 'Order cancelled' },
       );
 
+      // Phase 5.1: reverse the captured authorization. Passed the same manager
+      // so the refund commits atomically with the cancellation; a pre-payment
+      // order has no auth row and this is a no-op.
+      await this.paymentsService.refund(orderId, correlationId, manager);
+
       await this.auditService.logOrderStatusChange(correlationId, orderId, previousStatus, OrderStatus.CANCELLED);
 
       const refreshed = await manager.findOne(Order, {
@@ -322,6 +361,18 @@ export class OrdersService {
       });
       return this.toOrderResponseDto(refreshed as Order);
     });
+  }
+
+  /**
+   * Explicit refund of an order's captured payment (Phase 5.1) — for customers
+   * refunded outside the cancellation flow. Idempotent: already-refunded rows
+   * return unchanged; orders without a payment return null.
+   */
+  async refundOrder(
+    orderId: string,
+    correlationId: string,
+  ): Promise<PaymentAuthorization | null> {
+    return this.paymentsService.refund(orderId, correlationId);
   }
 
   /** ORD-YYYYMMDD-NNNNNN, human-facing plus sequence (Phase 2.2). */

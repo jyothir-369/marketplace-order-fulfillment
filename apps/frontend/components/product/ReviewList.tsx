@@ -4,11 +4,13 @@
 "use client";
 
 import { Star, ThumbsUp } from "lucide-react";
+import { ComingSoon } from "@/components/ui/coming-soon";
 
 export function ReviewList() {
   return (
     <div className="space-y-4">
       <h3 className="font-display text-xl font-bold text-[var(--color-foreground)]">Customer Reviews</h3>
+      <ComingSoon note="Reviews are not live yet — backend coverage (Review entity + endpoints) is deferred. The entries below are sample/demo data." />
       <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-5 shadow-v2 space-y-4">
         <div className="flex items-center gap-3">
           <div className="h-9 w-9 rounded-full bg-gradient-to-br from-[var(--color-ink-navy)] to-[var(--color-navy-deep)] text-white flex items-center justify-center font-display text-sm font-bold">JD</div>

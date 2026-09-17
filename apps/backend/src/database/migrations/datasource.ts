@@ -8,6 +8,7 @@ import { CategoriesAndCatalogContract1710000000005 } from './1710000000005-Categ
 import { AddMissingForeignKeysAndIndexes1710000000006 } from './1710000000006-AddMissingForeignKeysAndIndexes';
 import { AddProductDescriptionAndImages1710000000007 } from './1710000000007-AddProductDescriptionAndImages';
 import { AddOrderNumberSequence1710000000008 } from './1710000000008-AddOrderNumberSequence';
+import { AddPaymentAuthorizations1710000000009 } from './1710000000009-AddPaymentAuthorizations';
 
 export const migrationDataSource = new DataSource({
   type: 'postgres',
@@ -27,6 +28,7 @@ export const migrationDataSource = new DataSource({
     AddMissingForeignKeysAndIndexes1710000000006,
     AddProductDescriptionAndImages1710000000007,
     AddOrderNumberSequence1710000000008,
+    AddPaymentAuthorizations1710000000009,
   ],
   synchronize: false,
   logging: true,

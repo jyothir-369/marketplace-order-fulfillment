@@ -267,6 +267,67 @@ export class AuditService {
     });
   }
 
+  /** Payment captured at checkout (Phase 5.1). */
+  async logPaymentAuthorized(
+    correlationId: string,
+    paymentId: string,
+    orderId: string,
+    amount: number,
+    providerReference?: string,
+  ): Promise<void> {
+    await this.log({
+      correlationId,
+      action: AuditAction.PAYMENT_AUTHORIZED,
+      entityType: AuditEntityType.PAYMENT,
+      entityId: paymentId,
+      newState: { status: 'captured', amount, providerReference: providerReference || null },
+      message: 'Payment captured for order ' + orderId + ' | amount: ' + amount,
+      metadata: { orderId, amount, providerReference },
+    });
+  }
+
+  /**
+   * A declined authorization. Logged on the audit service's own connection so
+   * it survives the checkout transaction rollback (the decline is a real event
+   * even though nothing else is persisted).
+   */
+  async logPaymentFailed(
+    correlationId: string,
+    orderId: string,
+    amount: number,
+    reason: string,
+  ): Promise<void> {
+    await this.log({
+      correlationId,
+      action: AuditAction.PAYMENT_FAILED,
+      entityType: AuditEntityType.ORDER,
+      entityId: orderId,
+      previousState: { status: 'authorizing' },
+      newState: { status: 'failed', amount, reason },
+      message: 'Payment declined for order ' + orderId + ' | amount: ' + amount + ' | ' + reason,
+      metadata: { orderId, amount, reason },
+    });
+  }
+
+  /** Authorization reversed on cancellation / explicit refund (Phase 5.1). */
+  async logPaymentRefunded(
+    correlationId: string,
+    paymentId: string,
+    orderId: string,
+    amount: number,
+  ): Promise<void> {
+    await this.log({
+      correlationId,
+      action: AuditAction.PAYMENT_REFUNDED,
+      entityType: AuditEntityType.PAYMENT,
+      entityId: paymentId,
+      previousState: { status: 'captured' },
+      newState: { status: 'refunded', amount },
+      message: 'Payment refunded for order ' + orderId + ' | amount: ' + amount,
+      metadata: { orderId, amount },
+    });
+  }
+
   async logReconciliationResolved(
     correlationId: string,
     syncJobId: string,

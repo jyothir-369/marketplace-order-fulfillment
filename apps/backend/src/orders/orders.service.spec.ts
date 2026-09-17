@@ -6,10 +6,15 @@ import { DataSource } from 'typeorm';
 import { InventoryService } from '../inventory/inventory.service';
 import { AuditService } from '../common/audit';
 import { VendorQueueService } from '../fulfillment/vendor-queue.service';
+import { PaymentsService } from '../payments/payments.service';
+import { PAYMENT_SUCCESS_TOKEN, PAYMENT_DECLINE_TOKEN } from '../payments/mock-payment.service';
+import { HttpException, HttpStatus } from '@nestjs/common';
 
 describe('OrdersService', () => {
   let service: OrdersService;
   let vendorQueueService: VendorQueueService;
+  let paymentsService: any;
+  let auditService: any;
   let lineItemRepository: any;
 
   beforeEach(async () => {
@@ -50,13 +55,22 @@ describe('OrdersService', () => {
             update: jest.fn(),
         })) } },
         { provide: InventoryService, useValue: {} },
-        { provide: AuditService, useValue: { logInventoryDecrement: jest.fn(), logOrderCreated: jest.fn() } },
+        { provide: AuditService, useValue: { logInventoryDecrement: jest.fn(), logOrderCreated: jest.fn(), logPaymentFailed: jest.fn() } },
         { provide: VendorQueueService, useValue: { addJobToVendorQueue: jest.fn() } },
+        // Phase 5.1: mock the payment seam. authorize succeeds by default (the
+        // production default), recordCapture just records the call.
+        { provide: PaymentsService, useValue: {
+          authorize: jest.fn().mockResolvedValue({ success: true, status: 'authorized', providerReference: 'PAY-TEST123', message: 'Authorization approved' }),
+          recordCapture: jest.fn().mockResolvedValue({ id: 'pay1' }),
+          refund: jest.fn().mockResolvedValue({ id: 'pay1', status: 'refunded' }),
+        } },
       ],
     }).compile();
 
     service = module.get<OrdersService>(OrdersService);
     vendorQueueService = module.get<VendorQueueService>(VendorQueueService);
+    paymentsService = module.get<PaymentsService>(PaymentsService);
+    auditService = module.get<AuditService>(AuditService);
   });
 
   it('should be defined', () => {
@@ -96,5 +110,54 @@ describe('OrdersService', () => {
       String(now.getMonth() + 1).padStart(2, '0') +
       String(now.getDate()).padStart(2, '0');
     expect(result.order?.orderNumber).toBe('ORD-' + yyyymmdd + '-000001');
+  });
+
+  describe('Phase 5.1 — checkout payment integration', () => {
+    it('authorizes for the expected total and records the capture (order total)', async () => {
+      const dto = { buyerId: 'b1', items: [{ productId: 'p1', quantity: 2 }] };
+      const result = await service.checkout(dto as any, 'corr1');
+
+      // price 10 x 2 = 20, billed BEFORE any stock write.
+      expect(paymentsService.authorize).toHaveBeenCalledWith(20, 'corr1', undefined);
+      // Capture persisted against the order id after creation, same tx.
+      expect(paymentsService.recordCapture).toHaveBeenCalledWith(expect.anything(), 'order1', 20, expect.objectContaining({ success: true }), 'corr1');
+      expect(result.success).toBe(true);
+    });
+
+    it('passes the success token through to the payment provider', async () => {
+      const dto = { buyerId: 'b1', items: [{ productId: 'p1', quantity: 1 }], paymentMethodToken: PAYMENT_SUCCESS_TOKEN };
+      await service.checkout(dto as any, 'corr1');
+
+      expect(paymentsService.authorize).toHaveBeenCalledWith(10, 'corr1', PAYMENT_SUCCESS_TOKEN);
+    });
+
+    it('rejects a declined card with 402 and writes no capture', async () => {
+      (paymentsService.authorize as jest.Mock).mockResolvedValueOnce({
+        success: false, status: 'failed', providerReference: null, message: 'Card declined by issuer (mock)',
+      });
+      const dto = { buyerId: 'b1', items: [{ productId: 'p1', quantity: 2 }], paymentMethodToken: PAYMENT_DECLINE_TOKEN };
+
+      await expect(service.checkout(dto as any, 'corr1')).rejects.toMatchObject({
+        status: HttpStatus.PAYMENT_REQUIRED,
+        response: expect.objectContaining({ statusCode: HttpStatus.PAYMENT_REQUIRED, message: 'Card declined by issuer (mock)' }),
+      });
+
+      // The decline was audited (own connection, survives the rollback) and
+      // the capture never happened because the transaction aborted.
+      expect(auditService.logPaymentFailed).toHaveBeenCalledWith('corr1', 'b1', 20, 'Card declined by issuer (mock)');
+      expect(paymentsService.recordCapture).not.toHaveBeenCalled();
+    });
+
+    it('aborts before any stock decrement / order write on decline', async () => {
+      (paymentsService.authorize as jest.Mock).mockResolvedValueOnce({
+        success: false, status: 'failed', providerReference: null, message: 'Nope',
+      });
+      const dto = { buyerId: 'b1', items: [{ productId: 'p1', quantity: 2 }], paymentMethodToken: PAYMENT_DECLINE_TOKEN };
+
+      await expect(service.checkout(dto as any, 'corr1')).rejects.toThrow(HttpException);
+      // The order-created audit (the last write before commit) must never fire —
+      // the transaction bailed at the authorize step, before any ORDER/stock write.
+      expect(auditService.logOrderCreated).not.toHaveBeenCalled();
+    });
   });
 });

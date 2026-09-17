@@ -24,13 +24,14 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { AlertTriangle, CheckCircle2, ShoppingCart, Truck, ClipboardList, PackageCheck } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ShoppingCart, Truck, ClipboardList, PackageCheck, CreditCard } from "lucide-react";
 import {
   useCartStore,
   selectCart,
   selectTotalAmount,
 } from "@/context/CartStore";
 import { checkoutOrder } from "@/lib/api";
+import { PaymentStep, PAYMENT_SUCCESS_TOKEN } from "@/components/checkout/steps";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ToastProvider, useToast } from "@/components/ui/toast";
 import { formatCurrency, cn } from "@/lib/utils";
@@ -123,6 +124,8 @@ function CheckoutInner() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
+  // Phase 5.1 — the mock card selected on the payment step ("mock-success" default).
+  const [paymentMethodToken, setPaymentMethodToken] = useState<string>(PAYMENT_SUCCESS_TOKEN);
 
   const {
     register,
@@ -192,6 +195,7 @@ function CheckoutInner() {
         buyerId: BUYER_ID,
         items: cart.map((i) => ({ productId: i.productId, quantity: i.quantity })),
         shippingAddress: values.shippingAddress.trim(),
+        paymentMethodToken,
       });
       if (!res.success || !res.order) throw new Error(res.message);
       const createdOrderId = res.order.id;
@@ -208,6 +212,10 @@ function CheckoutInner() {
           : 0;
       if (sc === 409) {
         toast("One of your items just sold out. Please review your cart.", "warning");
+      } else if (sc === 402) {
+        // Phase 5.1 — the mock provider declined the card. Nothing persisted;
+        // the buyer can pick another card and retry.
+        toast("Payment declined. Please choose another card and try again.", "error");
       } else {
         toast(msg, "error");
       }
@@ -312,6 +320,21 @@ function CheckoutInner() {
             </tr>
           </tfoot>
         </table>
+      </section>
+
+      {/* Payment step (Phase 5.1) — mock card selection; token is sent with the
+          order so the "Decline" card exercises the backend 402 path. */}
+      <section
+        className="rounded-2xl border border-[var(--color-warm-border)] bg-[var(--color-card)] p-5 mb-6 shadow-v2"
+        aria-label="Payment"
+      >
+        <div className="flex items-center gap-2 mb-4">
+          <CreditCard className="h-4 w-4 text-[var(--color-warm-muted)]" aria-hidden />
+          <h2 className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-warm-muted)]">
+            Payment
+          </h2>
+        </div>
+        <PaymentStep value={paymentMethodToken} onChange={setPaymentMethodToken} />
       </section>
 
       {/* Address form */}
