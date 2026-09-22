@@ -16,17 +16,17 @@ function parseDatabaseUrl(): any {
   const dbUrl = process.env.DATABASE_URL;
   const isCloudDb = dbUrl && (dbUrl.includes('supabase.co') || dbUrl.includes('sslmode=require'));
 
-  if (dbUrl && dbUrl.trim() !== '') {
+  if (dbUrl && dbUrl.trim() !== '' && isCloudDb) {
     return {
       type: 'postgres',
       url: dbUrl,
-      ssl: isCloudDb ? { rejectUnauthorized: false } : false,
+      ssl: { rejectUnauthorized: false },
     };
   }
 
   return {
     type: 'postgres',
-    host: process.env.DB_HOST || 'localhost',
+    host: process.env.DB_HOST || '127.0.0.1',
     port: parseInt(process.env.DB_PORT || '5432'),
     username: process.env.DB_USERNAME || 'postgres',
     password: process.env.DB_PASSWORD || 'postgres',
@@ -266,7 +266,9 @@ async function seedDatabase(): Promise<void> {
     console.error('Error seeding database:', error);
     throw error;
   } finally {
-    await AppDataSource.destroy();
+    if (AppDataSource.isInitialized) {
+      await AppDataSource.destroy();
+    }
   }
 }
 

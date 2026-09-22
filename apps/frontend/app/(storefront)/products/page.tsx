@@ -108,6 +108,7 @@ function ProductsPageInner() {
     setLoading(true);
     setError(null);
     try {
+      console.log("Fetching products from API base:", process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api');
       const res = await getCatalogPage({
         q: q || undefined,
         category: category || undefined,
@@ -123,6 +124,8 @@ function ProductsPageInner() {
       setQuantities(init);
       setHasLoaded(true);
     } catch (err) {
+      const url = (process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api') + '/catalog';
+      console.error("Fetch failed for URL:", url, "Error:", err);
       setError(err instanceof Error ? err.message : "Failed to load catalog");
     } finally {
       setLoading(false);

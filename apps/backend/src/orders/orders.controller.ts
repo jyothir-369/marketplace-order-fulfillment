@@ -1,3 +1,4 @@
+import { Throttle } from '@nestjs/throttler';
 import {
   Controller,
   Get,
@@ -29,6 +30,7 @@ export class OrdersController {
   @Post('checkout')
   @HttpCode(HttpStatus.CREATED)
   @UseGuards(OptionalAuthGuard)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async checkout(
     @Body() dto: CheckoutDto,
     @CorrelationId() correlationId: string,

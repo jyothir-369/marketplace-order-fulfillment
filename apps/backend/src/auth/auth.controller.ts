@@ -1,4 +1,5 @@
 import { Controller, Post, Get, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { AuthGuard } from './auth.guard';
 import { CurrentUser } from './current-user.decorator';
@@ -12,6 +13,7 @@ export class AuthController {
   /** POST /api/auth/register — always creates a BUYER role account. */
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async register(@Body() dto: RegisterDto): Promise<AuthUserDto> {
     return this.authService.register(dto);
   }
@@ -19,6 +21,7 @@ export class AuthController {
   /** POST /api/auth/login — returns access + refresh tokens. */
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async login(@Body() dto: LoginDto): Promise<AuthTokensDto> {
     return this.authService.login(dto);
   }

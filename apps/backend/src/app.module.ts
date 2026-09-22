@@ -1,10 +1,13 @@
 import * as path from 'path';
-import { Module } from '@nestjs/common';
+import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { getBullMQConnectionOptions } from './common/config/redis-connection.factory';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bullmq';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { CatalogModule } from './catalog/catalog.module';
+import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware';
+import { LoggerModule } from 'nestjs-pino';
 import { InventoryModule } from './inventory/inventory.module';
 import { OrdersModule } from './orders/orders.module';
 import { FulfillmentModule } from './fulfillment/fulfillment.module';
@@ -41,7 +44,7 @@ import { PaymentsModule } from './payments/payments.module';
         const dbUrl = configService.get<string>('DATABASE_URL');
         const isCloudDb = dbUrl && (dbUrl.includes('supabase.co') || dbUrl.includes('sslmode=require'));
 
-        if (dbUrl && dbUrl.trim() !== '') {
+        if (dbUrl && dbUrl.trim() !== '' && isCloudDb) {
           return {
             type: 'postgres',
             url: dbUrl,
@@ -79,6 +82,30 @@ import { PaymentsModule } from './payments/payments.module';
       },
       inject: [ConfigService],
     }),
+    LoggerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        pinoHttp: {
+          // Use request correlation ID from our decorator
+          genReqId: (request) => request['correlationId'] || undefined,
+          // Custom properties to add correlation ID to logs
+          customProps: (req, res) => ({
+            correlationId: req['correlationId'] || 'N/A'
+          }),
+          // Log level based on environment
+          level: process.env.NODE_ENV !== 'production' ? 'debug' : 'info',
+          // Disable in test environment to avoid noise
+          ...(process.env.NODE_ENV === 'test' ? { enabled: false } : {}),
+          // Pretty print in development
+          transport: process.env.NODE_ENV !== 'production'
+            ? { target: 'pino-pretty' }
+            : undefined,
+          // Auto-logging for requests/responses
+          autoLogging: true,
+        },
+      }),
+    }),
     AuthModule,
     AuditModule,
     VendorMockModule,
@@ -89,6 +116,14 @@ import { PaymentsModule } from './payments/payments.module';
     PaymentsModule,
     AdminModule,
     HealthModule,
+    // Phase 6.1: global rate limiting. The default 100 req/60s covers every
+    // route; the abuse-sensitive auth + checkout routes get a tighter
+    // per-method limit via @Throttle on the controller methods.
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(CorrelationIdMiddleware).forRoutes('*');
+  }
+}

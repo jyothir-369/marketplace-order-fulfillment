@@ -43,11 +43,9 @@ export class AuthGuard implements CanActivate {
     }
 
     let payload: AuthJwtPayload;
-    const secret = this.configService.get<string>('JWT_SECRET');
+    const secret = this.configService.get('JWT_SECRET');
     if (!secret) {
       if (this.configService.get('NODE_ENV') === 'production') {
-        // Fail fast: a prod deploy must never accept tokens signed with the
-        // well-known dev secret below. Misconfiguration should 500, not 401.
         throw new InternalServerErrorException('JWT_SECRET is not configured');
       }
       this.logger.warn('JWT_SECRET missing — using insecure dev fallback. Do not use in production.');
