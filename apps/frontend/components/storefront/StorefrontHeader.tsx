@@ -17,7 +17,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, type FormEvent, useEffect } from "react";
-import { ShoppingCart, Package, ShoppingBag, Store, Search, BadgePercent, Heart } from "lucide-react";
+import { ShoppingCart, Package, ShoppingBag, Store, Search, BadgePercent, Heart, Star, Building2 } from "lucide-react";
 import {
   useCartStore,
   selectTotalItems,
@@ -37,6 +37,8 @@ const NAV_LINKS: Array<{
   { href: "/deals",    label: "Deals",    Icon: BadgePercent },
   { href: "/vendors",  label: "Vendors",  Icon: Store },
   { href: "/orders",   label: "Orders",   Icon: ShoppingBag },
+  { href: "/loyalty", label: "Loyalty", Icon: Star },
+  { href: "/b2b",     label: "B2B",     Icon: Building2 },
 ];
 
 const PRIMARY = "var(--color-primary)";      /* ink navy */
