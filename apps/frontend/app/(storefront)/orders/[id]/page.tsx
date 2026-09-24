@@ -248,18 +248,27 @@ function OrderConfirmationPageInner() {
       ))}
 
       {/* Footer actions */}
-      <div className="flex items-center justify-between text-sm pt-2">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
         <Link
           href="/products"
           className="text-sm font-semibold text-[var(--color-accent)] hover:text-[var(--color-foreground)] transition-colors"
         >
           Continue shopping
         </Link>
-        {isTerminal && (
-          <span className="text-xs text-[var(--color-warm-muted)]">
-            Status updates stopped (order is {order.status.toLowerCase()}).
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          <Link
+            href="#"
+            onClick={(e) => { e.preventDefault(); /* support link placeholder */ }}
+            className="text-sm font-medium text-[var(--color-warm-muted)] hover:text-[var(--color-foreground)] underline underline-offset-2"
+          >
+            Support / Return
+          </Link>
+          {isTerminal && (
+            <span className="text-xs text-[var(--color-warm-muted)]">
+              Status updates stopped (order is {order.status.toLowerCase()}).
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

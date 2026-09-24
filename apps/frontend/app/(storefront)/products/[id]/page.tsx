@@ -18,7 +18,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ShoppingBag } from "lucide-react";
+import { ArrowLeft, ShoppingBag, Heart, ChevronRight } from "lucide-react";
 import { getProductById, type Product } from "@/lib/api";
 import { useCartStore } from "@/context/CartStore";
 import { InventoryLockIndicator } from "@/components/order/InventoryLockIndicator";
@@ -53,6 +53,7 @@ function PDPInner() {
   const [error, setError] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [addedToCart, setAddedToCart] = useState(false);
+  const [isWishlisted, setIsWishlisted] = useState(false);
 
   const load = useCallback(async () => {
     if (!productId) return;
@@ -261,6 +262,22 @@ function PDPInner() {
             </div>
           </div>
 
+          {/* Wishlist action */}
+          <button
+            type="button"
+            onClick={() => setIsWishlisted((v) => !v)}
+            aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
+            className={cn(
+              "w-full py-2.5 rounded-xl font-medium text-sm border transition-colors flex items-center justify-center gap-2",
+              isWishlisted
+                ? "bg-[var(--color-ink-navy)] text-[var(--color-brass)] border-[var(--color-brass)]/30"
+                : "bg-transparent text-[var(--color-foreground)] border-[var(--color-border)] hover:border-[var(--color-accent)]"
+            )}
+          >
+            <Heart className={cn("h-4 w-4", isWishlisted && "fill-current")} aria-hidden />
+            {isWishlisted ? "Saved to Wishlist" : "Save to Wishlist"}
+          </button>
+
           {/* Inventory indicator */}
           <InventoryLockIndicator stockCount={product.stockCount} />
 
@@ -364,7 +381,28 @@ function PDPInner() {
           </div>
         </div>
 
-        {/* Below grid: reviews stub, related products, wishlist */}
+        {/* Below grid: reviews stub, related products, recently viewed */}
+        <section aria-label="Related products" className="mt-10 border-t border-[var(--color-border)] pt-8">
+          <h2 className="font-display text-xl font-bold text-[var(--color-foreground)] mb-4">Related products</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+              <Link key={i} href="/products" className="group rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-v2 hover:shadow-sm transition-shadow">
+                <div className="aspect-[4/3] rounded-lg bg-gradient-to-br from-[var(--color-cream)] to-[var(--color-muted)] mb-3" aria-hidden />
+                <p className="text-sm font-semibold text-[var(--color-foreground)] group-hover:text-[var(--color-brass)] transition-colors">Related item {i}</p>
+                <p className="text-xs text-[var(--color-warm-muted)]">Explore similar products</p>
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-ink-navy)] mt-2">
+                  View <ChevronRight className="h-3 w-3" aria-hidden />
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        <section aria-label="Recently viewed" className="mt-8 border-t border-[var(--color-border)] pt-8">
+          <h2 className="font-display text-xl font-bold text-[var(--color-foreground)] mb-4">Recently viewed</h2>
+          <p className="text-sm text-[var(--color-warm-muted)]">Add products to build your recently viewed list.</p>
+        </section>
+
         <section aria-label="Reviews" className="mt-12 border-t border-[var(--color-border)] pt-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-display text-xl font-bold text-[var(--color-foreground)]">Reviews</h2>

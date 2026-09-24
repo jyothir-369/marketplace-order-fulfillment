@@ -20,6 +20,8 @@ import {
   LayoutDashboard,
   LogOut,
   Heart,
+  Bell,
+  User,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
@@ -121,7 +123,9 @@ export function AccountMenu() {
 
           <div className="p-1.5">
             <MenuItem href="/orders" icon={ShoppingBag} label="My Orders" onNavigate={() => setOpen(false)} />
-            <MenuItem href="/wishlist" icon={Heart} label="Recently Viewed" onNavigate={() => setOpen(false)} />
+            <MenuItem href="/wishlist" icon={Heart} label="Wishlist" onNavigate={() => setOpen(false)} />
+            <MenuItem href="/notifications" icon={Bell} label="Notifications" onNavigate={() => setOpen(false)} />
+            <MenuItem href="/account" icon={User} label="Account" onNavigate={() => setOpen(false)} />
             {showVendorPortal && (
               <MenuItem href="/vendor/dashboard" icon={Store} label="Vendor Portal" onNavigate={() => setOpen(false)} />
             )}
