@@ -16,14 +16,16 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
-import { ShoppingCart, Package, ShoppingBag, Store, Search } from "lucide-react";
+import { useState, type FormEvent, useEffect } from "react";
+import { ShoppingCart, Package, ShoppingBag, Store, Search, BadgePercent, Heart } from "lucide-react";
 import {
   useCartStore,
   selectTotalItems,
 } from "@/context/CartStore";
 import { useCartHydration } from "@/lib/hooks/use-cart-hydration";
 import { AccountMenu } from "@/components/auth/AccountMenu";
+import { getCategories } from "@/lib/api";
+import type { CategorySummaryDto } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const NAV_LINKS: Array<{
@@ -32,6 +34,7 @@ const NAV_LINKS: Array<{
   Icon: typeof Package;
 }> = [
   { href: "/products", label: "Shop",     Icon: Package },
+  { href: "/deals",    label: "Deals",    Icon: BadgePercent },
   { href: "/vendors",  label: "Vendors",  Icon: Store },
   { href: "/orders",   label: "Orders",   Icon: ShoppingBag },
 ];
@@ -55,6 +58,11 @@ export function StorefrontHeader() {
     if (!q) return;
     router.push("/products?q=" + encodeURIComponent(q));
   };
+  const [categories, setCategories] = useState<CategorySummaryDto[]>([]);
+  const [megaOpen, setMegaOpen] = useState(false);
+  useEffect(() => {
+    getCategories().then(setCategories).catch(() => setCategories([]));
+  }, []);
   const hydrated = useCartHydration();
   const totalItems = useCartStore(selectTotalItems);
   const openDrawer = useCartStore((s) => s.openDrawer);
@@ -84,8 +92,58 @@ export function StorefrontHeader() {
             </span>
           </Link>
 
+            {/* Shop mega menu with live categories */}
+          <div
+            className="relative hidden sm:block"
+            onMouseEnter={() => setMegaOpen(true)}
+            onMouseLeave={() => setMegaOpen(false)}
+          >
+            <Link
+              href="/products"
+              className={cn(
+                "group relative inline-flex items-center gap-1.5 py-1 text-sm font-medium",
+                "text-[var(--color-ink-navy)] font-semibold",
+                pathname.startsWith("/products") ? "text-[var(--color-ink-navy)] font-semibold" : "text-[var(--color-warm-muted)] hover:text-[var(--color-foreground)]"
+              )}
+              aria-current={pathname.startsWith("/products") ? "page" : undefined}
+            >
+              <Package className="h-3.5 w-3.5 text-[var(--color-brass)]" aria-hidden />
+              <span>Shop</span>
+              <span aria-hidden className="absolute -bottom-[16px] left-0 right-0 h-[2px] rounded-full bg-[var(--color-brass)] opacity-100 scale-x-100" />
+            </Link>
+            <div
+              className={cn(
+                "absolute top-full left-0 mt-1 w-72 rounded-xl border border-[var(--color-warm-border)] bg-[var(--color-card)] shadow-v2-lg overflow-hidden transition-all duration-200 ease-out z-50",
+                megaOpen ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-1 pointer-events-none"
+              )}
+              aria-label="Shop categories"
+            >
+              <div className="p-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--color-warm-muted)] mb-2">Categories</h4>
+                {categories.length === 0 ? (
+                  <p className="text-sm text-[var(--color-warm-muted)]">Loading categories...</p>
+                ) : (
+                  <ul className="space-y-1">
+                    {categories.map((cat) => (
+                      <li key={cat.name}>
+                        <Link
+                          href={`/products?category=${encodeURIComponent(cat.name)}`}
+                          className="flex items-center justify-between rounded-lg px-2.5 py-1.5 text-sm text-[var(--color-foreground)] hover:bg-[var(--color-cream)]/60 transition-colors"
+                          onClick={() => setMegaOpen(false)}
+                        >
+                          <span>{cat.name}</span>
+                          <span className="text-xs text-[var(--color-warm-subtle)] tabular-nums">{cat.productCount ?? 0}</span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+
           <nav aria-label="Primary" className="hidden sm:flex items-center gap-7">
-            {NAV_LINKS.map(({ href, label, Icon }) => {
+            {NAV_LINKS.filter((n) => n.href !== "/products").map(({ href, label, Icon }) => {
               const isActive = pathname.startsWith(href);
               return (
                 <Link
@@ -190,15 +248,30 @@ export function StorefrontHeader() {
           {/* Account menu (Phase 1: sign-in state + role-aware portal links) */}
           <AccountMenu />
 
+          {/* Wishlist button — visually distinct from Cart */}
+          <Link
+            href="/wishlist"
+            className={cn(
+              "relative inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium",
+              "bg-[var(--color-ink-navy)] text-[var(--color-brass)] border border-[var(--color-brass)]/30",
+              "hover:bg-[var(--color-navy-deep)] hover:border-[var(--color-brass)] transition-all duration-200 shadow-xs hover:shadow-sm",
+              "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--color-brass)]/40"
+            )}
+            aria-label="Wishlist"
+          >
+            <Heart className="h-4 w-4" aria-hidden />
+            <span className="hidden sm:inline">Wishlist</span>
+          </Link>
+
           {/* Cart drawer trigger */}
           <button
             type="button"
             onClick={openDrawer}
             className={cn(
               "relative inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium",
-              "bg-[var(--color-ink-navy)] text-[var(--color-primary-foreground)]",
-              "hover:bg-[var(--color-primary-hover)] transition-all duration-200 shadow-xs hover:shadow-sm",
-              "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--color-brass)]"
+              "bg-[var(--color-brass)] text-[var(--color-ink-navy)]",
+              "hover:bg-[var(--color-brass-light)] transition-all duration-200 shadow-xs hover:shadow-sm",
+              "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--color-ink-navy)]/40"
             )}
             aria-label={
               hydrated
@@ -206,14 +279,14 @@ export function StorefrontHeader() {
                 : "Open cart"
             }
           >
-            <ShoppingCart className="h-4 w-4 text-[var(--color-brass)]" aria-hidden />
+            <ShoppingCart className="h-4 w-4 text-[var(--color-ink-navy)]" aria-hidden />
             <span className="hidden sm:inline">Cart</span>
             {hydrated && totalItems > 0 && (
               <span
                 className={cn(
                   "ml-1 inline-flex items-center justify-center",
                   "min-w-[1.25rem] h-5 px-1.5 rounded-full",
-                  "bg-[var(--color-brass)] text-[var(--color-ink-navy)] text-xs font-bold tabular-nums"
+                  "bg-[var(--color-ink-navy)] text-[var(--color-brass)] text-xs font-bold tabular-nums"
                 )}
                 data-testid="cart-counter"
                 aria-live="polite"

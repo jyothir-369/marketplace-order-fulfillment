@@ -19,6 +19,7 @@ import {
   Store,
   LayoutDashboard,
   LogOut,
+  Heart,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
@@ -67,7 +68,7 @@ export function AccountMenu() {
         </Link>
         <Link
           href="/register"
-          className="rounded-lg px-3 py-2 text-sm font-semibold text-[var(--color-primary-foreground)] bg-[var(--color-ink-navy)] hover:bg-[var(--color-primary-hover)] transition-colors"
+          className="rounded-lg px-3 py-2 text-sm font-semibold text-[var(--color-ink-navy)] border border-[var(--color-ink-navy)] hover:bg-[var(--color-cream)]/80 transition-colors"
         >
           Create account
         </Link>
@@ -120,6 +121,7 @@ export function AccountMenu() {
 
           <div className="p-1.5">
             <MenuItem href="/orders" icon={ShoppingBag} label="My Orders" onNavigate={() => setOpen(false)} />
+            <MenuItem href="/wishlist" icon={Heart} label="Recently Viewed" onNavigate={() => setOpen(false)} />
             {showVendorPortal && (
               <MenuItem href="/vendor/dashboard" icon={Store} label="Vendor Portal" onNavigate={() => setOpen(false)} />
             )}
