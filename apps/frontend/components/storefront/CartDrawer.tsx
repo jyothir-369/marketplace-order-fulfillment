@@ -126,16 +126,19 @@ function CartDrawerItem({
             <span className="text-sm font-semibold tabular-nums text-[var(--color-foreground)]">
               {formatCurrency(price * quantity)}
             </span>
-            <button
-              type="button"
-              onClick={onRemove}
-              className={cn(
-                "text-xs underline underline-offset-2",
-                "text-[var(--color-destructive)] hover:opacity-80"
-              )}
-            >
-              Remove
-            </button>
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-medium text-[var(--color-ink-navy)] hover:text-[var(--color-foreground)] underline underline-offset-2 cursor-pointer">Save for later</span>
+              <button
+                type="button"
+                onClick={onRemove}
+                className={cn(
+                  "text-xs underline underline-offset-2 text-[var(--color-destructive)] hover:opacity-80"
+                )}
+                aria-label="Remove item"
+              >
+                Remove
+              </button>
+            </div>
           </div>
         </div>
       </div>
