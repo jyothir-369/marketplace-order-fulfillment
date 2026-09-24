@@ -7,6 +7,7 @@
 
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { Lock, ShieldCheck, Truck, Receipt } from "lucide-react";
 
 const FOOTER_NAV: ReadonlyArray<{
   heading: string;
@@ -48,6 +49,8 @@ const FOOTER_NAV: ReadonlyArray<{
     links: [
       { href: "/help", label: "Help center" },
       { href: "/notifications", label: "Notifications" },
+      { href: "/help", label: "Contact support" },
+      { href: "/help", label: "Returns" },
     ],
   },
 ];
@@ -122,6 +125,13 @@ export function StorefrontFooter() {
         >
           <p>&copy; 2026 Marketplace. All rights reserved.</p>
           <p className="font-display italic">Shop from vendors you can trust.</p>
+        </div>
+        {/* Trust indicators */}
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-6 text-xs text-[var(--color-warm-subtle)]">
+          <span className="inline-flex items-center gap-1.5"><Lock className="h-3 w-3 text-[var(--color-forest)]" aria-hidden /> Secure checkout</span>
+          <span className="inline-flex items-center gap-1.5"><ShieldCheck className="h-3 w-3 text-[var(--color-forest)]" aria-hidden /> Verified vendors</span>
+          <span className="inline-flex items-center gap-1.5"><Truck className="h-3 w-3 text-[var(--color-forest)]" aria-hidden /> Delivery tracking</span>
+          <span className="inline-flex items-center gap-1.5"><Receipt className="h-3 w-3 text-[var(--color-forest)]" aria-hidden /> Return policy</span>
         </div>
       </div>
     </footer>

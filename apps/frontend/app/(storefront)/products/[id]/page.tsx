@@ -18,7 +18,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ShoppingBag, Heart, ChevronRight } from "lucide-react";
+import { ArrowLeft, ShoppingBag, Heart, ChevronRight, Lock, ShieldCheck, Truck } from "lucide-react";
 import { getProductById, type Product } from "@/lib/api";
 import { useCartStore } from "@/context/CartStore";
 import { InventoryLockIndicator } from "@/components/order/InventoryLockIndicator";
@@ -379,6 +379,13 @@ function PDPInner() {
               Buy Now
             </button>
           </div>
+        </div>
+
+        {/* Trust / delivery info */}
+        <div className="flex items-center gap-4 text-xs text-[var(--color-warm-subtle)] mt-4">
+          <span className="inline-flex items-center gap-1"><Lock size={12} aria-hidden /> Secure checkout</span>
+          <span className="inline-flex items-center gap-1"><ShieldCheck size={12} aria-hidden /> Verified vendor</span>
+          <span className="inline-flex items-center gap-1"><Truck size={12} aria-hidden /> Tracked delivery</span>
         </div>
 
         {/* Below grid: reviews stub, related products, recently viewed */}

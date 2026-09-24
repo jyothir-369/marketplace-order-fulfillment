@@ -26,6 +26,8 @@ import {
   LayoutDashboard,
   FolderTree,
   Building2,
+  Tag,
+  Settings,
 } from "lucide-react";
 
 type Role = "vendor" | "admin";
@@ -50,8 +52,12 @@ const ROLE_LABELS: Record<Role, string> = {
 
 const VENDOR_NAV: NavItem[] = [
   { href: "/vendor/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/vendor/products", label: "Products", icon: Package },
   { href: "/vendor/inventory", label: "Inventory", icon: LayoutGrid },
   { href: "/vendor/orders", label: "Orders", icon: ShoppingCart },
+  { href: "/vendor/promotions", label: "Promotions", icon: Tag },
+  { href: "/vendor/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/vendor/settings", label: "Settings", icon: Settings },
   { href: "/vendor/dead-letter", label: "Dead-Letter", icon: AlertTriangle },
 ];
 

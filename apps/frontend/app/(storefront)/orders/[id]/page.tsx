@@ -257,11 +257,17 @@ function OrderConfirmationPageInner() {
         </Link>
         <div className="flex items-center gap-2">
           <Link
-            href="#"
-            onClick={(e) => { e.preventDefault(); /* support link placeholder */ }}
+            href="/help"
             className="text-sm font-medium text-[var(--color-warm-muted)] hover:text-[var(--color-foreground)] underline underline-offset-2"
           >
             Support / Return
+          </Link>
+          <Link
+            href="#"
+            onClick={(e) => { e.preventDefault(); alert("Reorder action: add all items back to cart."); }}
+            className="text-sm font-medium text-[var(--color-ink-navy)] hover:text-[var(--color-foreground)] underline underline-offset-2"
+          >
+            Reorder
           </Link>
           {isTerminal && (
             <span className="text-xs text-[var(--color-warm-muted)]">
