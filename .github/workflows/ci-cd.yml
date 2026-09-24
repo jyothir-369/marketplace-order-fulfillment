@@ -37,7 +37,7 @@ jobs:
         run: npx tsc --noEmit
       - name: Type check frontend
         working-directory: apps/frontend
-        run: npx tsc --noEmit || true
+        run: npx tsc --noEmit
 
   # ============================================
   # Unit Tests - Backend

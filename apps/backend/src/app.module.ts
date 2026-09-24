@@ -42,7 +42,7 @@ import { PaymentsModule } from './payments/payments.module';
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => {
         const dbUrl = configService.get<string>('DATABASE_URL');
-        const isCloudDb = dbUrl && (dbUrl.includes('supabase.co') || dbUrl.includes('sslmode=require'));
+        const isCloudDb = dbUrl && dbUrl.trim() !== '' && (dbUrl.includes('supabase') || dbUrl.includes('pooler') || dbUrl.includes('sslmode=require') || dbUrl.includes('.co'));
 
         if (dbUrl && dbUrl.trim() !== '' && isCloudDb) {
           return {

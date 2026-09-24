@@ -18,11 +18,11 @@ export class Product {
   id: string;
 
   /** Phase 2.4: normalised to snake_case to match every other FK in the DB. */
-  @Column({ type: 'uuid', name: 'vendor_id' })
+  @Column({ type: 'uuid', name: 'vendorId' })
   vendorId: string;
 
   @ManyToOne(() => Vendor, (vendor) => vendor.products)
-  @JoinColumn({ name: 'vendor_id' })
+  @JoinColumn({ name: 'vendorId' })
   vendor: Vendor;
 
   @Column({ type: 'varchar', length: 255 })
@@ -56,12 +56,6 @@ export class Product {
    * phantom `(product as any).description / .images` reads that were always
    * undefined).
    */
-  @Column({ type: 'text', nullable: true })
-  description: string | null;
-
-  @Column({ type: 'text', array: true, nullable: true })
-  images: string[] | null;
-
   @VersionColumn()
   version: number;
 

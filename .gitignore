@@ -40,4 +40,4 @@ docker-compose*.yml
 
 # Misc
 *.bak
-*.tmp
+*.tmp*.md

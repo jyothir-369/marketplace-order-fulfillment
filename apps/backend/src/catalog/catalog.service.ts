@@ -92,8 +92,6 @@ export class CatalogService {
       price: dto.price,
       stockCount: dto.stockCount,
       isActive: true,
-      description: dto.description ?? null,
-      images: dto.images ?? null,
     });
 
     const saved = await this.productRepository.save(product);
@@ -128,8 +126,7 @@ export class CatalogService {
     if (dto.price !== undefined) { product.price = dto.price; }
     if (dto.stockCount !== undefined) { product.stockCount = dto.stockCount; }
     if (dto.isActive !== undefined) { product.isActive = dto.isActive; }
-    if (dto.description !== undefined) { product.description = dto.description; }
-    if (dto.images !== undefined) { product.images = dto.images; }
+    // description / images not present in remote DB schema — kept in DTO for contract compatibility
 
     // Phase 2.5: `save()` with a @VersionColumn throws
     // OptimisticLockVersionMismatchError on concurrent edits — surface it as a
@@ -256,10 +253,10 @@ export class CatalogService {
       // Fallback to raw SQL query using DB column names (snake_case) to avoid TypeORM column-mapping 500.
       this.logger.error('Catalog query failed, using raw SQL fallback: ' + (err instanceof Error ? err.message : err));
       const safe = await this.productRepository.query(
-        `SELECT id, vendor_id, name, slug, category, price, stock_count, is_active, description, images, created_at, updated_at FROM products WHERE is_active = true ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
+        `SELECT id, vendorId, name, slug, category, price, stock_count, isActive, createdAt, updatedAt FROM products WHERE isActive = true ORDER BY createdAt DESC LIMIT $1 OFFSET $2`,
         [pageSize, (page - 1) * pageSize],
       );
-      const countRow = await this.productRepository.query(`SELECT COUNT(*) as c FROM products WHERE is_active = true`);
+      const countRow = await this.productRepository.query(`SELECT COUNT(*) as c FROM products WHERE isActive = true`);
       const safeCount = parseInt(countRow[0]?.c ?? '0', 10);
       return {
         items: safe.map((row: any) => this.toResponseDto({
@@ -269,12 +266,12 @@ export class CatalogService {
           slug: row.slug,
           category: row.category,
           price: Number(row.price),
-          stockCount: Number(row.stock_count),
-          isActive: row.is_active,
-          description: row.description ?? null,
-          images: row.images ?? null,
-          createdAt: row.created_at ? new Date(row.created_at) : new Date(),
-          updatedAt: row.updated_at ? new Date(row.updated_at) : new Date(),
+          stockCount: Number(row.stock_count ?? row.stockCount ?? 0),
+          isActive: row.isActive,
+          // description not in DB
+          // images not in DB
+          createdAt: row.createdAt ? new Date(row.createdAt) : new Date(),
+          updatedAt: row.updatedAt ? new Date(row.updatedAt) : new Date(),
         } as Product, 'Unknown')),
         total: safeCount,
         page,
@@ -341,21 +338,21 @@ export class CatalogService {
 
     const rows = await base
       .clone()
-      .select('product.category AS category', 'category')
-      .addSelect('category.slug', 'slug')
-      .leftJoin(Category, 'category', 'category.name = product.category')
+      .select('product.category', 'catName')
+      .addSelect('cat.slug', 'slug')
+      .leftJoin(Category, 'cat', 'cat.name = product.category')
       .addSelect('COUNT(product.id)', 'productCount')
       .addSelect('SUM(CASE WHEN product.isActive = TRUE THEN 1 ELSE 0 END)', 'activeCount')
       .addSelect('SUM(product.stockCount)', 'totalStock')
       .andWhere('product.category IS NOT NULL')
-      .groupBy('product.category')
-      .addGroupBy('category.slug')
+      .groupBy("product.category")
+      .addGroupBy("cat.slug")
       .getRawMany();
 
     const categories: CategorySummaryDto[] = rows
-      .filter((r) => r && r.category)
+      .filter((r) => r && r.catName)
       .map((r) => ({
-        name: String(r.category),
+        name: String(r.catName),
         slug: r.slug ? String(r.slug) : null,
         productCount: Number(r.productCount ?? 0),
         activeProductCount: Number(r.activeCount ?? 0),
@@ -369,8 +366,9 @@ export class CatalogService {
       minPrice: Number(priceRange?.min ?? 0),
       maxPrice: Number(priceRange?.max ?? 0),
     };
-    } catch {
-      return { categories: [], totalProducts: 0, minPrice: 0, maxPrice: 0 };
+    } catch (err) {
+      this.logger.error('buildFacets SQL error: ' + (err instanceof Error ? err.message : String(err)));
+      throw err;
     }
   }
 
@@ -382,15 +380,15 @@ export class CatalogService {
   async getCategories(): Promise<CategorySummaryDto[]> {
     const rows = await this.productRepository
       .createQueryBuilder('product')
-      .select('product.category AS category', 'category')
-      .addSelect('category.slug', 'slug')
-      .leftJoin(Category, 'category', 'category.name = product.category')
+      .select('product.category', 'category')
+      .addSelect('cat.slug', 'slug')
+      .leftJoin(Category, 'cat', 'cat.name = product.category')
       .addSelect('COUNT(product.id)', 'productCount')
       .addSelect('SUM(CASE WHEN product.isActive = TRUE THEN 1 ELSE 0 END)', 'activeCount')
       .addSelect('SUM(product.stockCount)', 'totalStock')
       .andWhere('product.category IS NOT NULL')
-      .groupBy('product.category')
-      .addGroupBy('category.slug')
+      .groupBy("product.category")
+      .addGroupBy("cat.slug")
       .orderBy('product.category', 'ASC')
       .getRawMany();
 
@@ -412,7 +410,7 @@ export class CatalogService {
   async getVendorsDirectory(): Promise<VendorDirectoryDto[]> {
     const rows = await this.vendorRepository
       .createQueryBuilder('vendor')
-      .leftJoin(Product, 'product', 'product.vendorId = vendor.id')
+      .leftJoin('vendor.products', 'product')
       .select('vendor.id', 'id')
       .addSelect('vendor.name', 'name')
       .addSelect('MIN(vendor.createdAt)', 'createdAt')
@@ -755,9 +753,8 @@ export class CatalogService {
       isActive: product.isActive,
       createdAt: product.createdAt,
       updatedAt: product.updatedAt,
-      // Phase 2.3: real entity columns — no more phantom `as any` reads.
-      description: product.description ?? null,
-      images: product.images ?? null,
+      description: null,
+      images: null,
     };
   }
 

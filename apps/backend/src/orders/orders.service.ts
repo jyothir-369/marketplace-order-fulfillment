@@ -404,7 +404,7 @@ export class OrdersService {
     return {
       id: item.id,
       productId: item.productId,
-      productName: item.product ? item.product.name : 'Unknown',
+      productName: (item.product && item.product.name) ? item.product.name : 'Unknown',
       vendorId: item.vendorId,
       vendorName: item.vendor ? item.vendor.name : 'Unknown',
       quantity: item.quantity,
