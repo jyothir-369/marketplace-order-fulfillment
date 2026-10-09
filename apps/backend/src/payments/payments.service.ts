@@ -138,7 +138,14 @@ export class PaymentsService {
   }
 
   async refundViaRazorpay(paymentId: string, amountPaise?: number): Promise<{ id: string; status: string }> {
-    // Actual TEST-mode Razorpay refund via SDK (mock-tested; real call blocked without credentials)
-    const client = new (require('razorpay'))({ key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_000', key_secret: process.env.RAZORPAY_KEY_SECRET || 'test_secret' });
+    // Fail closed: no placeholder credentials; require validated provider credentials
+    const { RazorpayProviderService } = require('./razorpay-provider.service');
+    const provider = new RazorpayProviderService();
+    const keyId = process.env.RAZORPAY_KEY_ID?.trim();
+    const keySecret = process.env.RAZORPAY_KEY_SECRET?.trim();
+    if (!keyId || !keySecret || /replace|placeholder|your[_ -]?key/i.test(keySecret) || !keyId.startsWith('rzp_test_')) {
+      throw new Error('Valid Razorpay test credentials required for refund');
+    }
+    const client = new (require('razorpay'))({ key_id: keyId, key_secret: keySecret });
     return client.payments.refund(paymentId, { amount: amountPaise || 0, notes: { refund_type: 'full' } });
   }}

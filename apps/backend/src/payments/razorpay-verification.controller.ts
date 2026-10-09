@@ -1,19 +1,57 @@
-import { Controller, Post, Body, Req, UnauthorizedException } from '@nestjs/common';
-import { RazorpayProviderService } from './razorpay-provider.service';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import { IsString, MaxLength, MinLength } from 'class-validator';
+import { AuthGuard } from '../auth/auth.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
+import type { AuthenticatedUser } from '../auth/auth.types';
+import { RazorpayVerificationService } from './razorpay-verification.service';
+
+class RazorpayVerifyDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(64)
+  razorpay_order_id: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(64)
+  razorpay_payment_id: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(128)
+  razorpay_signature: string;
+}
 
 @Controller('payments/razorpay/verify')
 export class RazorpayVerificationController {
-  constructor(private readonly provider: RazorpayProviderService) {}
+  constructor(
+    private readonly verificationService: RazorpayVerificationService,
+  ) {}
 
   @Post()
-  async verify(@Req() req: any, @Body() body: any) {
-    // Mock implementation: verifies HMAC and captures if valid; no DB write due to mock-only testing
-    const sig = req.headers['x-razorpay-signature'] || body.signature || '';
-    const orderId = body.razorpay_order_id || body.order_id;
-    const paymentId = body.razorpay_payment_id || body.payment_id;
-    const isValid = this.provider.verifyPaymentSignature(orderId, paymentId, sig);
-    if (!isValid) throw new UnauthorizedException('Invalid signature');
-    const captured = await this.provider.verifyCapturedPayment(paymentId, orderId, body.amount || 100);
-    return { verified: captured, orderId, paymentId };
+  @UseGuards(AuthGuard)
+  async verify(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: RazorpayVerifyDto,
+    @Req() req: any,
+  ) {
+    if (!user?.id) {
+      throw new BadRequestException('Authenticated buyer is required.');
+    }
+
+    return this.verificationService.verify(
+      user.id,
+      body.razorpay_order_id,
+      body.razorpay_payment_id,
+      body.razorpay_signature,
+      String(req.correlationId || ''),
+    );
   }
 }
