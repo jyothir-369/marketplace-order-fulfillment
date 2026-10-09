@@ -11,6 +11,7 @@ import {
 import { Vendor } from './vendor.entity';
 import { Category } from './category.entity';
 import { OrderLineItem } from './order-line-item.entity';
+import { Review } from './review.entity';
 
 @Entity('products')
 export class Product {
@@ -45,6 +46,12 @@ export class Product {
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
   price: number;
 
+  @Column({ type: 'text', nullable: true })
+  description: string | null;
+
+  @Column('text', { array: true, nullable: true })
+  images: string[] | null;
+
   @Column({ type: 'int', default: 0, name: 'stock_count' })
   stockCount: number;
 
@@ -67,4 +74,7 @@ export class Product {
 
   @OneToMany(() => OrderLineItem, (lineItem) => lineItem.product)
   orderLineItems: OrderLineItem[];
+
+  @OneToMany(() => Review, (review) => review.product)
+  reviews: Review[];
 }

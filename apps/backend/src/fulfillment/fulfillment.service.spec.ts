@@ -1,9 +1,11 @@
+import { ConflictException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { FulfillmentService } from './fulfillment.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { OrderLineItem, FulfillmentStatus } from '../common/entities/order-line-item.entity';
 import { VendorSyncJob, SyncJobStatus } from '../common/entities/vendor-sync-job.entity';
 import { Order } from '../common/entities/order.entity';
+import { PaymentAuthorization } from '../common/entities/payment-authorization.entity';
 import { VendorMockService } from '../integrations/vendor-mock/vendor-mock.service';
 import { AuditService } from '../common/audit';
 import { VendorResponseType } from '../integrations/vendor-mock/dto/vendor-mock.dto';
@@ -50,6 +52,7 @@ describe('FulfillmentService - Reconciliation', () => {
         { provide: getRepositoryToken(VendorSyncJob), useValue: syncJobRepositoryMock },
         { provide: getRepositoryToken(OrderLineItem), useValue: lineItemRepositoryMock },
         { provide: getRepositoryToken(Order), useValue: {} },
+        { provide: getRepositoryToken(PaymentAuthorization), useValue: { findOne: jest.fn().mockResolvedValue(null) } },
         { provide: VendorMockService, useValue: vendorMockServiceMock },
         { provide: AuditService, useValue: auditServiceMock },
       ],
@@ -151,10 +154,67 @@ describe('FulfillmentService - Reconciliation', () => {
     expect(qb.andWhere).toHaveBeenCalledWith('lineItem.vendorId = :vendorId', { vendorId: 'v42' });
   });
 
-  it.todo('should throw error on invalid manual state transition');
-  // NOTE (Phase 0): manualResolve performs no state-transition validation
-  // today — any status can be forced onto a line item via the admin resolve
-  // flow (admin.service.ts -> fulfillmentService.manualResolve). This safety
-  // property is a real gap scheduled with the Phase 8 orders-depth work
-  // (transition rules + guard). Restore this test when validation lands.
+  it('should reject manual resolution from a terminal state', async () => {
+    const lineItem = {
+      id: 'li1',
+      fulfillmentStatus: FulfillmentStatus.CONFIRMED,
+      orderId: 'ord1',
+      syncJob: { id: 'job1' },
+    };
+    lineItemRepositoryMock.findOne.mockResolvedValue(lineItem);
+    auditServiceMock.logFulfillmentStatusChange = jest.fn();
+    service.checkOrderFulfillment = jest.fn();
+
+    await expect(
+      service.manualResolve('li1', { newStatus: FulfillmentStatus.FAILED }, 'c1'),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(lineItemRepositoryMock.update).not.toHaveBeenCalled();
+    expect(syncJobRepositoryMock.update).not.toHaveBeenCalled();
+    expect(auditServiceMock.logFulfillmentStatusChange).not.toHaveBeenCalled();
+    expect(service.checkOrderFulfillment).not.toHaveBeenCalled();
+  });
+
+  it('should reject a non-terminal manual resolution target', async () => {
+    const lineItem = {
+      id: 'li1',
+      fulfillmentStatus: FulfillmentStatus.AMBIGUOUS,
+      orderId: 'ord1',
+      syncJob: { id: 'job1' },
+    };
+    lineItemRepositoryMock.findOne.mockResolvedValue(lineItem);
+    auditServiceMock.logFulfillmentStatusChange = jest.fn();
+    service.checkOrderFulfillment = jest.fn();
+
+    await expect(
+      service.manualResolve('li1', { newStatus: FulfillmentStatus.PENDING }, 'c1'),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(lineItemRepositoryMock.update).not.toHaveBeenCalled();
+    expect(syncJobRepositoryMock.update).not.toHaveBeenCalled();
+  });
+
+  it('should mark the sync job failed when manual resolution sets FAILED', async () => {
+    const lineItem = {
+      id: 'li1',
+      fulfillmentStatus: FulfillmentStatus.DEAD_LETTER,
+      orderId: 'ord1',
+      syncJob: { id: 'job1' },
+    };
+    lineItemRepositoryMock.findOne.mockResolvedValue(lineItem);
+    auditServiceMock.logFulfillmentStatusChange = jest.fn();
+    service.checkOrderFulfillment = jest.fn();
+
+    await service.manualResolve('li1', { newStatus: FulfillmentStatus.FAILED }, 'c1');
+
+    expect(lineItemRepositoryMock.update).toHaveBeenCalledWith(
+      'li1',
+      expect.objectContaining({ fulfillmentStatus: FulfillmentStatus.FAILED }),
+    );
+    expect(syncJobRepositoryMock.update).toHaveBeenCalledWith('job1', {
+      status: SyncJobStatus.FAILED,
+    });
+    expect(auditServiceMock.logFulfillmentStatusChange).toHaveBeenCalled();
+    expect(service.checkOrderFulfillment).toHaveBeenCalledWith('ord1', 'c1');
+  });
 });

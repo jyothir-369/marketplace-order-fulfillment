@@ -21,6 +21,7 @@ export class AddPaymentAuthorizations1710000000009 implements MigrationInterface
   name = 'AddPaymentAuthorizations1710000000009';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    const auditEntityEnum = 'audit_logs_entity_type_enum';
     // ── 1. enum for payment_authorizations.status ────────────────────────────
     await queryRunner.query(`
       DO $$ BEGIN
@@ -43,7 +44,7 @@ export class AddPaymentAuthorizations1710000000009 implements MigrationInterface
     // ── 3. payment_authorizations table ──────────────────────────────────────
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS "payment_authorizations" (
-        "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+        "id" uuid NOT NULL DEFAULT gen_random_uuid(),
         "order_id" uuid NOT NULL,
         "amount" numeric(12,2) NOT NULL,
         "status" "payment_authorizations_status_enum" NOT NULL DEFAULT 'authorized',

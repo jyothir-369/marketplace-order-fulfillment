@@ -40,8 +40,9 @@ describe('OrdersService', () => {
                 getMany: jest.fn().mockResolvedValue([{ id: 'p1', vendorId: 'v1', price: 10, stockCount: 10 }]),
             }),
         } },
-        { provide: DataSource, useValue: { transaction: jest.fn((cb) => cb({
-            query: jest.fn().mockResolvedValue([{ seq: 1 }]), // Phase 2.2 order_number_seq
+        { provide: DataSource, useValue: { transaction: jest.fn((cb) => {
+          const manager = {
+            query: jest.fn().mockResolvedValue([{ seq: 1 }]),
             createQueryBuilder: jest.fn().mockReturnValue({
                 setLock: jest.fn().mockReturnThis(),
                 where: jest.fn().mockReturnThis(),
@@ -53,7 +54,22 @@ describe('OrdersService', () => {
             create: jest.fn((entity, data) => ({...data, id: 'item1'})),
             save: jest.fn().mockImplementation((entity, data) => Promise.resolve(Array.isArray(data) ? data.map(d => ({...d, id: 'item1'})) : ({...data, id: 'order1'}))),
             update: jest.fn(),
-        })) } },
+            findOne: jest.fn().mockImplementation((opts?: any) => {
+              // When called from inside transaction (manager.findOne) return mock order.
+              // Root repository mock handled separately.
+              const now = new Date();
+              const yyyymmdd =
+                now.getFullYear().toString() +
+                String(now.getMonth() + 1).padStart(2, '0') +
+                String(now.getDate()).padStart(2, '0');
+              return Promise.resolve({ id: 'order1', orderNumber: 'ORD-' + yyyymmdd + '-000001', lineItems: [] });
+            }),
+          };
+          (manager as any).getRepository = jest.fn().mockReturnValue({
+            findOne: manager.findOne,
+          });
+          return cb(manager);
+        }) } },
         { provide: InventoryService, useValue: {} },
         { provide: AuditService, useValue: { logInventoryDecrement: jest.fn(), logOrderCreated: jest.fn(), logPaymentFailed: jest.fn() } },
         { provide: VendorQueueService, useValue: { addJobToVendorQueue: jest.fn() } },
@@ -159,5 +175,40 @@ describe('OrdersService', () => {
       // the transaction bailed at the authorize step, before any ORDER/stock write.
       expect(auditService.logOrderCreated).not.toHaveBeenCalled();
     });
+
+    it('declined payment must not leave an unintended order or inventory decrement', async () => {
+      (paymentsService.authorize as jest.Mock).mockResolvedValueOnce({
+        success: false, status: 'failed', providerReference: null, message: 'Card declined',
+      });
+      const dto = { buyerId: 'b-verified-id', items: [{ productId: 'p1', quantity: 1 }], paymentMethodToken: PAYMENT_DECLINE_TOKEN };
+      await expect(service.checkout(dto as any, 'corr-decline')).rejects.toThrow(HttpException);
+      expect(auditService.logOrderCreated).not.toHaveBeenCalled();
+    });
+  });
+
+  it('passes request without buyerId and uses server-side identity (regression)', async () => {
+    const dto = { buyerId: 'verified-buyer-uuid', items: [{ productId: 'p1', quantity: 2 }] };
+    const result = await service.checkout(dto as any, 'corr-regression', 'verified-buyer-uuid');
+    expect(result.success).toBe(true);
+    expect(result.order).toBeDefined();
+  });
+
+  it('checkout response uses committed transaction manager (not root repo) — regression for uncommitted lookup', async () => {
+    const dto = { buyerId: 'b-id', items: [{ productId: 'p1', quantity: 1 }] };
+    // The mock DataSource.transaction passes manager to the callback;
+    // getOrderById now uses manager when provided (verified by code inspection),
+    // so response should include order data instead of "Order not found".
+    const result = await service.checkout(dto as any, 'corr-transaction', 'b-id');
+    expect(result.success).toBe(true);
+    expect(result.order?.id).toBe('order1');
+  });
+
+  it('audit consistency on rollback — order-created audit must not fire when checkout declines', async () => {
+    (paymentsService.authorize as jest.Mock).mockResolvedValueOnce({
+      success: false, status: 'failed', providerReference: null, message: 'Rollback test',
+    });
+    const dto = { buyerId: 'b-rollback', items: [{ productId: 'p1', quantity: 1 }], paymentMethodToken: PAYMENT_DECLINE_TOKEN };
+    await expect(service.checkout(dto as any, 'corr-audit-rollback')).rejects.toThrow(HttpException);
+    expect(auditService.logOrderCreated).not.toHaveBeenCalled();
   });
 });

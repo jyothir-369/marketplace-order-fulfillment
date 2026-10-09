@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import {
@@ -11,6 +11,14 @@ import { MockPaymentService, PaymentAuthorizationResult } from './mock-payment.s
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
+
+  private assertMockPaymentsAllowedInProduction(): void {
+    if (process.env.NODE_ENV === 'production') {
+      throw new ServiceUnavailableException(
+        'Mock payment processing is disabled in production. Configure a real payment provider before accepting payments or issuing refunds.',
+      );
+    }
+  }
 
   constructor(
     @InjectRepository(PaymentAuthorization)
@@ -28,6 +36,7 @@ export class PaymentsService {
     correlationId: string,
     paymentMethodToken?: string,
   ): Promise<PaymentAuthorizationResult> {
+    this.assertMockPaymentsAllowedInProduction();
     return this.mockPaymentService.authorize(amount, correlationId, paymentMethodToken);
   }
 
@@ -43,6 +52,7 @@ export class PaymentsService {
     authorization: PaymentAuthorizationResult,
     correlationId: string,
   ): Promise<PaymentAuthorization> {
+    this.assertMockPaymentsAllowedInProduction();
     const repo = manager.getRepository(PaymentAuthorization);
     const payment = repo.create({
       orderId,
@@ -102,6 +112,7 @@ export class PaymentsService {
     if (payment.status === PaymentStatus.REFUNDED) {
       return payment;
     }
+    this.assertMockPaymentsAllowedInProduction();
 
     await repo.update(payment.id, {
       status: PaymentStatus.REFUNDED,
@@ -125,4 +136,9 @@ export class PaymentsService {
       order: { createdAt: 'DESC' },
     });
   }
-}
+
+  async refundViaRazorpay(paymentId: string, amountPaise?: number): Promise<{ id: string; status: string }> {
+    // Actual TEST-mode Razorpay refund via SDK (mock-tested; real call blocked without credentials)
+    const client = new (require('razorpay'))({ key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_000', key_secret: process.env.RAZORPAY_KEY_SECRET || 'test_secret' });
+    return client.payments.refund(paymentId, { amount: amountPaise || 0, notes: { refund_type: 'full' } });
+  }}

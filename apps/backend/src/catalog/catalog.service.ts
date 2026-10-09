@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException, ForbiddenException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, SelectQueryBuilder, OptimisticLockVersionMismatchError } from 'typeorm';
+import { Repository, SelectQueryBuilder, OptimisticLockVersionMismatchError, In } from 'typeorm';
 import { Product } from '../common/entities/product.entity';
 import { Category } from '../common/entities/category.entity';
 import { Vendor } from '../common/entities/vendor.entity';
@@ -23,6 +23,8 @@ import {
   VendorDashboardDto,
   CatalogSort,
 } from './dto/catalog.dto';
+import { Review } from '../common/entities/review.entity';
+import { CreateReviewDto, ReviewDto, ReviewListResponseDto } from './dto/review.dto';
 
 /** Operational product aggregates for a single vendor (admin + dashboard). */
 interface ProductStats {
@@ -58,6 +60,8 @@ export class CatalogService {
     private readonly lineItemRepository: Repository<OrderLineItem>,
     @InjectRepository(Order)
     private readonly orderRepository: Repository<Order>,
+    @InjectRepository(Review)
+    private readonly reviewRepository: Repository<Review>,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -126,7 +130,8 @@ export class CatalogService {
     if (dto.price !== undefined) { product.price = dto.price; }
     if (dto.stockCount !== undefined) { product.stockCount = dto.stockCount; }
     if (dto.isActive !== undefined) { product.isActive = dto.isActive; }
-    // description / images not present in remote DB schema — kept in DTO for contract compatibility
+    if (dto.description !== undefined) { product.description = dto.description; }
+    if (dto.images !== undefined) { product.images = dto.images; }
 
     // Phase 2.5: `save()` with a @VersionColumn throws
     // OptimisticLockVersionMismatchError on concurrent edits — surface it as a
@@ -219,10 +224,11 @@ export class CatalogService {
     if (!dto.includeInactive) where.isActive = true;
     if (dto.category) where.category = dto.category;
     if (dto.vendor) where.vendorId = dto.vendor;
-    if (dto.minPrice !== undefined) where.price = undefined; // handled below via raw if needed; keep simple
+    if (dto.minPrice !== undefined) where.minPrice = dto.minPrice;
 
     // Build a safe base query that skips broken vendor join but keeps filters/sort.
     const qb = this.productRepository.createQueryBuilder('product');
+    qb.leftJoinAndSelect('product.vendor', 'vendor')
     if (!dto.includeInactive) qb.andWhere('product.isActive = :isActive', { isActive: true });
     if (dto.q) qb.andWhere('(product.name ILIKE :q OR product.slug ILIKE :q)', { q: `%${dto.q}%` });
     if (dto.category) qb.andWhere('product.category = :category', { category: dto.category });
@@ -242,7 +248,7 @@ export class CatalogService {
       const [items, total] = await qb.getManyAndCount();
       const totalPages = Math.ceil(total / pageSize);
       return {
-        items: items.map((p) => this.toResponseDto(p, 'Unknown')),
+        items: items.map((p) => this.toResponseDto(p, p.vendor ? p.vendor.name : 'Unknown')),
         total,
         page,
         pageSize,
@@ -253,23 +259,23 @@ export class CatalogService {
       // Fallback to raw SQL query using DB column names (snake_case) to avoid TypeORM column-mapping 500.
       this.logger.error('Catalog query failed, using raw SQL fallback: ' + (err instanceof Error ? err.message : err));
       const safe = await this.productRepository.query(
-        `SELECT id, vendorId, name, slug, category, price, stock_count, isActive, createdAt, updatedAt FROM products WHERE isActive = true ORDER BY createdAt DESC LIMIT $1 OFFSET $2`,
+        `SELECT id, "vendorId" AS "vendorId", name, slug, category, price, "stock_count" AS "stock_count", "isActive" AS "isActive", "createdAt" AS "createdAt", "updatedAt" AS "updatedAt", description, images FROM products WHERE "isActive" = true ORDER BY "createdAt" DESC LIMIT $1 OFFSET $2`,
         [pageSize, (page - 1) * pageSize],
       );
-      const countRow = await this.productRepository.query(`SELECT COUNT(*) as c FROM products WHERE isActive = true`);
+      const countRow = await this.productRepository.query(`SELECT COUNT(*) as c FROM products WHERE "isActive" = true`);
       const safeCount = parseInt(countRow[0]?.c ?? '0', 10);
       return {
         items: safe.map((row: any) => this.toResponseDto({
           id: row.id,
-          vendorId: row.vendor_id,
+          vendorId: row.vendorId || row.vendor_id,
           name: row.name,
           slug: row.slug,
           category: row.category,
           price: Number(row.price),
           stockCount: Number(row.stock_count ?? row.stockCount ?? 0),
           isActive: row.isActive,
-          // description not in DB
-          // images not in DB
+          description: row.description ?? null,
+          images: row.images ?? null,
           createdAt: row.createdAt ? new Date(row.createdAt) : new Date(),
           updatedAt: row.updatedAt ? new Date(row.updatedAt) : new Date(),
         } as Product, 'Unknown')),
@@ -277,7 +283,7 @@ export class CatalogService {
         page,
         pageSize,
         totalPages: Math.ceil(safeCount / pageSize),
-        facets: { categories: [], totalProducts: 0, minPrice: 0, maxPrice: 0 },
+        facets: await this.buildFacets(dto),
       };
     }
   }
@@ -322,6 +328,9 @@ export class CatalogService {
     }
     if (dto.minPrice !== undefined) {
       base.andWhere('product.price >= :minPrice', { minPrice: dto.minPrice });
+    }
+    if (dto.maxPrice !== undefined) {
+      base.andWhere('product.price <= :maxPrice', { maxPrice: dto.maxPrice });
     }
     if (dto.maxPrice !== undefined) {
       base.andWhere('product.price <= :maxPrice', { maxPrice: dto.maxPrice });
@@ -737,6 +746,53 @@ export class CatalogService {
   }
 
   // ---------------------------------------------------------------------------
+  // Reviews
+  // ---------------------------------------------------------------------------
+
+  async getReviews(productId: string): Promise<ReviewListResponseDto> {
+    const reviews = await this.reviewRepository.find({
+      where: { productId },
+      order: { createdAt: 'DESC' },
+    });
+    const total = reviews.length;
+    const avg = total > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / total : 0;
+    return {
+      reviews: reviews.map((r) => ({
+        id: r.id,
+        productId: r.productId,
+        buyerId: r.buyerId,
+        buyerName: 'Buyer',
+        rating: r.rating,
+        comment: r.comment ?? null,
+        createdAt: r.createdAt,
+      })),
+      averageRating: Math.round(avg * 100) / 100,
+      totalReviews: total,
+    };
+  }
+
+  async createReview(dto: CreateReviewDto, user: AuthenticatedUser, correlationId: string): Promise<string> {
+    this.logger.log('Creating review: ' + user.id, CatalogService.name, correlationId);
+    const eligible = await this.lineItemRepository.createQueryBuilder('li')
+      .innerJoin('li.order', 'o')
+      .where('li.productId = :pid', { pid: dto.productId })
+      .andWhere('o.buyerId = :buyer', { buyer: user.id })
+      .andWhere("o.status = 'fulfilled'")
+      .andWhere("li.fulfillmentStatus = 'fulfilled'")
+      .getCount();
+    if (eligible === 0) throw new ForbiddenException('Eligible completed purchase required');
+    const existing = await this.reviewRepository.findOne({ where: { productId: dto.productId, buyerId: user.id } });
+    if (existing) throw new ConflictException('Review already exists');
+    const saved = await this.reviewRepository.save(this.reviewRepository.create({
+      productId: dto.productId,
+      buyerId: user.id,
+      rating: dto.rating,
+      comment: dto.comment ?? null,
+    }));
+    return saved.id;
+  }
+
+  // ---------------------------------------------------------------------------
   // Mapping helpers
   // ---------------------------------------------------------------------------
 
@@ -753,8 +809,8 @@ export class CatalogService {
       isActive: product.isActive,
       createdAt: product.createdAt,
       updatedAt: product.updatedAt,
-      description: null,
-      images: null,
+      description: product.description ?? null,
+      images: product.images ?? null,
     };
   }
 

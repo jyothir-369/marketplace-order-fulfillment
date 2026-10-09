@@ -1,4 +1,4 @@
-﻿import { IsUUID, IsNumber, IsArray, ValidateNested, Min, ArrayMinSize, IsOptional, IsString, IsIn } from 'class-validator';
+import { IsUUID, IsNumber, IsArray, ValidateNested, Min, ArrayMinSize, IsOptional, IsString, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
 import { OrderStatus } from '../../common/entities/order.entity';
 import { FulfillmentStatus } from '../../common/entities/order-line-item.entity';
@@ -13,6 +13,25 @@ export class CheckoutItemDto {
   quantity: number;
 }
 
+/** Public checkout request: buyer identity is derived server-side from the
+ * verified JWT; client must NOT supply buyerId. */
+export class CheckoutRequestDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => CheckoutItemDto)
+  items: CheckoutItemDto[];
+
+  @IsOptional()
+  @IsString()
+  shippingAddress?: string;
+
+  @IsOptional()
+  @IsIn([PAYMENT_SUCCESS_TOKEN, PAYMENT_DECLINE_TOKEN])
+  paymentMethodToken?: string;
+}
+
+/** Internal checkout command (after controller verifies JWT identity). */
 export class CheckoutDto {
   @IsUUID()
   buyerId: string;
@@ -23,19 +42,10 @@ export class CheckoutDto {
   @Type(() => CheckoutItemDto)
   items: CheckoutItemDto[];
 
-  /**
-   * Shipping address for the order.
-   * Added as part of Phase 7 expand-and-contract migration.
-   * Optional to maintain backward compatibility during transition.
-   */
   @IsOptional()
   @IsString()
   shippingAddress?: string;
 
-  /**
-   * Phase 5.1 — mock payment selection (`mock-success` | `mock-decline`).
-   * Absent, the mock provider authorizes deterministically.
-   */
   @IsOptional()
   @IsIn([PAYMENT_SUCCESS_TOKEN, PAYMENT_DECLINE_TOKEN])
   paymentMethodToken?: string;
@@ -57,22 +67,12 @@ export class OrderLineItemResponseDto {
 
 export class OrderResponseDto {
   id: string;
-  /**
-   * Human-facing order reference (Phase 2.2) — null for orders placed before
-   * the order_number sequence was provisioned.
-   */
   orderNumber: string | null;
   buyerId: string;
   status: OrderStatus;
   totalAmount: number;
   correlationId: string;
-  
-  /**
-   * Shipping address for the order.
-   * Added as part of Phase 7 expand-and-contract migration.
-   */
   shippingAddress?: string;
-  
   lineItems: OrderLineItemResponseDto[];
   createdAt: Date;
   updatedAt: Date;
@@ -85,10 +85,8 @@ export class CheckoutResponseDto {
   correlationId: string;
 }
 
-/** Transition actions along the order lifecycle (Phase 2 — vendor/ops routes). */
-export type OrderTransitionAction = 'CONFIRM' | 'FULFILL' | 'SHIP' | 'CANCEL';
-
-export const ORDER_TRANSITION_ACTIONS: OrderTransitionAction[] = ['CONFIRM', 'FULFILL', 'SHIP', 'CANCEL'];
+export const ORDER_TRANSITION_ACTIONS = ['CONFIRM', 'FULFILL', 'SHIP', 'CANCEL'] as const;
+export type OrderTransitionAction = typeof ORDER_TRANSITION_ACTIONS[number];
 
 export class TransitionOrderDto {
   @IsIn(ORDER_TRANSITION_ACTIONS)

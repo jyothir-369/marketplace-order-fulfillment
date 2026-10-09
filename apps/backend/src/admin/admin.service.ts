@@ -41,8 +41,26 @@ export class AdminService {
       var s = statusCounts[i];
       countsByStatus.set(s.status, parseInt(s.count, 10));
     }
+    // Revenue rule: recognized revenue = orders with CAPTURED payment authorization
+    // (status CONFIRMED / FULFILLING / FULFILLED). CANCELLED orders with REFUNDED
+    // payments are excluded; FAILED payments never contribute.
+    var revenueResult = await this.orderRepository
+      .createQueryBuilder('order')
+      .innerJoin('payment_authorizations', 'pa', 'pa.order_id = order.id')
+      .select('COALESCE(SUM(order.totalAmount), 0)', 'total')
+      .where("pa.status = 'captured'")
+      .andWhere('order.status IN (:...included)', {
+        included: [
+          OrderStatus.CONFIRMED,
+          OrderStatus.FULFILLING,
+          OrderStatus.FULFILLED,
+        ],
+      })
+      .getRawOne();
+    var totalRevenue = parseFloat(revenueResult?.total ?? '0');
     return {
       totalOrders: totalOrders,
+      totalRevenue: totalRevenue,
       pendingOrders: countsByStatus.get(OrderStatus.PLACED) || 0,
       fulfillingOrders: countsByStatus.get(OrderStatus.FULFILLING) || 0,
       fulfilledOrders: countsByStatus.get(OrderStatus.FULFILLED) || 0,

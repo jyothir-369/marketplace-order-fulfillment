@@ -1,9 +1,10 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan, FindOptionsRelations } from 'typeorm';
 import { OrderLineItem, FulfillmentStatus } from '../common/entities/order-line-item.entity';
 import { VendorSyncJob, SyncJobStatus, MAX_RETRY_ATTEMPTS } from '../common/entities/vendor-sync-job.entity';
 import { Order, OrderStatus } from '../common/entities/order.entity';
+import { PaymentAuthorization, PaymentStatus } from '../common/entities/payment-authorization.entity';
 import { VendorMockService } from '../integrations/vendor-mock/vendor-mock.service';
 import { VendorFulfillmentRequestDto } from '../integrations/vendor-mock/dto/vendor-mock.dto';
 import { SyncJobDto, ReconciliationResultDto, ManualResolutionDto } from './dto/fulfillment.dto';
@@ -20,11 +21,41 @@ export class FulfillmentService {
     private readonly syncJobRepository: Repository<VendorSyncJob>,
     @InjectRepository(Order)
     private readonly orderRepository: Repository<Order>,
+    @InjectRepository(PaymentAuthorization)
+    private readonly paymentRepository: Repository<PaymentAuthorization>,
     private readonly vendorMockService: VendorMockService,
     private readonly auditService: AuditService,
   ) {}
 
+  /**
+   * Keep unpaid provider payments out of vendor fulfillment.
+   * Orders predating persisted payments remain backward-compatible.
+   */
+  private async assertPaymentCapturedOrLegacy(orderId: string): Promise<void> {
+    const payment = await this.paymentRepository.findOne({
+      where: { orderId },
+      order: { createdAt: 'DESC' },
+    });
+
+    if (!payment) return;
+
+    if (payment.status !== PaymentStatus.CAPTURED) {
+      throw new ConflictException(
+        'Payment must be captured before vendor fulfillment can proceed.',
+      );
+    }
+  }
   async createSyncJob(dto: SyncJobDto): Promise<VendorSyncJob> {
+    const lineItem = await this.lineItemRepository.findOne({
+      where: { id: dto.orderLineItemId },
+    });
+    if (!lineItem) {
+      throw new NotFoundException('Order line item not found');
+    }
+    if (lineItem.orderId !== dto.orderId || lineItem.vendorId !== dto.vendorId) {
+      throw new ConflictException('Sync job order/vendor does not match the line item.');
+    }
+    await this.assertPaymentCapturedOrLegacy(lineItem.orderId);
     this.logger.log('Creating sync job for line item ' + dto.orderLineItemId, FulfillmentService.name, dto.correlationId);
     const syncJob = this.syncJobRepository.create({
       orderLineItemId: dto.orderLineItemId,
@@ -55,6 +86,10 @@ export class FulfillmentService {
     if (syncJob.status === SyncJobStatus.COMPLETED) {
       return;
     }
+    if (!syncJob.orderLineItem?.orderId) {
+      throw new NotFoundException('Sync job order line item is missing');
+    }
+    await this.assertPaymentCapturedOrLegacy(syncJob.orderLineItem.orderId);
 
     const previousStatus = syncJob.status;
     await this.syncJobRepository.update(jobId, {
@@ -232,6 +267,21 @@ export class FulfillmentService {
     }
 
     const previousStatus = lineItem.fulfillmentStatus;
+    const resolvableStatuses = [FulfillmentStatus.AMBIGUOUS, FulfillmentStatus.DEAD_LETTER];
+    const resolutionStatuses = [FulfillmentStatus.CONFIRMED, FulfillmentStatus.FAILED];
+
+    if (!resolvableStatuses.includes(previousStatus)) {
+      throw new ConflictException(
+        'Cannot manually resolve line item from fulfillment status ' + previousStatus,
+      );
+    }
+
+    if (!resolutionStatuses.includes(dto.newStatus)) {
+      throw new ConflictException(
+        'Manual resolution must set fulfillment status to confirmed or failed',
+      );
+    }
+
     const updateData: any = { fulfillmentStatus: dto.newStatus };
     if (dto.vendorReference) { updateData.vendorReference = dto.vendorReference; }
     if (dto.reason) { updateData.failureReason = dto.reason; }
@@ -240,7 +290,7 @@ export class FulfillmentService {
 
     if (lineItem.syncJob) {
       await this.syncJobRepository.update(lineItem.syncJob.id, {
-        status: dto.newStatus === FulfillmentStatus.CONFIRMED ? SyncJobStatus.COMPLETED : SyncJobStatus.DEAD_LETTER,
+        status: dto.newStatus === FulfillmentStatus.CONFIRMED ? SyncJobStatus.COMPLETED : SyncJobStatus.FAILED,
       });
     }
 
@@ -259,12 +309,13 @@ export class FulfillmentService {
 
   async checkOrderFulfillment(orderId: string, correlationId: string): Promise<void> {
     const lineItems = await this.lineItemRepository.find({ where: { orderId } });
-    const allConfirmed = lineItems.every(
-      (item) => item.fulfillmentStatus === FulfillmentStatus.CONFIRMED || item.fulfillmentStatus === FulfillmentStatus.FAILED,
+    const allConfirmed = lineItems.length > 0 && lineItems.every(
+      (item) => item.fulfillmentStatus === FulfillmentStatus.CONFIRMED,
     );
     const anyDeadLetter = lineItems.some((item) => item.fulfillmentStatus === FulfillmentStatus.DEAD_LETTER);
+    const anyFailed = lineItems.some((item) => item.fulfillmentStatus === FulfillmentStatus.FAILED);
 
-    if (allConfirmed) {
+    if (allConfirmed || anyDeadLetter || anyFailed) {
       const order = await this.orderRepository.findOne({ where: { id: orderId } });
       if (order) {
         // Phase 0 hardening: never flip a terminal order back to an active
@@ -275,11 +326,22 @@ export class FulfillmentService {
         }
 
         const previousStatus = order.status;
-        const newStatus = anyDeadLetter ? OrderStatus.FULFILLING : OrderStatus.FULFILLED;
-        await this.orderRepository.update(orderId, { status: newStatus });
+        const newStatus =
+          allConfirmed && !anyDeadLetter && !anyFailed
+            ? OrderStatus.FULFILLED
+            : OrderStatus.FULFILLING;
 
-        // Audit: log order status change
-        await this.auditService.logOrderStatusChange(correlationId, orderId, previousStatus, newStatus);
+        if (previousStatus !== newStatus) {
+          await this.orderRepository.update(orderId, { status: newStatus });
+
+          // Audit: log order status change
+          await this.auditService.logOrderStatusChange(
+            correlationId,
+            orderId,
+            previousStatus,
+            newStatus,
+          );
+        }
       }
     }
   }

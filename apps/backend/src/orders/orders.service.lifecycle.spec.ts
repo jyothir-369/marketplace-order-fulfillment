@@ -53,6 +53,7 @@ describe('OrdersService - Lifecycle', () => {
     // cancel transaction via paymentsService.refund(orderId, cid, manager).
     paymentsMock = {
       refund: jest.fn().mockResolvedValue({ id: 'pay1', status: 'refunded' }),
+    findByOrderId: jest.fn().mockResolvedValue([]),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -162,6 +163,31 @@ describe('OrdersService - Lifecycle', () => {
       expect(managerMock.update).toHaveBeenCalledWith(Order, { id: 'ord1' }, { status: OrderStatus.CANCELLED });
     });
 
+
+    it('CONFIRM allows legacy orders with no payment record', async () => {
+      paymentsMock.findByOrderId = jest.fn().mockResolvedValue([]);
+      orderRepositoryMock.findOne
+        .mockResolvedValueOnce({ id: 'ord1', status: OrderStatus.PLACED, lineItems: [] })
+        .mockResolvedValueOnce({ id: 'ord1', status: OrderStatus.CONFIRMED, lineItems: [] });
+      await service.transitionOrder('ord1', { action: 'CONFIRM' }, 'c1');
+      expect(orderRepositoryMock.update).toHaveBeenCalledWith('ord1', { status: OrderStatus.CONFIRMED });
+    });
+
+    it('CONFIRM allows confirmed orders when latest payment is captured', async () => {
+      paymentsMock.findByOrderId = jest.fn().mockResolvedValue([{ id: 'pay-1', status: 'captured' }]);
+      orderRepositoryMock.findOne
+        .mockResolvedValueOnce({ id: 'ord1', status: OrderStatus.PLACED, lineItems: [] })
+        .mockResolvedValueOnce({ id: 'ord1', status: OrderStatus.CONFIRMED, lineItems: [] });
+      await service.transitionOrder('ord1', { action: 'CONFIRM' }, 'c1');
+      expect(orderRepositoryMock.update).toHaveBeenCalledWith('ord1', { status: OrderStatus.CONFIRMED });
+    });
+
+    it('CONFIRM rejects when payment is not captured', async () => {
+      paymentsMock.findByOrderId = jest.fn().mockResolvedValue([{ id: 'pay-1', status: 'pending' }]);
+      orderRepositoryMock.findOne.mockResolvedValue({ id: 'ord1', status: OrderStatus.PLACED, lineItems: [] });
+      await expect(service.transitionOrder('ord1', { action: 'CONFIRM' }, 'c1'))
+        .rejects.toThrow('Order cannot be confirmed: payment is not captured');
+    });
     it('returns 404 for an unknown order id', async () => {
       orderRepositoryMock.findOne.mockResolvedValue(null);
 

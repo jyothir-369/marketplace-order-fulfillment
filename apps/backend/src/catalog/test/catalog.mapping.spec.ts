@@ -12,6 +12,8 @@ describe('Catalog entity mapping regression', () => {
     // Protect against reverting category slug group reference to undeclared alias.
     expect('cat.slug').not.toBe('category.slug');
   });
+
+  test('DB column mapping matches verified schema', () => {
     const dbColumns = ['id', 'name', 'slug', 'description', 'created_at', 'updated_at'];
     expect(dbColumns).toContain('created_at');
   });

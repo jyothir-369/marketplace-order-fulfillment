@@ -72,6 +72,75 @@ describe('AdminService', () => {
     expect(result.orders).toEqual([]);
   });
 
+  it('should include totalRevenue in dashboard', async () => {
+    // Revenue query: must include innerJoin + where/andWhere; mock both branches
+    orderRepositoryMock.createQueryBuilder.mockImplementation((alias?: string) => {
+      const qb = {
+        innerJoin: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        groupBy: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([
+          { status: 'placed', count: '1' },
+          { status: 'fulfilled', count: '2' },
+        ]),
+        getRawOne: jest.fn().mockResolvedValue({ total: '123.45' }),
+      };
+      return qb;
+    });
+    orderRepositoryMock.count = jest.fn().mockResolvedValue(3);
+    syncJobRepositoryMock.count = jest.fn().mockResolvedValue(0);
+    const result = await service.getDashboard('c1');
+    expect(result.totalRevenue).toBeCloseTo(123.45, 2);
+  });
+
+  it('should include totalRevenue only for captured-payment orders in included statuses', async () => {
+    // Revenue rule test: included statuses (CONFIRMED, FULFILLING, FULFILLED) with
+    // CAPTURED payments are counted; CANCELLED / PLACED / FAILED excluded.
+    orderRepositoryMock.createQueryBuilder.mockImplementation((alias?: string) => {
+      const qb = {
+        innerJoin: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        groupBy: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([
+          { status: 'confirmed', count: '2' },
+          { status: 'fulfilling', count: '1' },
+          { status: 'fulfilled', count: '3' },
+        ]),
+        getRawOne: jest.fn().mockResolvedValue({ total: '678.90' }),
+      };
+      return qb;
+    });
+    orderRepositoryMock.count = jest.fn().mockResolvedValue(8);
+    syncJobRepositoryMock.count = jest.fn().mockResolvedValue(1);
+    const result = await service.getDashboard('c1');
+    expect(result.totalRevenue).toBeCloseTo(678.9, 2);
+    expect(result.totalOrders).toBe(8);
+  });
+
+  it('should return zero revenue when no captured payments exist', async () => {
+    orderRepositoryMock.createQueryBuilder.mockImplementation((alias?: string) => ({
+      innerJoin: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      addSelect: jest.fn().mockReturnThis(),
+      groupBy: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getRawMany: jest.fn().mockResolvedValue([]),
+      getRawOne: jest.fn().mockResolvedValue({ total: '0' }),
+    }));
+    orderRepositoryMock.count = jest.fn().mockResolvedValue(0);
+    syncJobRepositoryMock.count = jest.fn().mockResolvedValue(0);
+    const result = await service.getDashboard('c2');
+    expect(result.totalRevenue).toBe(0);
+    expect(result.pendingOrders).toBe(0);
+  });
+
   it('should resolve job via manual resolution', async () => {
     const lineItem = { id: 'li1', fulfillmentStatus: FulfillmentStatus.AMBIGUOUS };
     lineItemRepositoryMock.findOne.mockResolvedValue(lineItem);

@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { FulfillmentService } from './fulfillment.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Order, OrderStatus } from '../common/entities/order.entity';
+import { PaymentAuthorization } from '../common/entities/payment-authorization.entity';
 import { OrderLineItem, FulfillmentStatus } from '../common/entities/order-line-item.entity';
 import { VendorSyncJob } from '../common/entities/vendor-sync-job.entity';
 
@@ -27,6 +28,7 @@ describe('FulfillmentService - Hardening', () => {
       providers: [
         FulfillmentService,
         { provide: getRepositoryToken(Order), useValue: orderRepositoryMock },
+        { provide: getRepositoryToken(PaymentAuthorization), useValue: { findOne: jest.fn().mockResolvedValue(null) } },
         { provide: getRepositoryToken(OrderLineItem), useValue: lineItemRepositoryMock },
         { provide: getRepositoryToken(VendorSyncJob), useValue: {} },
         { provide: VendorMockService, useValue: {} },
@@ -58,6 +60,51 @@ describe('FulfillmentService - Hardening', () => {
     await service.checkOrderFulfillment('ord1', 'c1');
 
     // Not all items confirmed => order stays FULFILLING, no update.
+    expect(orderRepositoryMock.update).not.toHaveBeenCalled();
+  });
+  it('does not fulfill an order containing failed line items', async () => {
+    lineItemRepositoryMock.find.mockResolvedValue([
+      { fulfillmentStatus: FulfillmentStatus.CONFIRMED },
+      { fulfillmentStatus: FulfillmentStatus.FAILED },
+    ]);
+    orderRepositoryMock.findOne.mockResolvedValue({
+      id: 'ord1',
+      status: OrderStatus.CONFIRMED,
+    });
+
+    await service.checkOrderFulfillment('ord1', 'c1');
+
+    expect(orderRepositoryMock.update).toHaveBeenCalledWith('ord1', {
+      status: OrderStatus.FULFILLING,
+    });
+    expect(orderRepositoryMock.update).not.toHaveBeenCalledWith('ord1', {
+      status: OrderStatus.FULFILLED,
+    });
+  });
+
+  it('moves an order with dead-letter items to FULFILLING', async () => {
+    lineItemRepositoryMock.find.mockResolvedValue([
+      { fulfillmentStatus: FulfillmentStatus.DEAD_LETTER },
+      { fulfillmentStatus: FulfillmentStatus.PENDING },
+    ]);
+    orderRepositoryMock.findOne.mockResolvedValue({
+      id: 'ord1',
+      status: OrderStatus.CONFIRMED,
+    });
+
+    await service.checkOrderFulfillment('ord1', 'c1');
+
+    expect(orderRepositoryMock.update).toHaveBeenCalledWith('ord1', {
+      status: OrderStatus.FULFILLING,
+    });
+  });
+
+  it('does not fulfill an order with no line items', async () => {
+    lineItemRepositoryMock.find.mockResolvedValue([]);
+
+    await service.checkOrderFulfillment('ord1', 'c1');
+
+    expect(orderRepositoryMock.findOne).not.toHaveBeenCalled();
     expect(orderRepositoryMock.update).not.toHaveBeenCalled();
   });
 });

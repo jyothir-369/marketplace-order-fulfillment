@@ -7,6 +7,7 @@ import { Category } from '../common/entities/category.entity';
 import { Vendor } from '../common/entities/vendor.entity';
 import { Order } from '../common/entities/order.entity';
 import { OrderLineItem } from '../common/entities/order-line-item.entity';
+import { Review } from '../common/entities/review.entity';
 import { UserRole } from '../common/entities/user.entity';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { CatalogQueryDto, CatalogSort } from './dto/catalog.dto';
@@ -46,6 +47,8 @@ function makeProduct(overrides: Partial<Product> = {}): Product {
     stockCount: 100,
     isActive: true,
     version: 1,
+    description: null,
+    images: null,
     createdAt: new Date('2025-01-01'),
     updatedAt: new Date('2025-01-01'),
     vendor: { id: '00000000-0000-0000-0000-000000000099', name: 'Vendor A', createdAt: new Date(), updatedAt: new Date(), products: [] } as any,
@@ -100,6 +103,12 @@ describe('CatalogService', () => {
     // Phase 1.5: new admin/dashboard endpoints query line items + orders.
     const lineItemRepo = { createQueryBuilder: jest.fn().mockReturnValue(mockQb()) };
     const orderRepo = {};
+    const reviewRepo = {
+      find: jest.fn().mockResolvedValue([]),
+      findOne: jest.fn().mockResolvedValue(null),
+      save: jest.fn(),
+      create: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -109,6 +118,7 @@ describe('CatalogService', () => {
         { provide: getRepositoryToken(Category), useValue: categoryRepo },
         { provide: getRepositoryToken(OrderLineItem), useValue: lineItemRepo },
         { provide: getRepositoryToken(Order), useValue: orderRepo },
+        { provide: getRepositoryToken(Review), useValue: reviewRepo },
       ],
     }).compile();
 

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import { PaymentStatus } from '../common/entities/payment-authorization.entity';
 
@@ -60,8 +60,13 @@ export class MockPaymentService {
     correlationId: string,
     paymentMethodToken?: string,
   ): Promise<PaymentAuthorizationResult> {
+    if (process.env.NODE_ENV === 'production') {
+      throw new ServiceUnavailableException(
+        'Mock payment provider is disabled in production. Configure a real payment provider before accepting payments.',
+      );
+    }
     this.logger.log(
-      'Authorizing mock payment of ' + amount + (paymentMethodToken ? ' (token: ' + paymentMethodToken + ')' : ''),
+      'Authorizing mock payment of ' + amount + (paymentMethodToken ? ' (payment token supplied)' : ' (no payment token)'),
       MockPaymentService.name,
       correlationId,
     );

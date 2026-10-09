@@ -108,7 +108,6 @@ function ProductsPageInner() {
     setLoading(true);
     setError(null);
     try {
-      console.log("Fetching products from API base:", process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api');
       const res = await getCatalogPage({
         q: q || undefined,
         category: category || undefined,

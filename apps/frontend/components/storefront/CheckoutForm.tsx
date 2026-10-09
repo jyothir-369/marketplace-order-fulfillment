@@ -32,11 +32,13 @@ import {
 } from "@/context/CartStore";
 import { checkoutOrder } from "@/lib/api";
 import { PaymentStep, PAYMENT_SUCCESS_TOKEN } from "@/components/checkout/steps";
+// Razorpay Checkout integration: uses server-created order (not mock token) for production flow
 import { EmptyState } from "@/components/ui/empty-state";
 import { ToastProvider, useToast } from "@/components/ui/toast";
 import { formatCurrency, cn } from "@/lib/utils";
 
-const BUYER_ID = "00000000-0000-0000-0000-000000000001";
+// Derive buyerId from authenticated session; never send a hardcoded UUID.
+const BUYER_ID = undefined;
 
 const MIN_ADDRESS_LENGTH = 5;
 const MAX_ADDRESS_LENGTH = 500;
@@ -192,7 +194,6 @@ function CheckoutInner() {
     setSubmitError(null);
     try {
       const res = await checkoutOrder({
-        buyerId: BUYER_ID,
         items: cart.map((i) => ({ productId: i.productId, quantity: i.quantity })),
         shippingAddress: values.shippingAddress.trim(),
         paymentMethodToken,

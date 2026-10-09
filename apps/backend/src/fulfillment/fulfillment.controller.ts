@@ -108,6 +108,8 @@ export class FulfillmentController {
   }
 
   @Post('reconcile')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.OPERATIONS)
   async runReconciliation(@Body() body: { olderThanMinutes?: number }): Promise<ReconciliationResultDto> {
     return this.fulfillmentService.reconcile(body.olderThanMinutes !== undefined ? body.olderThanMinutes : 10);
   }

@@ -11,11 +11,12 @@ import { ReconciliationScheduler } from './reconciliation.scheduler';
 import { OrderLineItem } from '../common/entities/order-line-item.entity';
 import { VendorSyncJob } from '../common/entities/vendor-sync-job.entity';
 import { Order } from '../common/entities/order.entity';
+import { PaymentAuthorization } from '../common/entities/payment-authorization.entity';
 import { AuditModule, AuditLog } from '../common/audit';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([OrderLineItem, VendorSyncJob, Order, AuditLog]),
+    TypeOrmModule.forFeature([OrderLineItem, VendorSyncJob, Order, AuditLog, PaymentAuthorization]),
     BullModule.registerQueue({ name: VENDOR_SYNC_QUEUE }),
     BullModule.registerQueue({ name: 'vendor-sync-base' }),
     ScheduleModule.forRoot(),

@@ -8,7 +8,7 @@ import { CheckoutDto, CheckoutResponseDto, OrderResponseDto, OrderLineItemRespon
 import { InventoryService } from '../inventory/inventory.service';
 import { AuditService, AuditLog, AuditEntityType } from '../common/audit';
 import { PaymentsService } from '../payments/payments.service';
-import { PaymentAuthorization } from '../common/entities/payment-authorization.entity';
+import { PaymentAuthorization, PaymentStatus } from '\.\./common/entities/payment-authorization.entity';
 
 @Injectable()
 export class OrdersService {
@@ -177,9 +177,7 @@ export class OrdersService {
 
       await this.auditService.logOrderCreated(correlationId, savedOrder.id, dto.buyerId, totalAmount);
 
-      this.logger.log('Order ' + savedOrder.id + ' created with total ' + totalAmount, OrdersService.name, correlationId);
-
-      const response = await this.getOrderById(savedOrder.id, correlationId);
+      const response = await this.getOrderById(savedOrder.id, correlationId, manager);
 
       return {
         success: true,
@@ -190,9 +188,10 @@ export class OrdersService {
     });
   }
 
-  async getOrderById(id: string, correlationId: string): Promise<OrderResponseDto> {
+  async getOrderById(id: string, correlationId: string, manager?: any): Promise<OrderResponseDto> {
+    const repo = manager ? manager.getRepository(Order) : this.orderRepository;
     const relations: FindOptionsRelations<Order> = { lineItems: { product: true, vendor: true } };
-    const order = await this.orderRepository.findOne({
+    const order = await repo.findOne({
       where: { id },
       relations: relations,
     });
@@ -294,6 +293,15 @@ export class OrdersService {
       throw new BadRequestException('Illegal transition ' + dto.action + ' from current status ' + order.status);
     }
 
+    // For provider-backed orders, confirmation requires captured payment; preserve legacy orders with no payment record.
+    if (nextStatus === OrderStatus.CONFIRMED) {
+      const payments = await this.paymentsService.findByOrderId(orderId);
+      const hasCaptured = payments.some(p => p.status === PaymentStatus.CAPTURED);
+      const hasLegacyNoPayment = payments.length === 0;
+      if (!hasCaptured && !hasLegacyNoPayment) {
+        throw new BadRequestException('Order cannot be confirmed: payment is not captured.');
+      }
+    }
     await this.orderRepository.update(orderId, { status: nextStatus });
     await this.auditService.logOrderStatusChange(correlationId, orderId, order.status, nextStatus, actorId);
 

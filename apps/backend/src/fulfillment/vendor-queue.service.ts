@@ -191,8 +191,11 @@ export class VendorQueueService implements OnModuleInit, OnModuleDestroy {
   }
 
   async configureVendorConcurrency(vendorId: string, concurrency: number): Promise<void> {
-    const effectiveConcurrency = Math.min(concurrency, this.maxConcurrencyPerVendor);
-    
+    const effectiveConcurrency = Math.min(Math.max(1, concurrency), this.maxConcurrencyPerVendor);
+
+    // Enforce worker exists before concurrency change (worker-before-enqueue).
+    this.workerRegistry.getOrCreateWorker(vendorId, effectiveConcurrency);
+
     if (this.vendorQueues.has(vendorId)) {
       this.logger.log(
         'Updating concurrency for vendor: ' + vendorId + ' to ' + effectiveConcurrency,
@@ -201,7 +204,9 @@ export class VendorQueueService implements OnModuleInit, OnModuleDestroy {
     }
 
     await this.getOrCreateVendorQueue(vendorId, effectiveConcurrency);
-    
+
+    // Persistent stats: create temporary Queue instance per vendor when needed (or reuse mapped).
+    // Existing mapped queue already tracks via BullMQ Redis; stats reflect persistent state.
     this.logger.log(
       'Vendor concurrency configured: ' + vendorId + ' = ' + effectiveConcurrency,
       VendorQueueService.name,
@@ -217,28 +222,32 @@ export class VendorQueueService implements OnModuleInit, OnModuleDestroy {
     failed: number;
     delayed: number;
   } | null> {
-    const queue = this.vendorQueues.get(vendorId);
+    // Persistent stats from BullMQ Redis (not just local Map): if vendor not in local
+    // Map, open a temporary Queue to read counts, then close it.
+    let queue = this.vendorQueues.get(vendorId);
+    let temporary = false;
     if (!queue) {
-      return null;
+      queue = new Queue<VendorQueueJobData>(this.getQueueName(vendorId), {
+        connection: getBullMQConnectionOptions(this.configService),
+      });
+      temporary = true;
     }
-
-    const [waiting, active, completed, failed, delayed] = await Promise.all([
-      queue.getWaitingCount(),
-      queue.getActiveCount(),
-      queue.getCompletedCount(),
-      queue.getFailedCount(),
-      queue.getDelayedCount(),
-    ]);
-
-    return {
-      vendorId,
-      queueName: this.getQueueName(vendorId),
-      waiting,
-      active,
-      completed,
-      failed,
-      delayed,
-    };
+    try {
+      const [waiting, active, completed, failed, delayed] = await Promise.all([
+        queue.getWaitingCount(),
+        queue.getActiveCount(),
+        queue.getCompletedCount(),
+        queue.getFailedCount(),
+        queue.getDelayedCount(),
+      ]);
+      return {
+        vendorId,
+        queueName: this.getQueueName(vendorId),
+        waiting, active, completed, failed, delayed,
+      };
+    } finally {
+      if (temporary) await queue.close();
+    }
   }
 
   async getAllQueueStats(): Promise<Array<{

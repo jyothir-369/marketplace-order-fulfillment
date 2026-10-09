@@ -1,4 +1,4 @@
-﻿/**
+/**
  * lib/types.ts â€” DTO mirrors for the NestJS backend (Â§3.3).
  *
  * The frontend never speaks to the backend through untyped objects.
@@ -97,9 +97,8 @@ export interface CheckoutLineItemDto {
 }
 
 export interface CheckoutDto {
-  buyerId: Uuid;
   items: CheckoutLineItemDto[];
-  shippingAddress: string;
+  shippingAddress?: string;
   /** Optional client-generated idempotency key for safe retries. */
   idempotencyKey?: string;
   /** Phase 5.1 — mock payment card selection (`mock-success` | `mock-decline`). */
@@ -162,6 +161,7 @@ export interface AdminDashboardDto {
   totalOrders: number;
   totalRevenue: number;
   pendingOrders: number;
+  fulfillingOrders: number;
   fulfilledOrders: number;
   cancelledOrders: number;
   deadLetterJobs: number;
@@ -390,6 +390,28 @@ export interface VendorResponseDto {
 
 export type UserRole = "buyer" | "vendor" | "admin" | "operations";
 
+export interface ReviewDto {
+  id: Uuid;
+  productId: Uuid;
+  buyerId: Uuid;
+  buyerName: string | null;
+  rating: number;
+  comment: string | null;
+  createdAt: IsoDateTime;
+}
+
+export interface ReviewListResponse {
+  reviews: ReviewDto[];
+  averageRating: number;
+  totalReviews: number;
+}
+
+export interface CreateReviewDto {
+  productId: Uuid;
+  rating: number;
+  comment?: string;
+}
+
 export interface UserDto {
   id: Uuid;
   email: string;
@@ -443,3 +465,7 @@ export interface DashboardOverviewData {
     label: string;
   }>;
 }
+
+export interface ReconciliationResultDto { processed: number; resolved: number; stillAmbiguous: number; errors: string[]; }
+export interface ReconcilePayload { olderThanMinutes?: number; }
+export interface AmbiguousJobDto extends DeadLetterJobDto { status: "ambiguous"; orderLineItemId: Uuid; correlationId?: string | null; errorMessage?: string | null; lastAttemptedAt?: IsoDateTime | null; }

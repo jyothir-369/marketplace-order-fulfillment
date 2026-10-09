@@ -19,6 +19,7 @@ import { HealthModule } from './health/health.module';
 import { Vendor } from './common/entities/vendor.entity';
 import { Category } from './common/entities/category.entity';
 import { Product } from './common/entities/product.entity';
+import { Review } from './common/entities/review.entity';
 import { Order } from './common/entities/order.entity';
 import { OrderLineItem } from './common/entities/order-line-item.entity';
 import { VendorSyncJob } from './common/entities/vendor-sync-job.entity';
@@ -48,7 +49,7 @@ import { PaymentsModule } from './payments/payments.module';
           return {
             type: 'postgres',
             url: dbUrl,
-            entities: [Vendor, Category, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken, PaymentAuthorization],
+            entities: [Vendor, Category, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken, PaymentAuthorization, Review],
             // Phase 2.1: migrations own the schema — no more synchronize in any env.
             synchronize: false,
             logging: configService.get('NODE_ENV') === 'development',
@@ -65,7 +66,7 @@ import { PaymentsModule } from './payments/payments.module';
           database: configService.get('DB_DATABASE', 'marketplace'),
           // Fixed a latent drift: the fallback branch was missing Category from
           // entities, so `sync:true` would have silently dropped categories.
-          entities: [Vendor, Category, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken, PaymentAuthorization],
+          entities: [Vendor, Category, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken, PaymentAuthorization, Review],
           synchronize: false,
           logging: configService.get('NODE_ENV') === 'development',
           ssl: false,

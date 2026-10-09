@@ -1,5 +1,5 @@
 import { migrationDataSource } from './datasource';
-import { Baseline0000000000000 } from './0000000000000-Baseline';
+import { Baseline1709999999999 } from './1709999999999-Baseline';
 import { AddShippingAddressToOrders1710000000001 } from './1710000000001-AddShippingAddressToOrders';
 import { BackfillShippingAddress1710000000002 } from './1710000000002-BackfillShippingAddress';
 import { AddOrderNumber1710000000003 } from './1710000000003-AddOrderNumber';
@@ -11,7 +11,7 @@ import { AddOrderNumberSequence1710000000008 } from './1710000000008-AddOrderNum
 import { AddPaymentAuthorizations1710000000009 } from './1710000000009-AddPaymentAuthorizations';
 
 const migrations = [
-  Baseline0000000000000,
+  Baseline1709999999999,
   AddShippingAddressToOrders1710000000001,
   BackfillShippingAddress1710000000002,
   AddOrderNumber1710000000003,

@@ -4,6 +4,7 @@ import { PaymentAuthorization } from '../common/entities/payment-authorization.e
 import { AuditModule } from '../common/audit';
 import { PaymentsService } from './payments.service';
 import { MockPaymentService } from './mock-payment.service';
+import { RazorpayProviderService } from './razorpay-provider.service';
 
 /**
  * PaymentsModule (Phase 5.1).
@@ -15,7 +16,7 @@ import { MockPaymentService } from './mock-payment.service';
  */
 @Module({
   imports: [TypeOrmModule.forFeature([PaymentAuthorization]), AuditModule],
-  providers: [PaymentsService, MockPaymentService],
-  exports: [PaymentsService, MockPaymentService],
+  providers: [PaymentsService, MockPaymentService, RazorpayProviderService],
+  exports: [PaymentsService, MockPaymentService, RazorpayProviderService],
 })
 export class PaymentsModule {}

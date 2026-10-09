@@ -17,8 +17,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *
  * Enums are named `<table>_<column>_enum` to match what synchronize produces.
  */
-export class Baseline0000000000000 implements MigrationInterface {
-  name = 'Baseline0000000000000';
+export class Baseline1709999999999 implements MigrationInterface {
+  name = 'Baseline1709999999999';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // ── enum consts duplicated from the entity enums ─────────────────────
@@ -26,8 +26,8 @@ export class Baseline0000000000000 implements MigrationInterface {
     const fulfillmentStatuses = "'pending','syncing','confirmed','failed','dead_letter','ambiguous'";
     const syncJobStatuses = "'pending','in_progress','completed','failed','ambiguous','dead_letter'";
     const auditActions =
-      "'INVENTORY_DECREMENT','INVENTORY_RESTORE','ORDER_CREATED','ORDER_STATUS_CHANGED','FULFILLMENT_STATUS_CHANGED','SYNC_JOB_CREATED','SYNC_JOB_STATUS_CHANGED','SYNC_JOB_RETRIED','SYNC_JOB_DEAD_LETTER','ADMIN_RESOLUTION','ADMIN_ORDER_CANCEL','ADMIN_DEAD_LETTER_RETRY','RECONCILIATION_RESOLVED','RECONCILIATION_FAILED'";
-    const auditEntityTypes = "'PRODUCT','ORDER','ORDER_LINE_ITEM','VENDOR_SYNC_JOB'";
+      "'INVENTORY_DECREMENT','INVENTORY_RESTORE','ORDER_CREATED','ORDER_STATUS_CHANGED','FULFILLMENT_STATUS_CHANGED','SYNC_JOB_CREATED','SYNC_JOB_STATUS_CHANGED','SYNC_JOB_RETRIED','SYNC_JOB_DEAD_LETTER','ADMIN_RESOLUTION','ADMIN_ORDER_CANCEL','ADMIN_DEAD_LETTER_RETRY','RECONCILIATION_RESOLVED','RECONCILIATION_FAILED','PAYMENT_AUTHORIZED','PAYMENT_FAILED','PAYMENT_REFUNDED'";
+    const auditEntityTypes = "'PRODUCT','ORDER','ORDER_LINE_ITEM','VENDOR_SYNC_JOB','PAYMENT'";
 
     for (const { name, values } of [
       { name: 'orders_status_enum', values: orderStatuses },
@@ -39,10 +39,13 @@ export class Baseline0000000000000 implements MigrationInterface {
       await queryRunner.query(`DO $$ BEGIN CREATE TYPE "${name}" AS ENUM (${values}); EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
     }
 
+    // Ensure pgcrypto (gen_random_uuid) is available; safe idempotent guard.
+    await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto"`);
+
     // ── vendors ──────────────────────────────────────────────────────────
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS "vendors" (
-        "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+        "id" uuid NOT NULL DEFAULT gen_random_uuid(),
         "name" character varying(255) NOT NULL,
         "createdAt" timestamp DEFAULT now(),
         "updatedAt" timestamp DEFAULT now(),
@@ -56,7 +59,7 @@ export class Baseline0000000000000 implements MigrationInterface {
     // 0006 renames it to `vendor_id`.
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS "products" (
-        "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+        "id" uuid NOT NULL DEFAULT gen_random_uuid(),
         "vendorId" uuid NOT NULL,
         "name" character varying(255) NOT NULL,
         "price" numeric(10,2) NOT NULL DEFAULT 0,
@@ -73,7 +76,7 @@ export class Baseline0000000000000 implements MigrationInterface {
     // Pre-0001/0003/0005 state: no shipping_address / order_number / buyer_user_id.
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS "orders" (
-        "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+        "id" uuid NOT NULL DEFAULT gen_random_uuid(),
         "buyer_id" uuid NOT NULL,
         "status" "orders_status_enum" NOT NULL DEFAULT 'placed',
         "totalAmount" numeric(12,2) NOT NULL DEFAULT 0,
@@ -87,7 +90,7 @@ export class Baseline0000000000000 implements MigrationInterface {
     // ── order_line_items ─────────────────────────────────────────────────
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS "order_line_items" (
-        "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+        "id" uuid NOT NULL DEFAULT gen_random_uuid(),
         "order_id" uuid NOT NULL,
         "product_id" uuid NOT NULL,
         "vendor_id" uuid NOT NULL,
@@ -106,7 +109,7 @@ export class Baseline0000000000000 implements MigrationInterface {
     // ── vendor_sync_jobs ─────────────────────────────────────────────────
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS "vendor_sync_jobs" (
-        "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+        "id" uuid NOT NULL DEFAULT gen_random_uuid(),
         "order_line_item_id" uuid NOT NULL,
         "status" "vendor_sync_jobs_status_enum" NOT NULL DEFAULT 'pending',
         "attempts" integer NOT NULL DEFAULT 0,
@@ -125,10 +128,10 @@ export class Baseline0000000000000 implements MigrationInterface {
     // ── audit_logs ───────────────────────────────────────────────────────
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS "audit_logs" (
-        "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+        "id" uuid NOT NULL DEFAULT gen_random_uuid(),
         "correlation_id" character varying(100) NOT NULL,
         "action" "audit_logs_action_enum" NOT NULL,
-        "entity_type" "audit_logs_entity_type_enum" NOT NULL,
+        "entityType" "audit_logs_entity_type_enum" NOT NULL,
         "entity_id" uuid NOT NULL,
         "previous_state" jsonb,
         "new_state" jsonb,

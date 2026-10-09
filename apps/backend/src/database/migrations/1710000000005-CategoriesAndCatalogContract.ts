@@ -42,10 +42,10 @@ export class CategoriesAndCatalogContract1710000000005 implements MigrationInter
 
     // ── 2. products — add slug + category columns ─────────────────────────────
     await queryRunner.query(
-      `ALTER TABLE "products" ADD COLUMN "slug" varchar(255) NULL`,
+      `ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "slug" varchar(255) NULL`,
     );
     await queryRunner.query(
-      `ALTER TABLE "products" ADD COLUMN "category" varchar(120) NULL`,
+      `ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "category" varchar(120) NULL`,
     );
     await queryRunner.createIndex(
       'products',
@@ -57,9 +57,26 @@ export class CategoriesAndCatalogContract1710000000005 implements MigrationInter
     );
 
     // ── 3. orders — add buyer_user_id ─────────────────────────────────────────
-    await queryRunner.query(
-      `ALTER TABLE "orders" ADD COLUMN "buyer_user_id" uuid NULL`,
+    const buyerUserIdColumn = await queryRunner.query(
+      `SELECT udt_name, is_nullable
+       FROM information_schema.columns
+       WHERE table_schema = current_schema()
+         AND table_name = 'orders'
+         AND column_name = 'buyer_user_id'`,
     );
+
+    if (buyerUserIdColumn.length === 0) {
+      await queryRunner.query(
+        `ALTER TABLE "orders" ADD COLUMN "buyer_user_id" uuid NULL`,
+      );
+    } else if (
+      buyerUserIdColumn[0].udt_name !== 'uuid' ||
+      buyerUserIdColumn[0].is_nullable !== 'YES'
+    ) {
+      throw new Error(
+        'Existing orders.buyer_user_id must be a nullable UUID column.',
+      );
+    }
     await queryRunner.createIndex(
       'orders',
       new TableIndex({ name: 'idx_orders_buyer_user_id', columnNames: ['buyer_user_id'] }),
@@ -76,34 +93,18 @@ export class CategoriesAndCatalogContract1710000000005 implements MigrationInter
       ON CONFLICT ("name") DO NOTHING
     `);
 
-    // ── 5. backfill product slugs (unique via id suffix) ──────────────────────
+    // ── 5. backfill product slugs (unique via id suffix, only when NULL) ────────
     await queryRunner.query(`
       UPDATE "products"
       SET "slug" = LOWER(
         REGEXP_REPLACE("name", '[^a-zA-Z0-9]+', '-', 'g')
       ) || '-' || SUBSTR(MD5("id"::text), 1, 8)
+      WHERE "slug" IS NULL
     `);
 
-    // ── 6. backfill product categories (round-robin across 5 defaults) ────────
-    await queryRunner.query(`
-      WITH cats(name, slot) AS (
-        VALUES
-          ('Electronics', 0),
-          ('Apparel', 1),
-          ('Home & Kitchen', 2),
-          ('Sports & Outdoors', 3),
-          ('Books & Media', 4)
-      ),
-      numbered AS (
-        SELECT p."id", ROW_NUMBER() OVER (ORDER BY p."created_at", p."id") - 1 AS idx
-        FROM "products" p
-      )
-      UPDATE "products" p
-      SET "category" = c.name
-      FROM numbered n
-      JOIN cats c ON c.slot = (n.idx % 5)
-      WHERE p."id" = n."id"
-    `);
+    // ── 6. Skip round-robin category assignment — do not invent product classifications.
+    // Products remain unclassified (NULL) unless an explicit trusted mapping is configured.
+    // No automated UPDATE to products.category is performed by this migration.
 
     // ── 7. FK: products.category -> categories.name (dual-write name column) ──
     await queryRunner.query(`

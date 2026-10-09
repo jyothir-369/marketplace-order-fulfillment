@@ -1,4 +1,4 @@
-﻿/**
+/**
  * lib/api.ts — typed fetch client
  */
 
@@ -29,6 +29,8 @@ import type {
   LoginDto,
   CatalogQuery,
   CatalogListResponse,
+  ReviewListResponse,
+  CreateReviewDto,
 } from "@/lib/types";
 import { getAccessToken } from "@/lib/auth-token";
 
@@ -171,9 +173,12 @@ export async function getVendorProducts(
   vendorId: string = VENDOR_ID,
   includeInactive = false
 ): Promise<ProductDto[]> {
-  return apiFetch<ProductDto[]>(`/catalog/vendor/${vendorId}`, {
-    params: { includeInactive: includeInactive ? "true" : "false" },
-  });
+  if (includeInactive) {
+    return apiFetch<ProductDto[]>(`/catalog/vendor/${vendorId}/manage`);
+  }
+
+  // Public storefront requests always return active products.
+  return apiFetch<ProductDto[]>(`/catalog/vendor/${vendorId}`);
 }
 
 export const getVendorCatalog = getVendorProducts;
@@ -193,9 +198,33 @@ export async function updateStock(
   });
 }
 
+/** PATCH /api/catalog/:id — update product (name, category, price, stock, active). Uses bearer auth, returns ProductDto. */
+export async function updateProduct(
+  id: string,
+  payload: Partial<{ name: string; category: string; price: number; stockCount: number; isActive: boolean }>
+): Promise<ProductDto> {
+  return apiFetch<ProductDto>(`/catalog/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
 /** POST /api/catalog */
 export async function createProduct(payload: CreateProductDto): Promise<ProductDto> {
   return apiFetch<ProductDto>("/catalog", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+/** GET /api/catalog/reviews/product/:productId */
+export async function getReviews(productId: string): Promise<ReviewListResponse> {
+  return apiFetch<ReviewListResponse>(`/catalog/reviews/product/${productId}`);
+}
+
+/** POST /api/catalog/reviews */
+export async function createReview(payload: CreateReviewDto): Promise<{ message: string; reviewId: string }> {
+  return apiFetch<{ message: string; reviewId: string }>("/catalog/reviews", {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -283,6 +312,17 @@ export async function getVendorOrders(
 // ---------------------------------------------------------------------------
 // Dead-letter / sync jobs
 // ---------------------------------------------------------------------------
+
+export async function getAmbiguousJobs(): Promise<DeadLetterJobDto[]> {
+  return apiFetch<DeadLetterJobDto[]>("/fulfillment/ambiguous");
+}
+
+export async function runReconciliation(payload?: { olderThanMinutes?: number }): Promise<{ processed: number; resolved: number; stillAmbiguous: number; errors: string[] }> {
+  return apiFetch<{ processed: number; resolved: number; stillAmbiguous: number; errors: string[] }>("/fulfillment/reconcile", {
+    method: "POST",
+    body: JSON.stringify(payload ?? { olderThanMinutes: 10 }),
+  });
+}
 
 /** GET /api/fulfillment/dead-letter (vendor-scoped) */
 export async function getVendorDeadLetterJobs(): Promise<DeadLetterJobDto[]> {

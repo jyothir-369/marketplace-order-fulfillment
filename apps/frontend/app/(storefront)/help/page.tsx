@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, HelpCircle, MessageCircle, Truck, CreditCard,
   UserCog, ShieldCheck, Receipt, Store, FileText, Lock, CheckCircle2 } from "lucide-react";
 import { SupportTicketForm } from "@/components/storefront/SupportTicketForm";
+import { AnalyticsPageEvents, MetricsPanel } from "@/components/storefront/AnalyticsEvents";
 import { cn } from "@/lib/utils";
 
 const SECTIONS = [
@@ -131,6 +132,9 @@ export default function HelpPage() {
         </p>
         <SupportTicketForm />
       </section>
+
+      <AnalyticsPageEvents eventName="help_article_opened" category="help" label="Help Center loaded" />
+      <MetricsPanel />
 
       {/* Trust / support indicators */}
       <section aria-label="Trust and policies" className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">

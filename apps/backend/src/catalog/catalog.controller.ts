@@ -26,6 +26,7 @@ import {
   VendorDetailDto,
   VendorDashboardDto,
 } from './dto/catalog.dto';
+import { CreateReviewDto, ReviewListResponseDto, ReviewDto } from './dto/review.dto';
 import { CorrelationId } from '../common/decorators/correlation-id.decorator';
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -111,13 +112,29 @@ export class CatalogController {
     return this.catalogService.getVendorDashboard(vendorId);
   }
 
+  /**
+   * Protected vendor-management listing, including inactive products.
+   * A vendor may only inspect products in their own tenant.
+   */
+  @Get('vendor/:vendorId/manage')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(UserRole.VENDOR, UserRole.ADMIN)
+  async getVendorProductsForManagement(
+    @Param('vendorId', ParseUUIDPipe) vendorId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ProductResponseDto[]> {
+    this.assertVendorScoped(vendorId, user);
+    return this.catalogService.findByVendor(vendorId, false);
+  }
+
+  /**
+   * Public storefront listing. Inactive products are never exposed here.
+   */
   @Get('vendor/:vendorId')
   async getProductsByVendor(
     @Param('vendorId', ParseUUIDPipe) vendorId: string,
-    @Query('includeInactive') includeInactive: string,
   ): Promise<ProductResponseDto[]> {
-    const activeOnly = includeInactive !== 'true';
-    return this.catalogService.findByVendor(vendorId, activeOnly);
+    return this.catalogService.findByVendor(vendorId, true);
   }
 
   // Static/literal routes MUST precede :id — Express matches in declaration
@@ -184,6 +201,25 @@ export class CatalogController {
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<ProductResponseDto> {
     return this.catalogService.updateProduct(id, dto, correlationId, user);
+  }
+
+  @Get('reviews/product/:productId')
+  async getReviews(
+    @Param('productId', ParseUUIDPipe) productId: string,
+  ): Promise<ReviewListResponseDto> {
+    return this.catalogService.getReviews(productId);
+  }
+
+  @Post('reviews')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(UserRole.BUYER, UserRole.ADMIN, UserRole.OPERATIONS, UserRole.VENDOR)
+  async createReview(
+    @Body() dto: CreateReviewDto,
+    @CurrentUser() user: AuthenticatedUser,
+    @CorrelationId() correlationId: string,
+  ): Promise<{ message: string; reviewId: string }> {
+    const reviewId = await this.catalogService.createReview({ ...dto, productId: (dto as any).productId }, user, correlationId);
+    return { message: 'Review submitted', reviewId };
   }
 
   @Delete(':id')

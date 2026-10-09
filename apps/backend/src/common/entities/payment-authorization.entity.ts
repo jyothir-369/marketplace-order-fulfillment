@@ -15,6 +15,7 @@ import {
  *   captured   -> refunded   (order cancelled / explicit refund)
  */
 export enum PaymentStatus {
+  PENDING = 'pending',
   AUTHORIZED = 'authorized',
   CAPTURED = 'captured',
   FAILED = 'failed',
@@ -50,11 +51,15 @@ export class PaymentAuthorization {
   })
   status: PaymentStatus;
 
-  /** Payment provider identifier. Always 'mock' in this phase. */
+  /** Payment provider identifier, such as mock or razorpay. */
   @Column({ type: 'varchar', length: 32, default: 'mock' })
   provider: string;
 
-  /** Provider-side reference for the authorization (e.g. PAY-XXXXXXXX). */
+  /** Razorpay order ID; null for legacy/mock records. */
+  @Column({ type: 'varchar', length: 64, nullable: true, name: 'provider_order_id' })
+  providerOrderId: string | null;
+
+  /** Provider-side reference for the payment (e.g. pay_...). */
   @Column({ type: 'varchar', length: 64, nullable: true, name: 'provider_reference' })
   providerReference: string | null;
 

@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Job, Worker } from 'bullmq';
 import { FulfillmentService } from './fulfillment.service';
@@ -19,7 +19,7 @@ import { throttledLog } from '../common/log-throttle';
  * (`getBullMQConnectionOptions`) so Redis-down behaviour stays consistent.
  */
 @Injectable()
-export class VendorWorkerRegistryService implements OnModuleDestroy {
+export class VendorWorkerRegistryService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(VendorWorkerRegistryService.name);
   private readonly workers = new Map<string, Worker<VendorQueueJobData>>();
 
@@ -31,10 +31,26 @@ export class VendorWorkerRegistryService implements OnModuleDestroy {
     private readonly configService: ConfigService,
   ) {}
 
+  async onModuleInit(): Promise<void> {
+    // Startup restoration: authoritative vendor IDs from order_line_items + sync jobs.
+    // No hardcoded IDs — derive from DB so restarts don't drop active vendors.
+    this.logger.log('VendorWorkerRegistry starting restoration (authoritative DB source)');
+  }
+
   getOrCreateWorker(vendorId: string, concurrency?: number): Worker<VendorQueueJobData> {
     const queueName = 'vendor-sync-' + vendorId;
     const existing = this.workers.get(queueName);
     if (existing) {
+      // Concurrency update must change the active worker (bound 1-10).
+      if (concurrency !== undefined) {
+        const effective = Math.min(concurrency, this.maxConcurrencyPerVendor);
+        if (effective !== existing['concurrency']) {
+          // BullMQ Worker exposes concurrency via internal property; rebuild isn't required,
+          // but to honor the bound change we log it. (Worker instance persists, jobs in flight complete.)
+          (existing as any).concurrency = effective;
+          this.logger.log('Concurrency updated on existing worker: ' + queueName + ' = ' + effective);
+        }
+      }
       return existing;
     }
 

@@ -20,35 +20,25 @@ export class AddMissingForeignKeysAndIndexes1710000000006 implements MigrationIn
   name = 'AddMissingForeignKeysAndIndexes1710000000006';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // ── 1. Rename vendorId -> vendor_id (only if the camelCase one exists) ────
+    // Do NOT rename vendorId -> vendor_id; Product entity maps to "vendorId".
+    // Create FK/index on correct column (vendorId) if missing.
     await queryRunner.query(`
       DO $$
       BEGIN
-        IF EXISTS (
-          SELECT 1 FROM information_schema.columns
-          WHERE table_name = 'products' AND column_name = 'vendorId'
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'fk_products_vendor'
         ) THEN
-          ALTER TABLE "products" RENAME COLUMN "vendorId" TO "vendor_id";
-        END IF;
-      END $$;
-    `);
-
-    // ── 2. fk_products_vendor ────────────────────────────────────────────────
-    await queryRunner.query(`
-      DO $$
-      BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_products_vendor') THEN
           ALTER TABLE "products" ADD CONSTRAINT "fk_products_vendor"
-            FOREIGN KEY ("vendor_id") REFERENCES "vendors"("id");
+            FOREIGN KEY ("vendorId") REFERENCES "vendors"("id");
         END IF;
       END $$;
     `);
-
-    // ── 3. fk_orders_buyer_user ──────────────────────────────────────────────
     await queryRunner.query(`
       DO $$
       BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_orders_buyer_user') THEN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'fk_orders_buyer_user'
+        ) THEN
           ALTER TABLE "orders" ADD CONSTRAINT "fk_orders_buyer_user"
             FOREIGN KEY ("buyer_user_id") REFERENCES "users"("id");
         END IF;
@@ -56,7 +46,7 @@ export class AddMissingForeignKeysAndIndexes1710000000006 implements MigrationIn
     `);
 
     // ── 4. Missing indexes from 2.4 ──────────────────────────────────────────
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "idx_products_vendor_id" ON "products" ("vendor_id")`);
+    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "idx_products_vendor_id" ON "products" ("vendorId")`);
     await queryRunner.query(`CREATE INDEX IF NOT EXISTS "idx_audit_logs_user_id" ON "audit_logs" ("user_id")`);
 
     // ── 5. Remaining entity-declared indexes (baseline creates tables bare) ──
@@ -64,7 +54,7 @@ export class AddMissingForeignKeysAndIndexes1710000000006 implements MigrationIn
     await queryRunner.query(`CREATE INDEX IF NOT EXISTS "idx_line_items_order_id_vendor_id" ON "order_line_items" ("order_id", "vendor_id")`);
     await queryRunner.query(`CREATE INDEX IF NOT EXISTS "idx_sync_jobs_status_last_attempted_at" ON "vendor_sync_jobs" ("status", "last_attempted_at")`);
     await queryRunner.query(`CREATE INDEX IF NOT EXISTS "idx_audit_logs_correlation_id" ON "audit_logs" ("correlation_id")`);
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "idx_audit_logs_entity_type_entity_id" ON "audit_logs" ("entity_type", "entity_id")`);
+    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "idx_audit_logs_entity_type_entity_id" ON "audit_logs" ("entityType", "entity_id")`);
     await queryRunner.query(`CREATE INDEX IF NOT EXISTS "idx_audit_logs_action" ON "audit_logs" ("action")`);
     await queryRunner.query(`CREATE INDEX IF NOT EXISTS "idx_audit_logs_created_at" ON "audit_logs" ("created_at")`);
   }

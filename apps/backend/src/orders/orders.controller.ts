@@ -11,7 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
-import { CheckoutDto, CheckoutResponseDto, OrderResponseDto, TransitionOrderDto } from './dto/orders.dto';
+import { CheckoutRequestDto, CheckoutDto, CheckoutResponseDto, OrderResponseDto, TransitionOrderDto } from './dto/orders.dto';
 import { CorrelationId } from '../common/decorators/correlation-id.decorator';
 import { AuthGuard } from '../auth/auth.guard';
 import { OptionalAuthGuard } from '../auth/optional-auth.guard';
@@ -32,11 +32,21 @@ export class OrdersController {
   @UseGuards(OptionalAuthGuard)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   async checkout(
-    @Body() dto: CheckoutDto,
+    @Body() requestDto: CheckoutRequestDto,
     @CorrelationId() correlationId: string,
     @CurrentUser() user?: AuthenticatedUser,
   ): Promise<CheckoutResponseDto> {
-    return this.ordersService.checkout(dto, correlationId, user?.id);
+    // Derive buyer identity from verified JWT; never accept a client-supplied UUID.
+    if (!user || !user.id) {
+      throw new ForbiddenException('Buyer must be authenticated: buyerId must come from verified JWT identity');
+    }
+    // Reject any attempt to override identity via payload.
+    const payloadKeys = Object.keys(requestDto || {});
+    if (payloadKeys.includes('buyerId')) {
+      throw new ForbiddenException('Client-supplied buyerId is not allowed');
+    }
+    const correctedDto: CheckoutDto = { ...requestDto, buyerId: user.id };
+    return this.ordersService.checkout(correctedDto, correlationId, user.id);
   }
 
   // NOTE: static paths MUST precede :id — Express matches in declaration order,
