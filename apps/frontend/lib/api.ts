@@ -569,3 +569,48 @@ export async function validateCoupon(code: string, orderTotal?: number): Promise
 export async function getMe(): Promise<UserDto> {
   return apiFetch<UserDto>("/auth/me");
 }
+export interface RazorpayInitiationRequest {
+  items: Array<{ productId: string; quantity: number }>;
+  shippingAddress: string;
+}
+
+export interface RazorpayInitiationResponse {
+  success: true;
+  orderId: string;
+  orderNumber: string | null;
+  providerOrderId: string;
+  publicKeyId: string;
+  amountPaise: number;
+  currency: string;
+}
+
+export interface RazorpayVerificationRequest {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+}
+
+export interface RazorpayVerificationResponse {
+  verified: boolean;
+  alreadyProcessed: boolean;
+  orderId: string;
+  paymentId: string;
+}
+
+export async function initiateRazorpayOrder(
+  payload: RazorpayInitiationRequest,
+): Promise<RazorpayInitiationResponse> {
+  return apiFetch<RazorpayInitiationResponse>("/payments/razorpay/initiate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function verifyRazorpayPayment(
+  payload: RazorpayVerificationRequest,
+): Promise<RazorpayVerificationResponse> {
+  return apiFetch<RazorpayVerificationResponse>("/payments/razorpay/verify", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
