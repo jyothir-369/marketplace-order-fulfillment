@@ -1,8 +1,8 @@
-﻿module.exports = {
+module.exports = {
   testEnvironment: 'jsdom',
   setupFilesAfterEnv: ['<rootDir>/test/setupTests.ts'],
   transform: {
-    '^.+\\.(ts|tsx)$': ['babel-jest', { configFile: require('path').resolve(__dirname, 'babel.jest.config.cjs') }],
+    '^.+\\.(ts|tsx)$': ['babel-jest'],
   },
   moduleNameMapper: { '^@/(.*)$': '<rootDir>/$1' },
   testMatch: [
@@ -10,6 +10,3 @@
     '**/test/**/*.spec.[tj]s?(x)',
   ],
 };
-
-
-

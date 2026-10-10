@@ -1,4 +1,4 @@
-import { Test, TestingModule } from '@nestjs/testing';
+﻿import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource, Repository } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { CheckoutReconciliationService } from './checkout-reconciliation.service';
@@ -67,7 +67,7 @@ describe('CheckoutReconciliationService', () => {
         { provide: getRepositoryToken(OrderLineItem), useValue: buildMockRepo() },
         { provide: DataSource, useValue: buildMockDataSource(buildMockRepo()) },
         { provide: InventoryService, useValue: { restoreStock: async () => ({ success: true, productId: "product-1", previousStock: 10, newStock: 11, requestedQuantity: 1 }) } },
-        { provide: AuditService, useValue: ({ log: async () => ({ id: 'audit-1' }) } as unknown as AuditService) },
+        { provide: AuditService, useValue: { log: async () => ({ id: 'audit-1' }) } },
       ],
     }).compile();
 
@@ -88,8 +88,8 @@ describe('CheckoutReconciliationService', () => {
     const capturedRepo = buildMockRepo([captured]);
     const ds = buildMockDataSource(capturedRepo);
     const svc = new CheckoutReconciliationService(capturedRepo as any, capturedRepo as any, capturedRepo as any, ds,
-      ({ restoreStock: async () => ({ success: true, productId: "product-1", previousStock: 10, newStock: 11, requestedQuantity: 1 }) } as unknown as InventoryService),
-      ({ log: async () => ({ id: 'audit-1' }) } as unknown as AuditService),
+      { restoreStock: async () => ({ success: true, productId: "product-1", previousStock: 10, newStock: 11, requestedQuantity: 1 }) },
+      { log: async () => ({ id: 'audit-1' }) },
     );
     const res = await svc.reconcileAttempt('captured-id', 'corr-1');
     expect(res.reconciled).toBe(false);
@@ -106,8 +106,8 @@ describe('CheckoutReconciliationService', () => {
     const orderRepo = buildMockRepo([{ id: 'order-old', status: OrderStatus.PLACED, createdAt: new Date() }]);
     const ds = buildMockDataSource(repo, { order: orderRepo });
     const svc = new CheckoutReconciliationService(repo as any, orderRepo as any, repo as any, ds,
-      ({ restoreStock: async () => ({ success: true, productId: "product-1", previousStock: 10, newStock: 11, requestedQuantity: 1 }) } as unknown as InventoryService),
-      ({ log: async () => ({ id: 'audit-1' }) } as unknown as AuditService),
+      { restoreStock: async () => ({ success: true, productId: "product-1", previousStock: 10, newStock: 11, requestedQuantity: 1 }) },
+      { log: async () => ({ id: 'audit-1' }) },
     );
     const res = await svc.reconcileAttempt('old-pay', 'corr-old');
     expect(res.reconciled).toBe(true);
@@ -123,7 +123,7 @@ describe('CheckoutReconciliationService', () => {
   it('handles concurrent duplicate executions safely (transaction rollback)', async () => {
     const dupRepo = buildMockRepo([{ id: 'dup', status: PaymentStatus.AUTHORIZED, orderId: 'o', createdAt: new Date(Date.now()-40*60*1000) }]);
     const dupDs = buildMockDataSource(dupRepo);
-    const dupSvc = new CheckoutReconciliationService(dupRepo as any, dupRepo as any, dupRepo as any, dupDs, ({ restoreStock: async () => ({ success: true, productId: "product-1", previousStock: 10, newStock: 11, requestedQuantity: 1 }) } as unknown as InventoryService), ({ log: async () => ({id:'a'}) } as unknown as AuditService));
+    const dupSvc = new CheckoutReconciliationService(dupRepo as any, dupRepo as any, dupRepo as any, dupDs, { restoreStock: async () => ({ success: true, productId: "product-1", previousStock: 10, newStock: 11, requestedQuantity: 1 }) }, { log: async () => ({id:'a'}) });
     const res = await dupSvc.retryReconciliation('dup', 'corr-dup');
     expect(res.attemptId).toBe('dup');
   });
@@ -146,8 +146,8 @@ describe('CheckoutReconciliationService', () => {
     const ds = buildMockDataSource(payRepo, { order: orderRepo, line: lineRepo });
     const restored = [];
     const svc = new CheckoutReconciliationService(payRepo as any, orderRepo as any, lineRepo as any, ds,
-      ({ restoreStock: async (pid: string, qty: number) => { restored.push({ pid, qty }); return { success: true, productId: pid, previousStock: 10, newStock: 11, requestedQuantity: qty }; } } as unknown as InventoryService),
-      ({ log: async () => ({ id: 'audit-1' }) } as unknown as AuditService),
+      { restoreStock: async (pid: string, qty: number) => { restored.push({ pid, qty }); return { success: true, productId: pid, previousStock: 10, newStock: 11, requestedQuantity: qty }; } },
+      { log: async () => ({ id: 'audit-1' }) },
     );
     const res = await svc.reconcileAttempt('pay-line', 'corr-line');
     expect(res.reconciled).toBe(true);
@@ -159,7 +159,7 @@ describe('CheckoutReconciliationService', () => {
   it('is idempotent: retry does not restore inventory twice', async () => {
     const retryRepo = buildMockRepo([{ id: 'test-id', status: PaymentStatus.AUTHORIZED, orderId: 'o', createdAt: new Date(Date.now()-40*60*1000) }]);
     const retryDs = buildMockDataSource(retryRepo);
-    const retrySvc = new CheckoutReconciliationService(retryRepo as any, retryRepo as any, retryRepo as any, retryDs, ({ restoreStock: async () => ({ success: true, productId: "product-1", previousStock: 10, newStock: 11, requestedQuantity: 1 }) } as unknown as InventoryService), ({ log: async () => ({id:'a'}) } as unknown as AuditService));
+    const retrySvc = new CheckoutReconciliationService(retryRepo as any, retryRepo as any, retryRepo as any, retryDs, { restoreStock: async () => ({ success: true, productId: "product-1", previousStock: 10, newStock: 11, requestedQuantity: 1 }) }, { log: async () => ({id:'a'}) });
     const res = await retrySvc.retryReconciliation('test-id', 'corr-test');
     expect(res.attemptId).toBe('test-id');
   });

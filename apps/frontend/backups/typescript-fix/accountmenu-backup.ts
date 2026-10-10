@@ -63,7 +63,7 @@ export function AccountMenu() {
     return (
       <div className="hidden items-center gap-1.5 sm:flex">
         <Link
-          href={`/login?redirect=${encodeURIComponent(pathname ?? '')}`}
+          href={`/login?redirect=${encodeURIComponent(pathname)}`}
           className="rounded-lg px-3 py-2 text-sm font-medium text-[var(--color-foreground)] hover:bg-[var(--color-cream)]/60 transition-colors"
         >
           Sign in

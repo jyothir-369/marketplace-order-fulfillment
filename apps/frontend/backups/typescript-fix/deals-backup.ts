@@ -37,7 +37,7 @@ function DealsPageInner() {
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
 
-  const sort = searchParams?.get("sort") ?? "price-asc";
+  const sort = searchParams.get("sort") ?? "price-asc";
 
   useEffect(() => {
     let cancelled = false;
@@ -142,7 +142,7 @@ function DealsPageInner() {
           <select
             value={sort}
             onChange={(e) => {
-              const p = new URLSearchParams(searchParams ? searchParams.toString() : "");
+              const p = new URLSearchParams(searchParams.toString());
               p.set("sort", e.target.value);
               window.history.replaceState(null, "", `/deals?${p.toString()}`);
               // re-render driven by searchParams change after navigation state

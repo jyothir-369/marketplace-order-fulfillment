@@ -78,13 +78,13 @@ function ProductsPageInner() {
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
 
   // URL-driven filters
-  const q = searchParams?.get("q") ?? "";
-  const vendor = searchParams?.get("vendor") ?? "";
-  const category = searchParams?.get("category") ?? "";
-  const maxPriceParam = searchParams?.get("maxPrice") ?? "";
+  const q = searchParams.get("q") ?? "";
+  const vendor = searchParams.get("vendor") ?? "";
+  const category = searchParams.get("category") ?? "";
+  const maxPriceParam = searchParams.get("maxPrice");
   const maxPrice = maxPriceParam ? Number(maxPriceParam) : undefined;
-  const sort = (searchParams?.get("sort") ?? "") as CatalogSort | "";
-  const pageParam = searchParams?.get("page") ?? "";
+  const sort = (searchParams.get("sort") ?? "") as CatalogSort | "";
+  const pageParam = searchParams.get("page");
   const currentPage = pageParam ? Math.max(1, Number(pageParam)) : 1;
 
   const products = response?.items ?? [];
@@ -160,7 +160,7 @@ function ProductsPageInner() {
 
   // URL filter helpers
   const updateFilter = (key: string, value: string) => {
-    const params = new URLSearchParams((searchParams ?? new URLSearchParams()).toString());
+    const params = new URLSearchParams(searchParams.toString());
     if (value) {
       params.set(key, value);
     } else {

@@ -98,7 +98,7 @@ export function OperationalSidebar({ role, footer }: OperationalSidebarProps) {
       <nav className="flex-1 py-2" aria-label="Primary navigation">
         {navItems.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.href || (pathname ?? '').startsWith(item.href + "/");
+          const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
           return (
             <Link
               key={item.href}

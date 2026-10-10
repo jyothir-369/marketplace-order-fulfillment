@@ -42,7 +42,7 @@ export function useRoleGuard(required: readonly Role[]): UseRoleGuardResult {
 
     if (!user) {
       // Unauthenticated → send to the login page, preserving the destination.
-      const redirect = encodeURIComponent(pathname ?? '');
+      const redirect = encodeURIComponent(pathname);
       router.replace(`/login?redirect=${redirect}`);
       return;
     }

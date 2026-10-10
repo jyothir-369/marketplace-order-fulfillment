@@ -105,9 +105,9 @@ export function StorefrontHeader() {
               className={cn(
                 "group relative inline-flex items-center gap-1.5 py-1 text-sm font-medium",
                 "text-[var(--color-ink-navy)] font-semibold",
-                (pathname ?? '').startsWith("/products") ? "text-[var(--color-ink-navy)] font-semibold" : "text-[var(--color-warm-muted)] hover:text-[var(--color-foreground)]"
+                pathname.startsWith("/products") ? "text-[var(--color-ink-navy)] font-semibold" : "text-[var(--color-warm-muted)] hover:text-[var(--color-foreground)]"
               )}
-              aria-current={(pathname ?? '').startsWith("/products") ? "page" : undefined}
+              aria-current={pathname.startsWith("/products") ? "page" : undefined}
             >
               <Package className="h-3.5 w-3.5 text-[var(--color-brass)]" aria-hidden />
               <span>Shop</span>
@@ -146,7 +146,7 @@ export function StorefrontHeader() {
 
           <nav aria-label="Primary" className="hidden sm:flex items-center gap-7">
             {NAV_LINKS.filter((n) => n.href !== "/products").map(({ href, label, Icon }) => {
-              const isActive = (pathname ?? '').startsWith(href);
+              const isActive = pathname.startsWith(href);
               return (
                 <Link
                   key={href}
@@ -223,7 +223,7 @@ export function StorefrontHeader() {
           {/* Mobile nav â€” icon-only links */}
           <nav aria-label="Mobile navigation" className="flex sm:hidden items-center gap-1">
             {NAV_LINKS.map(({ href, label, Icon }) => {
-              const isActive = (pathname ?? '').startsWith(href);
+              const isActive = pathname.startsWith(href);
               return (
                 <Link
                   key={href}

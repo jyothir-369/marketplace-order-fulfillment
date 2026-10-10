@@ -60,7 +60,7 @@ function CategoryIcon({ type, className }: { type: VendorMeta["iconType"]; class
 function VendorStorefrontInner() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const params = useParams();
-  const vendorId = String(params?.vendorId ?? "");
+  const vendorId = String(params.vendorId ?? "");
   const { push: toast } = useToast();
   const addToCart = useCartStore((s) => s.addToCart);
 
