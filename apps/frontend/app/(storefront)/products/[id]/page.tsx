@@ -18,7 +18,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ShoppingBag } from "lucide-react";
+import { ArrowLeft, ShoppingBag, Heart, ChevronRight, Lock, ShieldCheck, Truck } from "lucide-react";
 import { getProductById, type Product } from "@/lib/api";
 import { useCartStore } from "@/context/CartStore";
 import { InventoryLockIndicator } from "@/components/order/InventoryLockIndicator";
@@ -53,6 +53,7 @@ function PDPInner() {
   const [error, setError] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [addedToCart, setAddedToCart] = useState(false);
+  const [isWishlisted, setIsWishlisted] = useState(false);
 
   const load = useCallback(async () => {
     if (!productId) return;
@@ -161,35 +162,58 @@ function PDPInner() {
         Back to Catalog
       </Link>
 
+      {/* Breadcrumbs */}
+      <nav aria-label="Breadcrumb" className="text-xs text-[var(--color-warm-muted)] mb-4">
+        <ol className="flex items-center gap-2">
+          <li><Link href="/" className="hover:text-[var(--color-foreground)]">Home</Link></li>
+          <li aria-hidden>/</li>
+          <li><Link href="/products" className="hover:text-[var(--color-foreground)]">Shop</Link></li>
+          <li aria-hidden>/</li>
+          <li className="text-[var(--color-foreground)] font-medium truncate max-w-[200px]">{product.name}</li>
+        </ol>
+      </nav>
+
       {/* Editorial eyebrow */}
       <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--color-accent)] mb-1">
         {product.category ?? "Product Detail"}
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-        {/* Left: PhotoBlock gallery */}
+        {/* Left: PhotoBlock gallery + thumbnails */}
         <div className="space-y-3">
-          <PhotoBlock
-            category={palette}
-            label={`${product.name} product image`}
-            accent
-            square={false}
-            className="rounded-xl border border-[var(--color-border)] shadow-v2"
-          />
-          {/* Ships-from callout — editorial brand moment */}
+          <div className="grid grid-cols-4 gap-2">
+            <div className="col-span-4">
+              <PhotoBlock
+                category={palette}
+                label={`${product.name} product image`}
+                accent
+                square={false}
+                className="rounded-xl border border-[var(--color-border)] shadow-v2"
+              />
+            </div>
+            {[1,2,3].map((i) => (
+              <div key={i} className="aspect-square rounded-lg border border-[var(--color-border)] bg-[var(--color-cream)] overflow-hidden">
+                <PhotoBlock category={palette} label={`${product.name} thumbnail ${i}`} square className="rounded-lg w-full h-full" />
+              </div>
+            ))}
+          </div>
+          {/* Specs */}
+          {product.description && (
+            <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-v2">
+              <h3 className="font-display text-sm font-bold text-[var(--color-foreground)] mb-2">Details</h3>
+              <p className="text-sm text-[var(--color-warm-muted)] leading-relaxed">{product.description}</p>
+            </div>
+          )}
+          {/* Ships-from callout */}
           <div
             className={cn(
               "flex items-center gap-2 px-4 py-3 rounded-lg",
               "bg-[var(--color-forest)]/8 border border-[var(--color-forest)]/20"
             )}
           >
-            <span
-              aria-hidden
-              className="h-1.5 w-1.5 rounded-full bg-[var(--color-forest)]"
-            />
+            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[var(--color-forest)]" />
             <p className="text-xs font-medium text-[var(--color-forest)]">
-              Ships from&nbsp;
-              <span className="font-semibold">{product.vendorName}</span>
+              Ships from&nbsp;<span className="font-semibold">{product.vendorName}</span>
             </p>
           </div>
         </div>
@@ -222,6 +246,37 @@ function PDPInner() {
               currency: "USD",
             }).format(product.price)}
           </p>
+
+          {/* Vendor profile card */}
+          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-v2">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[var(--color-ink-navy)] to-[var(--color-navy-deep)] flex items-center justify-center text-white font-display text-sm font-bold">
+                {product.vendorName?.charAt(0)?.toUpperCase() ?? "V"}
+              </div>
+              <div>
+                <Link href={`/vendors/${product.vendorId}`} className="font-display text-sm font-bold text-[var(--color-foreground)] hover:text-[var(--color-brass)] transition-colors">
+                  {product.vendorName}
+                </Link>
+                <p className="text-[11px] text-[var(--color-warm-muted)]">Verified Seller</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Wishlist action */}
+          <button
+            type="button"
+            onClick={() => setIsWishlisted((v) => !v)}
+            aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
+            className={cn(
+              "w-full py-2.5 rounded-xl font-medium text-sm border transition-colors flex items-center justify-center gap-2",
+              isWishlisted
+                ? "bg-[var(--color-ink-navy)] text-[var(--color-brass)] border-[var(--color-brass)]/30"
+                : "bg-transparent text-[var(--color-foreground)] border-[var(--color-border)] hover:border-[var(--color-accent)]"
+            )}
+          >
+            <Heart className={cn("h-4 w-4", isWishlisted && "fill-current")} aria-hidden />
+            {isWishlisted ? "Saved to Wishlist" : "Save to Wishlist"}
+          </button>
 
           {/* Inventory indicator */}
           <InventoryLockIndicator stockCount={product.stockCount} />
@@ -325,6 +380,45 @@ function PDPInner() {
             </button>
           </div>
         </div>
+
+        {/* Trust / delivery info */}
+        <div className="flex items-center gap-4 text-xs text-[var(--color-warm-subtle)] mt-4">
+          <span className="inline-flex items-center gap-1"><Lock size={12} aria-hidden /> Secure checkout</span>
+          <span className="inline-flex items-center gap-1"><ShieldCheck size={12} aria-hidden /> Verified vendor</span>
+          <span className="inline-flex items-center gap-1"><Truck size={12} aria-hidden /> Tracked delivery</span>
+        </div>
+
+        {/* Below grid: reviews stub, related products, recently viewed */}
+        <section aria-label="Related products" className="mt-10 border-t border-[var(--color-border)] pt-8">
+          <h2 className="font-display text-xl font-bold text-[var(--color-foreground)] mb-4">Related products</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+              <Link key={i} href="/products" className="group rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-v2 hover:shadow-sm transition-shadow">
+                <div className="aspect-[4/3] rounded-lg bg-gradient-to-br from-[var(--color-cream)] to-[var(--color-muted)] mb-3" aria-hidden />
+                <p className="text-sm font-semibold text-[var(--color-foreground)] group-hover:text-[var(--color-brass)] transition-colors">Related item {i}</p>
+                <p className="text-xs text-[var(--color-warm-muted)]">Explore similar products</p>
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-ink-navy)] mt-2">
+                  View <ChevronRight className="h-3 w-3" aria-hidden />
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        <section aria-label="Recently viewed" className="mt-8 border-t border-[var(--color-border)] pt-8">
+          <h2 className="font-display text-xl font-bold text-[var(--color-foreground)] mb-4">Recently viewed</h2>
+          <p className="text-sm text-[var(--color-warm-muted)]">Add products to build your recently viewed list.</p>
+        </section>
+
+        <section aria-label="Reviews" className="mt-12 border-t border-[var(--color-border)] pt-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-display text-xl font-bold text-[var(--color-foreground)]">Reviews</h2>
+            <span className="text-xs text-[var(--color-warm-muted)]">0 reviews</span>
+          </div>
+          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-6 shadow-v2 text-center text-sm text-[var(--color-warm-muted)]">
+            No reviews yet. Be the first to share your experience with this product.
+          </div>
+        </section>
       </div>
     </div>
   );

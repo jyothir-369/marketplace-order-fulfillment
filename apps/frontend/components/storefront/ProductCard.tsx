@@ -277,7 +277,7 @@ export function ProductCard({
             </span>
           </div>
 
-          {/* Price pill */}
+          {/* Price pill + discount badge */}
           <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-[var(--color-cream)] border border-[var(--color-warm-border)] text-[var(--color-ink-navy)] shadow-xs">
             {formatCurrency(product.price)}
           </span>

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body, Query, ParseUUIDPipe } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Query, ParseUUIDPipe, UseGuards } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { FulfillmentService } from './fulfillment.service';
@@ -7,6 +7,12 @@ import { VendorSyncJobData, VENDOR_SYNC_QUEUE } from './vendor-sync.processor';
 import { VendorQueueService } from './vendor-queue.service';
 import { ReconciliationResultDto } from './dto/fulfillment.dto';
 import { CorrelationId } from '../common/decorators/correlation-id.decorator';
+import { AuthGuard } from '../auth/auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { UserRole } from '../common/entities/user.entity';
+import type { AuthenticatedUser } from '../auth/auth.types';
 
 @Controller('fulfillment')
 export class FulfillmentController {
@@ -82,7 +88,10 @@ export class FulfillmentController {
     };
   }
 
+  // Ops/config surface — gated to authenticated vendors/admins (Phase 1 RBAC gate).
   @Post('vendor/:vendorId/configure')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(UserRole.VENDOR, UserRole.ADMIN, UserRole.OPERATIONS)
   async configureVendor(
     @Param('vendorId') vendorId: string,
     @Body() body: { concurrency?: number },
@@ -99,6 +108,8 @@ export class FulfillmentController {
   }
 
   @Post('reconcile')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.OPERATIONS)
   async runReconciliation(@Body() body: { olderThanMinutes?: number }): Promise<ReconciliationResultDto> {
     return this.fulfillmentService.reconcile(body.olderThanMinutes !== undefined ? body.olderThanMinutes : 10);
   }
@@ -111,13 +122,30 @@ export class FulfillmentController {
     return this.vendorQueueService.getAllQueueStats();
   }
 
+  /**
+   * Dead-letter sync jobs. Authenticated VENDOR/ADMIN/OPERATIONS only
+   * (Phase 3.3 — was public); VENDORs are filtered to their own line items.
+   */
   @Get('dead-letter')
-  async getDeadLetterJobs(): Promise<VendorSyncJob[]> {
-    return this.fulfillmentService.getDeadLetterJobs();
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(UserRole.VENDOR, UserRole.ADMIN, UserRole.OPERATIONS)
+  async getDeadLetterJobs(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<VendorSyncJob[]> {
+    return this.fulfillmentService.getDeadLetterJobs(
+      user.role === UserRole.VENDOR ? user.vendorId ?? undefined : undefined,
+    );
   }
 
+  /** Ambiguous-gate sync jobs — same gate as dead-letter (Phase 3.3). */
   @Get('ambiguous')
-  async getAmbiguousJobs(): Promise<VendorSyncJob[]> {
-    return this.fulfillmentService.getAmbiguousJobs();
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(UserRole.VENDOR, UserRole.ADMIN, UserRole.OPERATIONS)
+  async getAmbiguousJobs(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<VendorSyncJob[]> {
+    return this.fulfillmentService.getAmbiguousJobs(
+      user.role === UserRole.VENDOR ? user.vendorId ?? undefined : undefined,
+    );
   }
 }

@@ -8,12 +8,14 @@ import { Product } from '../common/entities/product.entity';
 import { Vendor } from '../common/entities/vendor.entity';
 import { InventoryModule } from '../inventory/inventory.module';
 import { AuditModule } from '../common/audit';
+import { PaymentsModule } from '../payments/payments.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Order, OrderLineItem, Product, Vendor]),
     InventoryModule,
     AuditModule,
+    PaymentsModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService],

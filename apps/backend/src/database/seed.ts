@@ -1,8 +1,9 @@
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
-import { Vendor, Product, Order, OrderLineItem, VendorSyncJob } from '../common/entities';
+import { Vendor, Product, Order, OrderLineItem, VendorSyncJob, User, UserRole, Category } from '../common/entities';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
+import * as bcrypt from 'bcryptjs';
 
 // Load root .env file
 const envPath = path.resolve(__dirname, '../../../../.env');
@@ -15,17 +16,17 @@ function parseDatabaseUrl(): any {
   const dbUrl = process.env.DATABASE_URL;
   const isCloudDb = dbUrl && (dbUrl.includes('supabase.co') || dbUrl.includes('sslmode=require'));
 
-  if (dbUrl && dbUrl.trim() !== '') {
+  if (dbUrl && dbUrl.trim() !== '' && isCloudDb) {
     return {
       type: 'postgres',
       url: dbUrl,
-      ssl: isCloudDb ? { rejectUnauthorized: false } : false,
+      ssl: { rejectUnauthorized: false },
     };
   }
 
   return {
     type: 'postgres',
-    host: process.env.DB_HOST || 'localhost',
+    host: process.env.DB_HOST || '127.0.0.1',
     port: parseInt(process.env.DB_PORT || '5432'),
     username: process.env.DB_USERNAME || 'postgres',
     password: process.env.DB_PASSWORD || 'postgres',
@@ -35,15 +36,18 @@ function parseDatabaseUrl(): any {
 }
 
 const dbConfig = parseDatabaseUrl();
+// Phase 2.1: schema now comes from `npm run migration:run`, never synchronize.
+// Run migrations first, then `npm run seed` against the migrated schema.
 const AppDataSource = new DataSource({
   ...dbConfig,
-  entities: [Vendor, Product, Order, OrderLineItem, VendorSyncJob],
-  synchronize: true,
+  entities: [Vendor, Category, Product, Order, OrderLineItem, VendorSyncJob, User],
+  synchronize: false,
   logging: true,
 });
 
 interface VendorSeed {
   name: string;
+  category: string;
   products: Array<{
     name: string;
     price: number;
@@ -51,9 +55,18 @@ interface VendorSeed {
   }>;
 }
 
+function slugify(value: string): string {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 const vendorSeeds: VendorSeed[] = [
   {
     name: 'Electronics World',
+    category: 'Electronics',
     products: [
       { name: 'Wireless Headphones', price: 79.99, stockCount: 50 },
       { name: 'Bluetooth Speaker', price: 49.99, stockCount: 100 },
@@ -64,6 +77,7 @@ const vendorSeeds: VendorSeed[] = [
   },
   {
     name: 'Home & Kitchen Co',
+    category: 'Home & Kitchen',
     products: [
       { name: 'Coffee Maker', price: 89.99, stockCount: 40 },
       { name: 'Air Fryer', price: 149.99, stockCount: 25 },
@@ -74,6 +88,7 @@ const vendorSeeds: VendorSeed[] = [
   },
   {
     name: 'Sports Gear Inc',
+    category: 'Sports & Outdoors',
     products: [
       { name: 'Yoga Mat Premium', price: 34.99, stockCount: 120 },
       { name: 'Resistance Bands', price: 19.99, stockCount: 200 },
@@ -84,6 +99,7 @@ const vendorSeeds: VendorSeed[] = [
   },
   {
     name: 'Fashion Forward',
+    category: 'Apparel',
     products: [
       { name: 'Cotton T-Shirt', price: 24.99, stockCount: 500 },
       { name: 'Denim Jeans', price: 59.99, stockCount: 200 },
@@ -94,6 +110,7 @@ const vendorSeeds: VendorSeed[] = [
   },
   {
     name: 'Books & Media',
+    category: 'Books & Media',
     products: [
       { name: 'Bestseller Novel', price: 14.99, stockCount: 300 },
       { name: 'Cookbook Collection', price: 29.99, stockCount: 100 },
@@ -119,8 +136,24 @@ async function seedDatabase(): Promise<void> {
 
     console.log('Clearing existing data...');
     // Use raw query to truncate tables (cascade handles FK constraints)
-    await AppDataSource.query('TRUNCATE TABLE products, vendors, order_line_items, orders, vendor_sync_jobs RESTART IDENTITY CASCADE');
+    await AppDataSource.query('TRUNCATE TABLE refresh_tokens, users, products, categories, vendors, order_line_items, orders, vendor_sync_jobs RESTART IDENTITY CASCADE');
     console.log('Existing data cleared');
+    console.log('');
+
+    // ── Seed categories (Phase 2) ──────────────────────────────────────────────
+    const categoryRepo = AppDataSource.getRepository(Category);
+    const defaultCategories: Array<{ name: string; slug: string; description: string }> = [
+      { name: 'Electronics', slug: 'electronics', description: 'Gadgets, devices, and accessories' },
+      { name: 'Apparel', slug: 'apparel', description: 'Clothing, shoes, and fashion accessories' },
+      { name: 'Home & Kitchen', slug: 'home-kitchen', description: 'Furniture, appliances, and home goods' },
+      { name: 'Sports & Outdoors', slug: 'sports-outdoors', description: 'Fitness gear and outdoor equipment' },
+      { name: 'Books & Media', slug: 'books-media', description: 'Books, music, and digital media' },
+    ];
+    for (const c of defaultCategories) {
+      const cat = categoryRepo.create(c);
+      await categoryRepo.save(cat);
+      console.log('  + Category: ' + c.name + ' (' + c.slug + ')');
+    }
     console.log('');
 
     let totalProducts = 0;
@@ -138,9 +171,13 @@ async function seedDatabase(): Promise<void> {
 
       const products: Product[] = [];
       for (const productSeed of vendorSeed.products) {
+        const baseSlug = slugify(productSeed.name);
+        const uniqueSuffix = Math.random().toString(36).slice(2, 8);
         const product = productRepo.create({
           vendorId: savedVendor.id,
           name: productSeed.name,
+          slug: baseSlug + '-' + uniqueSuffix,
+          category: vendorSeed.category,
           price: productSeed.price,
           stockCount: productSeed.stockCount,
           isActive: true,
@@ -148,12 +185,49 @@ async function seedDatabase(): Promise<void> {
         const savedProduct = await productRepo.save(product);
         products.push(savedProduct);
         totalProducts++;
-        console.log('    + ' + productSeed.name + ' (Stock: ' + productSeed.stockCount + ', Price: $' + productSeed.price + ')');
+        console.log('    + ' + productSeed.name + ' [' + vendorSeed.category + '] (Stock: ' + productSeed.stockCount + ', Price: $' + productSeed.price + ')');
       }
 
       vendorMap.set(savedVendor.id, { vendor: savedVendor, products });
       console.log('');
     }
+
+    // ─────────────────────────────────────────────────────────────
+    // Phase 1 — demo users (one per role). The vendor user is tied
+    // to the first seeded vendor so RBAC tenant scoping is testable.
+    // ─────────────────────────────────────────────────────────────
+    const userRepo = AppDataSource.getRepository(User);
+    const passwordHash = await bcrypt.hash('DemoPass2024!', 10);
+    const firstVendorId = vendorMap.keys().next().value as string;
+
+    const demoUsers: Array<{
+      email: string;
+      role: UserRole;
+      displayName: string;
+      vendorId: string | null;
+    }> = [
+      { email: 'buyer@marketplace.dev', role: UserRole.BUYER, displayName: 'Demo Buyer', vendorId: null },
+      { email: 'vendor@marketplace.dev', role: UserRole.VENDOR, displayName: 'Demo Vendor', vendorId: firstVendorId },
+      { email: 'admin@marketplace.dev', role: UserRole.ADMIN, displayName: 'Demo Admin', vendorId: null },
+      { email: 'operations@marketplace.dev', role: UserRole.OPERATIONS, displayName: 'Demo Ops', vendorId: null },
+    ];
+
+    console.log('='.repeat(60));
+    console.log('SEED USERS (Phase 1 auth/RBAC)');
+    console.log('='.repeat(60));
+    for (const u of demoUsers) {
+      const user = userRepo.create({
+        email: u.email,
+        passwordHash,
+        role: u.role,
+        displayName: u.displayName,
+        vendorId: u.vendorId,
+      });
+      const saved = await userRepo.save(user);
+      console.log(`  + ${saved.email} (${saved.role})${saved.vendorId ? ' -> vendor ' + saved.vendorId : ''} - ID: ${saved.id}`);
+    }
+    console.log('  Common password for all demo users: DemoPass2024!');
+    console.log('');
 
     console.log('='.repeat(60));
     console.log('SEED SUMMARY');
@@ -192,7 +266,9 @@ async function seedDatabase(): Promise<void> {
     console.error('Error seeding database:', error);
     throw error;
   } finally {
-    await AppDataSource.destroy();
+    if (AppDataSource.isInitialized) {
+      await AppDataSource.destroy();
+    }
   }
 }
 

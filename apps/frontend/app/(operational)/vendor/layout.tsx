@@ -16,6 +16,8 @@ import { ThemeController } from "@/components/operational/ThemeController";
 import { ToastProvider } from "@/components/ui/toast";
 import { ErrorBoundary } from "@/components/operational/ErrorBoundary";
 import { NetworkStatusBanner } from "@/components/order/NetworkStatusBanner";
+import { RequireRole } from "@/components/auth/RequireRole";
+import { VENDOR_ROLES } from "@/lib/rbac";
 
 export const metadata: Metadata = {
   title: {
@@ -26,6 +28,7 @@ export const metadata: Metadata = {
 
 export default function VendorLayout({ children }: { children: React.ReactNode }) {
   return (
+    <RequireRole roles={VENDOR_ROLES}>
     <ErrorBoundary label="Vendor portal">
       <div
         className="flex min-h-screen bg-[var(--color-background)]"
@@ -46,5 +49,6 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
         </div>
       </div>
     </ErrorBoundary>
+    </RequireRole>
   );
 }

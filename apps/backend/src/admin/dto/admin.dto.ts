@@ -18,6 +18,7 @@ export class AdminResolveDto {
 
 export class AdminDashboardDto {
   totalOrders: number;
+  totalRevenue: number;
   pendingOrders: number;
   fulfillingOrders: number;
   fulfilledOrders: number;

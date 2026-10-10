@@ -40,4 +40,9 @@ docker-compose*.yml
 
 # Misc
 *.bak
-*.tmp
+*.tmp*.md
+
+# Local environment secrets
+.env
+.env.*
+!.env.example

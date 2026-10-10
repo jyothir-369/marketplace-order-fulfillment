@@ -94,6 +94,8 @@ export const useCartStore = create<CartState>()(
           cart: state.cart.filter((i) => i.productId !== productId),
         })),
 
+      clearCart: () => set({ cart: [] }),
+
       updateQuantity: (productId, quantity) =>
         set((state) => ({
           cart: state.cart
@@ -108,8 +110,6 @@ export const useCartStore = create<CartState>()(
             // Drop items whose quantity fell to 0
             .filter((i) => i.quantity > 0),
         })),
-
-      clearCart: () => set({ cart: [] }),
 
       openDrawer: () => set({ drawerOpen: true }),
       closeDrawer: () => set({ drawerOpen: false }),

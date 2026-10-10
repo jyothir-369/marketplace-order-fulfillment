@@ -4,11 +4,11 @@ import { FormEvent, useEffect, useState } from "react";
 import { Plus, X, AlertTriangle, RefreshCw } from "lucide-react";
 import {
   Product,
-  VENDOR_ID,
   getVendorProducts,
   updateStock,
   createProduct,
 } from "@/lib/api";
+import { useVendorId } from "@/lib/hooks/use-vendor-id";
 import { ToastProvider, useToast } from "@/components/ui/toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -31,6 +31,9 @@ function stockStatus(p: Product): { label: string; tone: "success" | "warning" |
 
 function InventoryInner() {
   const { push: toast } = useToast();
+  // Phase 3.1/3.2: the tenant comes from the session — the backend forces
+  // product writes onto the caller's vendor and rejects other-vendor reads.
+  const vendorId = useVendorId();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,10 +45,11 @@ function InventoryInner() {
   const [filter, setFilter] = useState("");
 
   const refresh = async () => {
+    if (!vendorId) return;
     setLoading(true);
     setError(null);
     try {
-      const data = await getVendorProducts(VENDOR_ID, true);
+      const data = await getVendorProducts(vendorId, true);
       setProducts(data);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to load inventory";
@@ -56,7 +60,7 @@ function InventoryInner() {
     }
   };
 
-  useEffect(() => { void refresh(); }, []);
+  useEffect(() => { void refresh(); }, [vendorId]);
 
   const saveStock = async (productId: string) => {
     const raw = editing[productId];
@@ -108,7 +112,7 @@ function InventoryInner() {
     setCreating(true);
     try {
       const created = await createProduct({
-        vendorId: VENDOR_ID,
+        vendorId: vendorId ?? "",
         name: form.name.trim(),
         price: form.price,
         stockCount: form.stockCount,

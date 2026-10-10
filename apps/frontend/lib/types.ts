@@ -1,4 +1,4 @@
-﻿/**
+/**
  * lib/types.ts â€” DTO mirrors for the NestJS backend (Â§3.3).
  *
  * The frontend never speaks to the backend through untyped objects.
@@ -22,13 +22,15 @@ export type CorrelationId = string;
 export interface ProductDto {
   id: Uuid;
   name: string;
+  slug: string | null;
   price: number;
   stockCount: number;
   vendorId: Uuid;
   vendorName: string;
-  /** Optional product category (e.g. Electronics, Apparel, Home & Living, Industrial). */
   category: string | null;
   isActive: boolean;
+  description?: string | null;
+  images?: string[] | null;
 }
 
 export interface CreateProductDto {
@@ -95,11 +97,12 @@ export interface CheckoutLineItemDto {
 }
 
 export interface CheckoutDto {
-  buyerId: Uuid;
   items: CheckoutLineItemDto[];
-  shippingAddress: string;
+  shippingAddress?: string;
   /** Optional client-generated idempotency key for safe retries. */
   idempotencyKey?: string;
+  /** Phase 5.1 — mock payment card selection (`mock-success` | `mock-decline`). */
+  paymentMethodToken?: string;
 }
 
 export interface CheckoutResponseDto {
@@ -158,6 +161,7 @@ export interface AdminDashboardDto {
   totalOrders: number;
   totalRevenue: number;
   pendingOrders: number;
+  fulfillingOrders: number;
   fulfilledOrders: number;
   cancelledOrders: number;
   deadLetterJobs: number;
@@ -332,9 +336,44 @@ export interface VendorDashboardDto {
 
 export interface CategorySummaryDto {
   name: string;
+  slug: string | null;
   productCount: number;
   activeProductCount: number;
   totalStock: number;
+}
+
+// ---------------------------------------------------------------------------
+// Catalog query + paginated response (Phase 2)
+// ---------------------------------------------------------------------------
+
+export type CatalogSort = 'newest' | 'price-asc' | 'price-desc' | 'name-asc' | 'name-desc';
+
+export interface CatalogQuery {
+  q?: string;
+  category?: string;
+  vendor?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  sort?: CatalogSort;
+  page?: number;
+  pageSize?: number;
+  includeInactive?: boolean;
+}
+
+export interface CatalogFacets {
+  categories: CategorySummaryDto[];
+  totalProducts: number;
+  minPrice: number;
+  maxPrice: number;
+}
+
+export interface CatalogListResponse {
+  items: ProductDto[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  facets: CatalogFacets;
 }
 
 export interface VendorResponseDto {
@@ -344,3 +383,89 @@ export interface VendorResponseDto {
   activeProductCount: number;
   createdAt: IsoDateTime;
 }
+
+// ---------------------------------------------------------------------------
+// Auth + RBAC (Phase 1)
+// ---------------------------------------------------------------------------
+
+export type UserRole = "buyer" | "vendor" | "admin" | "operations";
+
+export interface ReviewDto {
+  id: Uuid;
+  productId: Uuid;
+  buyerId: Uuid;
+  buyerName: string | null;
+  rating: number;
+  comment: string | null;
+  createdAt: IsoDateTime;
+}
+
+export interface ReviewListResponse {
+  reviews: ReviewDto[];
+  averageRating: number;
+  totalReviews: number;
+}
+
+export interface CreateReviewDto {
+  productId: Uuid;
+  rating: number;
+  comment?: string;
+}
+
+export interface UserDto {
+  id: Uuid;
+  email: string;
+  role: UserRole;
+  displayName: string | null;
+  vendorId: Uuid | null;
+}
+
+export interface AuthTokensDto {
+  id: Uuid;
+  email: string;
+  role: UserRole;
+  displayName: string | null;
+  vendorId: Uuid | null;
+  accessToken: string;
+  refreshToken: string;
+  /** Access token lifetime in seconds (drives proactive re-auth). */
+  expiresIn: number;
+}
+
+export interface RegisterDto {
+  email: string;
+  password: string;
+  displayName?: string;
+}
+
+export interface LoginDto {
+  email: string;
+  password: string;
+}
+
+export interface DashboardOverviewData {
+  stats: {
+    outstanding_cents: number;
+    overdue_cents: number;
+    paid_this_month_cents: number;
+    paid_this_month_delta_pct: number | null;
+    total_customers: number;
+  };
+  recent_invoices: Array<{
+    id: string;
+    number: string;
+    customer_name: string;
+    status: string;
+    total_cents: number;
+    due_date: string;
+  }>;
+  recent_activity: Array<{
+    entity_id: string;
+    timestamp: string;
+    label: string;
+  }>;
+}
+
+export interface ReconciliationResultDto { processed: number; resolved: number; stillAmbiguous: number; errors: string[]; }
+export interface ReconcilePayload { olderThanMinutes?: number; }
+export interface AmbiguousJobDto extends DeadLetterJobDto { status: "ambiguous"; orderLineItemId: Uuid; correlationId?: string | null; errorMessage?: string | null; lastAttemptedAt?: IsoDateTime | null; }

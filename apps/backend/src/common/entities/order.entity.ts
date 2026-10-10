@@ -26,12 +26,30 @@ export class Order {
   @Column({ type: 'uuid', name: 'buyer_id' })
   buyerId: string;
 
+  /**
+   * The authenticated buyer user (users.id) that placed the order, when the
+   * checkout was performed by a signed-in user. Nullable — legacy/anonymous
+   * checkouts keep only `buyerId`. Powers `GET /api/orders/me` (Phase 2).
+   */
+  @Index()
+  @Column({ type: 'uuid', nullable: true, name: 'buyer_user_id' })
+  buyerUserId: string | null;
+
   @Column({
     type: 'enum',
     enum: OrderStatus,
     default: OrderStatus.PLACED,
   })
   status: OrderStatus;
+
+  /**
+   * Human-facing order reference (`ORD-YYYYMMDD-NNNNNN`), generated inside the
+   * checkout transaction from the `order_number_seq` Postgres sequence.
+   * Column pre-exists from migration 0003 (varchar(20) nullable unique);
+   * migration 0008 adds the backing sequence.
+   */
+  @Column({ type: 'varchar', length: 20, nullable: true, name: 'order_number' })
+  orderNumber: string | null;
 
   @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
   totalAmount: number;

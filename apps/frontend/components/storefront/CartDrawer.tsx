@@ -126,16 +126,19 @@ function CartDrawerItem({
             <span className="text-sm font-semibold tabular-nums text-[var(--color-foreground)]">
               {formatCurrency(price * quantity)}
             </span>
-            <button
-              type="button"
-              onClick={onRemove}
-              className={cn(
-                "text-xs underline underline-offset-2",
-                "text-[var(--color-destructive)] hover:opacity-80"
-              )}
-            >
-              Remove
-            </button>
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-medium text-[var(--color-ink-navy)] hover:text-[var(--color-foreground)] underline underline-offset-2 cursor-pointer">Save for later</span>
+              <button
+                type="button"
+                onClick={onRemove}
+                className={cn(
+                  "text-xs underline underline-offset-2 text-[var(--color-destructive)] hover:opacity-80"
+                )}
+                aria-label="Remove item"
+              >
+                Remove
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -293,9 +296,12 @@ export function CartDrawer() {
             )}
           >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-warm-muted)]">
-                Subtotal
-              </span>
+              <div>
+                <span className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-warm-muted)] block">
+                  Subtotal
+                </span>
+                <span className="text-[10px] text-[var(--color-warm-subtle)]">Delivery estimate: 2–4 business days</span>
+              </div>
               <span className="font-display text-2xl font-bold tabular-nums text-[var(--color-foreground)]">
                 {formatCurrency(totalAmount)}
               </span>
@@ -315,8 +321,8 @@ export function CartDrawer() {
               Proceed to Checkout
               <ArrowRight className="h-4 w-4" aria-hidden />
             </Link>
-            <button
-              type="button"
+            <Link
+              href="/products"
               onClick={closeDrawer}
               className={cn(
                 "text-center text-sm underline underline-offset-2",
@@ -324,7 +330,7 @@ export function CartDrawer() {
               )}
             >
               Continue shopping
-            </button>
+            </Link>
           </div>
         )}
       </DialogContent>

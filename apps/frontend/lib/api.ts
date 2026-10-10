@@ -1,4 +1,4 @@
-﻿/**
+/**
  * lib/api.ts — typed fetch client
  */
 
@@ -23,7 +23,16 @@ import type {
   CategorySummaryDto,
   VendorDetailDto,
   VendorResponseDto,
+  AuthTokensDto,
+  UserDto,
+  RegisterDto,
+  LoginDto,
+  CatalogQuery,
+  CatalogListResponse,
+  ReviewListResponse,
+  CreateReviewDto,
 } from "@/lib/types";
+import { getAccessToken } from "@/lib/auth-token";
 
 // ---------------------------------------------------------------------------
 // Client defaults
@@ -57,8 +66,15 @@ async function apiFetch<T>(
 
   const { params: _params, ...fetchInit } = init ?? {};
 
+  // Attach the bearer token when present (Phase 1 auth). SSR-safe: reads are
+  // no-ops without `window`, and authenticated calls only run in the browser.
+  const accessToken = getAccessToken();
+  const authHeaders: Record<string, string> = accessToken
+    ? { Authorization: `Bearer ${accessToken}` }
+    : {};
+
   const res = await fetch(url, {
-    headers: { "Content-Type": "application/json", ...fetchInit?.headers },
+    headers: { "Content-Type": "application/json", ...authHeaders, ...fetchInit?.headers },
     ...fetchInit,
   });
 
@@ -104,30 +120,62 @@ function parseOrder(order: unknown): OrderResponseDto {
 // Catalog / products
 // ---------------------------------------------------------------------------
 
-/** GET /api/catalog */
-export async function getProducts(filter: { category?: string } = {}): Promise<ProductDto[]> {
-  return apiFetch<ProductDto[]>("/catalog", {
-    params: { category: filter.category },
+/** Server-side paginated catalog query (Phase 2). GET /api/catalog with query params. */
+export async function getCatalogPage(query: CatalogQuery = {}): Promise<CatalogListResponse> {
+  return apiFetch<CatalogListResponse>("/catalog", {
+    params: {
+      q: query.q,
+      category: query.category,
+      vendor: query.vendor,
+      minPrice: query.minPrice,
+      maxPrice: query.maxPrice,
+      sort: query.sort,
+      page: query.page,
+      pageSize: query.pageSize,
+      includeInactive: query.includeInactive ? "true" : undefined,
+    },
   });
+}
+
+/**
+ * Legacy helper — returns an unpaged array of products.
+ * Calls the paged endpoint with pageSize 1000 and unwraps `.items`
+ * so existing callers (deals page, vendor detail page) keep working.
+ */
+export async function getProducts(filter: { category?: string } = {}): Promise<ProductDto[]> {
+  const pageSize = 100;
+
+  const firstPage = await getCatalogPage({
+    category: filter.category,
+    page: 1,
+    pageSize,
+  });
+
+  const products: ProductDto[] = [...firstPage.items];
+
+  // Fetch remaining pages using the backend's maximum allowed page size.
+  for (let page = 2; page <= firstPage.totalPages; page += 1) {
+    const result = await getCatalogPage({
+      category: filter.category,
+      page,
+      pageSize,
+    });
+    products.push(...result.items);
+  }
+
+  return products;
 }
 
 export const getCatalog = getProducts;
 
+/** Soft-delete a product (vendor/admin). DELETE /api/catalog/:id */
+export async function deleteProduct(id: string): Promise<{ message: string }> {
+  return apiFetch<{ message: string }>(`/catalog/${id}`, { method: "DELETE" });
+}
+
 /** GET /api/catalog/:id */
 export async function getProductById(id: string): Promise<ProductDto> {
   return apiFetch<ProductDto>(`/catalog/${id}`);
-}
-
-/** POST /api/catalog/seed — returns HTTP 201 */
-export async function seedCatalog(): Promise<{
-  message: string;
-  productsCreated: number;
-  vendorsCreated: number;
-}> {
-  return apiFetch<{ message: string; productsCreated: number; vendorsCreated: number }>(
-    "/catalog/seed",
-    { method: "POST" }
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -144,9 +192,12 @@ export async function getVendorProducts(
   vendorId: string = VENDOR_ID,
   includeInactive = false
 ): Promise<ProductDto[]> {
-  return apiFetch<ProductDto[]>(`/catalog/vendor/${vendorId}`, {
-    params: { includeInactive: includeInactive ? "true" : "false" },
-  });
+  if (includeInactive) {
+    return apiFetch<ProductDto[]>(`/catalog/vendor/${vendorId}/manage`);
+  }
+
+  // Public storefront requests always return active products.
+  return apiFetch<ProductDto[]>(`/catalog/vendor/${vendorId}`);
 }
 
 export const getVendorCatalog = getVendorProducts;
@@ -166,9 +217,33 @@ export async function updateStock(
   });
 }
 
+/** PATCH /api/catalog/:id — update product (name, category, price, stock, active). Uses bearer auth, returns ProductDto. */
+export async function updateProduct(
+  id: string,
+  payload: Partial<{ name: string; category: string; price: number; stockCount: number; isActive: boolean }>
+): Promise<ProductDto> {
+  return apiFetch<ProductDto>(`/catalog/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
 /** POST /api/catalog */
 export async function createProduct(payload: CreateProductDto): Promise<ProductDto> {
   return apiFetch<ProductDto>("/catalog", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+/** GET /api/catalog/reviews/product/:productId */
+export async function getReviews(productId: string): Promise<ReviewListResponse> {
+  return apiFetch<ReviewListResponse>(`/catalog/reviews/product/${productId}`);
+}
+
+/** POST /api/catalog/reviews */
+export async function createReview(payload: CreateReviewDto): Promise<{ message: string; reviewId: string }> {
+  return apiFetch<{ message: string; reviewId: string }>("/catalog/reviews", {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -232,11 +307,16 @@ export async function cancelOrder(
   }).then(parseOrder);
 }
 
-/** GET /api/orders/buyer/:buyerId */
-export async function getOrdersForBuyer(
-  buyerId: string = "00000000-0000-0000-0000-000000000001"
-): Promise<OrderResponseDto[]> {
-  return apiFetch<OrderResponseDto[]>(`/orders/buyer/${buyerId}`).then((orders) =>
+/**
+ * GET /api/orders/me — the currently authenticated buyer's own order history.
+ *
+ * Phase 3.2: `/orders/buyer/:buyerId` was public (anyone could enumerate any
+ * buyer's orders) and is now ADMIN/OPERATIONS support-only. The buyer-facing
+ * route resolves the identity from the bearer token instead of a client-
+ * supplied id.
+ */
+export async function getOrdersForBuyer(): Promise<OrderResponseDto[]> {
+  return apiFetch<OrderResponseDto[]>(`/orders/me`).then((orders) =>
     orders.map(parseOrder)
   );
 }
@@ -251,6 +331,17 @@ export async function getVendorOrders(
 // ---------------------------------------------------------------------------
 // Dead-letter / sync jobs
 // ---------------------------------------------------------------------------
+
+export async function getAmbiguousJobs(): Promise<DeadLetterJobDto[]> {
+  return apiFetch<DeadLetterJobDto[]>("/fulfillment/ambiguous");
+}
+
+export async function runReconciliation(payload?: { olderThanMinutes?: number }): Promise<{ processed: number; resolved: number; stillAmbiguous: number; errors: string[] }> {
+  return apiFetch<{ processed: number; resolved: number; stillAmbiguous: number; errors: string[] }>("/fulfillment/reconcile", {
+    method: "POST",
+    body: JSON.stringify(payload ?? { olderThanMinutes: 10 }),
+  });
+}
 
 /** GET /api/fulfillment/dead-letter (vendor-scoped) */
 export async function getVendorDeadLetterJobs(): Promise<DeadLetterJobDto[]> {
@@ -270,10 +361,19 @@ export async function getVendorDashboard(
 }
 
 // ---------------------------------------------------------------------------
+// Categories (public storefront + admin)
+// ---------------------------------------------------------------------------
+
+/** GET /api/catalog/categories — live category counts for storefront tabs. */
+export async function getCategories(): Promise<CategorySummaryDto[]> {
+  return apiFetch<CategorySummaryDto[]>("/catalog/categories");
+}
+
+// ---------------------------------------------------------------------------
 // Admin: categories
 // ---------------------------------------------------------------------------
 
-/** GET /api/catalog/categories */
+/** GET /api/catalog/categories (admin alias — same endpoint) */
 export async function getAdminCategories(): Promise<CategorySummaryDto[]> {
   return apiFetch<CategorySummaryDto[]>("/catalog/categories");
 }
@@ -309,6 +409,13 @@ export async function getVendorDetail(vendorId: string): Promise<VendorDetailDto
 }// ---------------------------------------------------------------------------
 // Admin
 // ---------------------------------------------------------------------------
+
+/** Phase 4 — Autocomplete endpoint for SearchBar typeahead. */
+export async function getAutocomplete(q?: string): Promise<{ products: string[]; vendors: string[]; categories: string[] }> {
+  return apiFetch<{ products: string[]; vendors: string[]; categories: string[] }>("/catalog/autocomplete", {
+    params: { q: q || undefined },
+  });
+}
 
 /** GET /api/admin/dashboard */
 export async function getAdminDashboard(): Promise<AdminDashboardDto> {
@@ -415,3 +522,114 @@ export type AdminAuditLogFilter = { correlationId?: string; entityType?: string;
 export type AdminResolvePayload = AdminResolveLineItemDto;
 export type DeadLetterJob = DeadLetterJobDto;
 export type HealthStatus = HealthStatusDto;
+
+// ---------------------------------------------------------------------------
+// Auth (Phase 1)
+// ---------------------------------------------------------------------------
+
+/** POST /api/auth/register — always provisions a BUYER role account. */
+export async function registerAccount(payload: RegisterDto): Promise<UserDto> {
+  return apiFetch<UserDto>("/auth/register", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export const register = registerAccount;
+
+/** POST /api/auth/login — returns access + refresh tokens. */
+export async function loginAccount(payload: LoginDto): Promise<AuthTokensDto> {
+  return apiFetch<AuthTokensDto>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export const login = loginAccount;
+
+/** POST /api/auth/refresh — rotates the refresh token, returns a fresh pair. */
+export async function refreshAccessToken(refreshToken: string): Promise<AuthTokensDto> {
+  return apiFetch<AuthTokensDto>("/auth/refresh", {
+    method: "POST",
+    body: JSON.stringify({ refreshToken }),
+  });
+}
+
+/** POST /api/auth/logout — revokes the presented refresh token. */
+export async function logoutAccount(refreshToken: string): Promise<{ message: string }> {
+  return apiFetch<{ message: string }>("/auth/logout", {
+    method: "POST",
+    body: JSON.stringify({ refreshToken }),
+  });
+}
+
+export const logout = logoutAccount;
+
+/** POST /api/orders/checkout (idempotency + price conflict 409 handling — Phase 7) */
+export async function checkoutWithIdempotency(payload: CheckoutDto & { idempotencyKey?: string }): Promise<CheckoutResponseDto> {
+  return apiFetch<CheckoutResponseDto>("/orders/checkout", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }).then((res) => {
+    if (res.order) res.order = parseOrder(res.order);
+    return res;
+  });
+}
+
+/** Phase 7 — coupon validation stub */
+export async function validateCoupon(code: string, orderTotal?: number): Promise<{ valid: boolean; discount?: number; message?: string }> {
+  return apiFetch<{ valid: boolean; discount?: number; message?: string }>("/coupons/validate", {
+    method: "POST",
+    body: JSON.stringify({ code, orderTotal }),
+  }).catch(() => ({ valid: false, message: "Invalid coupon" }));
+}
+
+/** GET /api/auth/me — current authenticated user (requires a valid access token). */
+export async function getMe(): Promise<UserDto> {
+  return apiFetch<UserDto>("/auth/me");
+}
+export interface RazorpayInitiationRequest {
+  items: Array<{ productId: string; quantity: number }>;
+  shippingAddress: string;
+}
+
+export interface RazorpayInitiationResponse {
+  success: true;
+  orderId: string;
+  orderNumber: string | null;
+  providerOrderId: string;
+  publicKeyId: string;
+  amountPaise: number;
+  currency: string;
+}
+
+export interface RazorpayVerificationRequest {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+}
+
+export interface RazorpayVerificationResponse {
+  verified: boolean;
+  alreadyProcessed: boolean;
+  orderId: string;
+  paymentId: string;
+}
+
+export async function initiateRazorpayOrder(
+  payload: RazorpayInitiationRequest,
+): Promise<RazorpayInitiationResponse> {
+  return apiFetch<RazorpayInitiationResponse>("/payments/razorpay/initiate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function verifyRazorpayPayment(
+  payload: RazorpayVerificationRequest,
+): Promise<RazorpayVerificationResponse> {
+  return apiFetch<RazorpayVerificationResponse>("/payments/razorpay/verify", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}

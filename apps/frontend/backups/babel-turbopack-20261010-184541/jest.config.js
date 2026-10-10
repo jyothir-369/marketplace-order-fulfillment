@@ -1,0 +1,12 @@
+module.exports = {
+  testEnvironment: 'jsdom',
+  setupFilesAfterEnv: ['<rootDir>/test/setupTests.ts'],
+  transform: {
+    '^.+\\.(ts|tsx)$': ['babel-jest'],
+  },
+  moduleNameMapper: { '^@/(.*)$': '<rootDir>/$1' },
+  testMatch: [
+    '**/__tests__/**/*.spec.[tj]s?(x)',
+    '**/test/**/*.spec.[tj]s?(x)',
+  ],
+};

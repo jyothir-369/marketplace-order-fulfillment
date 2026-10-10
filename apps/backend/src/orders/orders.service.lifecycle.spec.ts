@@ -8,6 +8,7 @@ import { DataSource } from 'typeorm';
 import { InventoryService } from '../inventory/inventory.service';
 import { AuditService } from '../common/audit';
 import { VendorQueueService } from '../fulfillment/vendor-queue.service';
+import { PaymentsService } from '../payments/payments.service';
 
 describe('OrdersService - Lifecycle', () => {
   let service: OrdersService;
@@ -16,6 +17,8 @@ describe('OrdersService - Lifecycle', () => {
   let auditMock: any;
   let inventoryMock: any;
   let dataSourceMock: any;
+  let managerMock: any;
+  let paymentsMock: any;
 
   beforeEach(async () => {
     orderRepositoryMock = {
@@ -31,12 +34,26 @@ describe('OrdersService - Lifecycle', () => {
         getRawMany: jest.fn().mockResolvedValue([]),
       }),
     };
-    dataSourceMock = {};
+    // cancelOrder runs inside dataSource.transaction() and does every read/write
+    // through the transaction manager (Phase 1.6), so the spec drives managerMock.
+    managerMock = {
+      findOne: jest.fn(),
+      update: jest.fn(),
+    };
+    dataSourceMock = {
+      transaction: jest.fn((cb: (m: any) => any) => cb(managerMock)),
+    };
     auditMock = {
       logOrderStatusChange: jest.fn().mockResolvedValue(undefined),
     };
     inventoryMock = {
       restoreStock: jest.fn().mockResolvedValue(undefined),
+    };
+    // Phase 5.1: cancellation must reverse the captured payment inside the
+    // cancel transaction via paymentsService.refund(orderId, cid, manager).
+    paymentsMock = {
+      refund: jest.fn().mockResolvedValue({ id: 'pay1', status: 'refunded' }),
+    findByOrderId: jest.fn().mockResolvedValue([]),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -49,6 +66,7 @@ describe('OrdersService - Lifecycle', () => {
         { provide: InventoryService, useValue: inventoryMock },
         { provide: AuditService, useValue: auditMock },
         { provide: VendorQueueService, useValue: {} },
+        { provide: PaymentsService, useValue: paymentsMock },
       ],
     }).compile();
 
@@ -56,20 +74,22 @@ describe('OrdersService - Lifecycle', () => {
   });
 
   it('should prevent cancellation of FULFILLED orders', async () => {
-    orderRepositoryMock.findOne.mockResolvedValue({ id: 'ord1', status: OrderStatus.FULFILLED });
+    managerMock.findOne.mockResolvedValue({ id: 'ord1', status: OrderStatus.FULFILLED });
 
     await expect(service.cancelOrder('ord1', 'c1')).rejects.toThrow('Cannot cancel order in status: fulfilled');
   });
 
   it('should allow cancellation of PLACED orders', async () => {
-    orderRepositoryMock.findOne.mockResolvedValue({
+    managerMock.findOne.mockResolvedValue({
       id: 'ord1',
       status: OrderStatus.PLACED,
       lineItems: [],
     });
 
     await service.cancelOrder('ord1', 'c1');
-    expect(orderRepositoryMock.update).toHaveBeenCalledWith('ord1', { status: OrderStatus.CANCELLED });
+    expect(managerMock.update).toHaveBeenCalledWith(Order, { id: 'ord1' }, { status: OrderStatus.CANCELLED });
+    // Phase 5.1: the captured payment is refunded inside the cancel tx.
+    expect(paymentsMock.refund).toHaveBeenCalledWith('ord1', 'c1', managerMock);
   });
 
   describe('transitionOrder', () => {
@@ -118,16 +138,9 @@ describe('OrdersService - Lifecycle', () => {
     });
 
     it('CANCEL delegates to cancelOrder and restores inventory for pending items', async () => {
-      orderRepositoryMock.findOne.mockResolvedValue({
-        id: 'ord1',
-        status: OrderStatus.CONFIRMED,
-        lineItems: [
-          { id: 'li1', productId: 'p1', quantity: 2, fulfillmentStatus: FulfillmentStatus.PENDING },
-        ],
-      });
-
-      // Stub the second findOne from getOrderById (post-cancel).
-      orderRepositoryMock.findOne
+      // First manager.findOne is the locked read inside the transaction; second
+      // is the post-cancel refresh for the DTO.
+      managerMock.findOne
         .mockResolvedValueOnce({
           id: 'ord1',
           status: OrderStatus.CONFIRMED,
@@ -145,10 +158,36 @@ describe('OrdersService - Lifecycle', () => {
 
       await service.transitionOrder('ord1', { action: 'CANCEL', reason: 'buyer request' }, 'c1');
 
-      expect(inventoryMock.restoreStock).toHaveBeenCalledWith('p1', 2, 'c1', 'Order cancellation');
-      expect(orderRepositoryMock.update).toHaveBeenCalledWith('ord1', { status: OrderStatus.CANCELLED });
+      // restoreStock now receives the transaction manager as its 5th arg (Phase 1.6).
+      expect(inventoryMock.restoreStock).toHaveBeenCalledWith('p1', 2, 'c1', 'Order cancellation', managerMock);
+      expect(managerMock.update).toHaveBeenCalledWith(Order, { id: 'ord1' }, { status: OrderStatus.CANCELLED });
     });
 
+
+    it('CONFIRM allows legacy orders with no payment record', async () => {
+      paymentsMock.findByOrderId = jest.fn().mockResolvedValue([]);
+      orderRepositoryMock.findOne
+        .mockResolvedValueOnce({ id: 'ord1', status: OrderStatus.PLACED, lineItems: [] })
+        .mockResolvedValueOnce({ id: 'ord1', status: OrderStatus.CONFIRMED, lineItems: [] });
+      await service.transitionOrder('ord1', { action: 'CONFIRM' }, 'c1');
+      expect(orderRepositoryMock.update).toHaveBeenCalledWith('ord1', { status: OrderStatus.CONFIRMED });
+    });
+
+    it('CONFIRM allows confirmed orders when latest payment is captured', async () => {
+      paymentsMock.findByOrderId = jest.fn().mockResolvedValue([{ id: 'pay-1', status: 'captured' }]);
+      orderRepositoryMock.findOne
+        .mockResolvedValueOnce({ id: 'ord1', status: OrderStatus.PLACED, lineItems: [] })
+        .mockResolvedValueOnce({ id: 'ord1', status: OrderStatus.CONFIRMED, lineItems: [] });
+      await service.transitionOrder('ord1', { action: 'CONFIRM' }, 'c1');
+      expect(orderRepositoryMock.update).toHaveBeenCalledWith('ord1', { status: OrderStatus.CONFIRMED });
+    });
+
+    it('CONFIRM rejects when payment is not captured', async () => {
+      paymentsMock.findByOrderId = jest.fn().mockResolvedValue([{ id: 'pay-1', status: 'pending' }]);
+      orderRepositoryMock.findOne.mockResolvedValue({ id: 'ord1', status: OrderStatus.PLACED, lineItems: [] });
+      await expect(service.transitionOrder('ord1', { action: 'CONFIRM' }, 'c1'))
+        .rejects.toThrow('Order cannot be confirmed: payment is not captured');
+    });
     it('returns 404 for an unknown order id', async () => {
       orderRepositoryMock.findOne.mockResolvedValue(null);
 

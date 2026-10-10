@@ -120,6 +120,7 @@
   --color-forest:           120 25% 35%;  /* #2f5f42 â€” stock/success accents */
   --color-clay:             12 40% 34%;   /* #8a3b2c â€” limited-stock / warning accents */
   --color-cream:             38 43% 91%;   /* #f3ede0 â€” cream for subtle panels */
+  --color-brass-light:       38 40% 65%;   /* #d1b082 â€” lighter brass for hover states */
 
   /* ----- Radius scale (unchanged) ----- */
   --radius: 0.5rem;

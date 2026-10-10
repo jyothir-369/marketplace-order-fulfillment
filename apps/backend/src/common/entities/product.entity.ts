@@ -2,20 +2,24 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
+  Index,
   ManyToOne,
   JoinColumn,
   OneToMany,
   VersionColumn,
 } from 'typeorm';
 import { Vendor } from './vendor.entity';
+import { Category } from './category.entity';
 import { OrderLineItem } from './order-line-item.entity';
+import { Review } from './review.entity';
 
 @Entity('products')
 export class Product {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'uuid' })
+  /** Phase 2.4: normalised to snake_case to match every other FK in the DB. */
+  @Column({ type: 'uuid', name: 'vendorId' })
   vendorId: string;
 
   @ManyToOne(() => Vendor, (vendor) => vendor.products)
@@ -25,8 +29,28 @@ export class Product {
   @Column({ type: 'varchar', length: 255 })
   name: string;
 
+  /** URL-friendly slug derived from the product name (Phase 2). */
+  @Index()
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  slug: string | null;
+
+  /** Category name, referencing `categories.name` (phase 2 enrichment). */
+  @Index()
+  @Column({ type: 'varchar', length: 120, nullable: true })
+  category: string | null;
+
+  @ManyToOne(() => Category, (category) => category.products, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'category', referencedColumnName: 'name' })
+  categoryRelation: Category | null;
+
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
   price: number;
+
+  @Column({ type: 'text', nullable: true })
+  description: string | null;
+
+  @Column('text', { array: true, nullable: true })
+  images: string[] | null;
 
   @Column({ type: 'int', default: 0, name: 'stock_count' })
   stockCount: number;
@@ -34,6 +58,11 @@ export class Product {
   @Column({ type: 'boolean', default: true })
   isActive: boolean;
 
+  /**
+   * Phase 2.3: real product description + images columns (replacing the
+   * phantom `(product as any).description / .images` reads that were always
+   * undefined).
+   */
   @VersionColumn()
   version: number;
 
@@ -45,4 +74,7 @@ export class Product {
 
   @OneToMany(() => OrderLineItem, (lineItem) => lineItem.product)
   orderLineItems: OrderLineItem[];
+
+  @OneToMany(() => Review, (review) => review.product)
+  reviews: Review[];
 }

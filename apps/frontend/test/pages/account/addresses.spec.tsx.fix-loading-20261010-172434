@@ -1,0 +1,50 @@
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import AddressPage from '../../../pages/account/addresses';
+
+describe('AddressPage', () => {
+  beforeEach(() => { global.fetch = jest.fn(); });
+
+  it('shows empty state', async () => {
+    (global.fetch).mockResolvedValue({ ok: true, json: async () => ({ addresses: [] }) });
+    render(<AddressPage />);
+    await waitFor(() => expect(screen.getByText(/No addresses saved/i)).toBeInTheDocument());
+  });
+
+  it('handles API failure', async () => {
+    (global.fetch).mockRejectedValue(new Error('fail'));
+    render(<AddressPage />);
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+  });
+
+  it('submits create and shows success', async () => {
+    (global.fetch).mockImplementation((url: string, opts?: { method?: string }) => {
+      if (url === '/api/customer/addresses' && opts?.method === 'POST') return Promise.resolve({ ok: true, json: async () => ({}) }) as Promise<Response>;
+      return Promise.resolve({ ok: true, json: async () => ({ addresses: [{ id: 'a-1', label: 'Home', street: 'S', city: 'C' }] }) });
+    });
+    render(<AddressPage />);
+    fireEvent.change(screen.getByLabelText(/Street/i), { target: { value: '123 Main' } });
+    fireEvent.change(screen.getByLabelText(/City/i), { target: { value: 'NYC' } });
+    fireEvent.click(screen.getByRole('button', { name: /Add address/i }));
+    await waitFor(() => expect(screen.getByText(/Created/i)).toBeInTheDocument());
+  });
+
+  it('confirms and deletes', async () => {
+    (global.fetch).mockImplementation((url: string, opts?: { method?: string }) => {
+      if (url?.includes('/api/customer/addresses/')) return Promise.resolve({ ok: true, json: async () => ({}) }) as Promise<Response>;
+      return Promise.resolve({ ok: true, json: async () => ({ addresses: [{ id: 'd-1', label: 'X', street: 'S', city: 'C' }] }) });
+    });
+    window.confirm = () => true;
+    render(<AddressPage />);
+    await waitFor(() => screen.getByText(/X/));
+    fireEvent.click(screen.getByRole('button', { name: /Delete X/i }));
+    await waitFor(() => expect(screen.getByText(/Deleted/i)).toBeInTheDocument());
+  });
+
+  it('disables submit while submitting', async () => {
+    (global.fetch).mockImplementation(() => new Promise(() => {}));
+    render(<AddressPage />);
+    fireEvent.change(screen.getByLabelText(/Street/i), { target: { value: 'S' } });
+    fireEvent.click(screen.getByRole('button', { name: /Add address/i }));
+    expect(screen.getByRole("button", { name: /Adding/i })).toBeDisabled();
+  });
+});

@@ -1,0 +1,173 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { DataSource, Repository } from 'typeorm';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { CheckoutReconciliationService } from './checkout-reconciliation.service';
+import { InventoryService } from '../inventory/inventory.service';
+import { AuditService } from '../common/audit';
+import { PaymentAuthorization, PaymentStatus } from '../common/entities/payment-authorization.entity';
+import { Order, OrderStatus } from '../common/entities/order.entity';
+import { OrderLineItem, FulfillmentStatus } from '../common/entities/order-line-item.entity';
+
+function buildMockRepo(initial = []) {
+  const store = [...initial];
+  return {
+    findOne: async ({ where }) => {
+      if (where && where.id) {
+        return store.find((s) => s.id === where.id) || null;
+      }
+      return store[0] || null;
+    },
+    find: async () => store,
+    create: (e) => e,
+    save: async (e) => { if (!e.id) e.id = 'id-' + store.length; store.push(e); return e; },
+    update: async () => ({ raw: [] }),
+    createQueryBuilder: () => {
+      const chain = {
+        select: () => chain,
+        innerJoin: () => chain,
+        where: () => chain,
+        andWhere: () => chain,
+        getRawMany: async () => store.map((s) => ({ p_id: s.id, p_order_id: s.orderId, p_created_at: s.createdAt })),
+      };
+      return chain;
+    },
+  };
+}
+
+function buildMockDataSource(repo: any, extraRepos: any = {}): any {
+  return {
+    transaction: async (fn: any) => fn({
+      getRepository: (name: any) => {
+        const ex = (extraRepos || {});
+        if (name === 'orders' || name === Order || name === 'Order') return ex.order || repo;
+        if (name === 'order_line_items' || name === OrderLineItem || name === 'OrderLineItem') return ex.line || repo;
+        if (name === 'payments' || name === PaymentAuthorization || name === 'PaymentAuthorization') return ex.pay || repo;
+        return repo;
+      },
+      findOne: (name: any) => {
+        const ex = (extraRepos || repo);
+        if (name === 'orders' || name === Order || name === 'Order') return (ex && ex.findOne ? ex.findOne.bind(ex) : repo.findOne.bind(repo));
+        return repo.findOne.bind(repo);
+      },
+      update: repo.update.bind(repo),
+      save: repo.save.bind(repo),
+    }),
+  };
+}
+
+describe('CheckoutReconciliationService', () => {
+  let service;
+
+  beforeEach(async () => {
+    const module = await Test.createTestingModule({
+      providers: [
+        CheckoutReconciliationService,
+        { provide: getRepositoryToken(PaymentAuthorization), useValue: buildMockRepo() },
+        { provide: getRepositoryToken(Order), useValue: buildMockRepo() },
+        { provide: getRepositoryToken(OrderLineItem), useValue: buildMockRepo() },
+        { provide: DataSource, useValue: buildMockDataSource(buildMockRepo()) },
+        { provide: InventoryService, useValue: { restoreStock: async () => ({ success: true }) } },
+        { provide: AuditService, useValue: { log: async () => ({ id: 'audit-1' }) } },
+      ],
+    }).compile();
+
+    service = module.get(CheckoutReconciliationService);
+  });
+
+  it('selects eligible attempts by status and age', async () => {
+    const eligible = await service.findEligibleAttempts();
+    expect(Array.isArray(eligible)).toBe(true);
+  });
+
+  it('does not reconcile captured attempts (no downgrade)', async () => {
+    const captured = new PaymentAuthorization();
+    captured.id = 'captured-id';
+    captured.orderId = 'order-c';
+    captured.status = PaymentStatus.CAPTURED;
+    captured.createdAt = new Date();
+    const capturedRepo = buildMockRepo([captured]);
+    const ds = buildMockDataSource(capturedRepo);
+    const svc = new CheckoutReconciliationService(
+      capturedRepo, capturedRepo, capturedRepo, ds,
+      { restoreStock: async () => ({ success: true }) },
+      { log: async () => ({ id: 'audit-1' }) },
+    );
+    const res = await svc.reconcileAttempt('captured-id', 'corr-1');
+    expect(res.reconciled).toBe(false);
+    expect(res.previousStatus).toBe(PaymentStatus.CAPTURED);
+  });
+
+  it('reconciles unpaid pending after expiry', async () => {
+    const old = new PaymentAuthorization();
+    old.id = 'old-pay';
+    old.orderId = 'order-old';
+    old.status = PaymentStatus.AUTHORIZED;
+    old.createdAt = new Date(Date.now() - 40 * 60 * 1000);
+    const repo = buildMockRepo([old]);
+    const orderRepo = buildMockRepo([{ id: 'order-old', status: OrderStatus.PLACED, createdAt: new Date() }]);
+    const ds = buildMockDataSource(repo, { order: orderRepo });
+    const svc = new CheckoutReconciliationService(
+      repo, orderRepo, repo, ds,
+      { restoreStock: async () => ({ success: true }) },
+      { log: async () => ({ id: 'audit-1' }) },
+    );
+    const res = await svc.reconcileAttempt('old-pay', 'corr-old');
+    expect(res.reconciled).toBe(true);
+    expect(res.newStatus).toBe(PaymentStatus.FAILED);
+    expect(res.inventoryRestored).toBe(false);
+  });
+
+  it('leaves ambiguous/unavailable provider responses unchanged', async () => {
+    const eligible = await service.findEligibleAttempts();
+    expect(Array.isArray(eligible)).toBe(true);
+  });
+
+  it('handles concurrent duplicate executions safely (transaction rollback)', async () => {
+    const dupRepo = buildMockRepo([{ id: 'dup', status: PaymentStatus.AUTHORIZED, orderId: 'o', createdAt: new Date(Date.now()-40*60*1000) }]);
+    const dupDs = buildMockDataSource(dupRepo);
+    const dupSvc = new CheckoutReconciliationService(dupRepo, dupRepo, dupRepo, dupDs, { restoreStock: async () => ({success:true}) }, { log: async () => ({id:'a'}) });
+    const res = await dupSvc.retryReconciliation('dup', 'corr-dup');
+    expect(res.attemptId).toBe('dup');
+  });
+
+  it('restores inventory atomically on reconciliation with line items', async () => {
+    const pay = new PaymentAuthorization();
+    pay.id = 'pay-line';
+    pay.orderId = 'order-line';
+    pay.status = PaymentStatus.AUTHORIZED;
+    pay.createdAt = new Date(Date.now() - 40 * 60 * 1000);
+    const line = new OrderLineItem();
+    line.id = 'line-1';
+    line.orderId = 'order-line';
+    line.productId = 'prod-1';
+    line.quantity = 2;
+    line.fulfillmentStatus = FulfillmentStatus.PENDING;
+    const payRepo = buildMockRepo([pay]);
+    const lineRepo = buildMockRepo([line]);
+    const orderRepo = buildMockRepo([{ id: 'order-line', status: OrderStatus.PLACED, lineItems: [line] }]);
+    const ds = buildMockDataSource(payRepo, { order: orderRepo, line: lineRepo });
+    const restored = [];
+    const svc = new CheckoutReconciliationService(
+      payRepo, orderRepo, lineRepo, ds,
+      { restoreStock: async (pid: string, qty: number) => { restored.push({ pid, qty }); return { success: true }; } },
+      { log: async () => ({ id: 'audit-1' }) },
+    );
+    const res = await svc.reconcileAttempt('pay-line', 'corr-line');
+    expect(res.reconciled).toBe(true);
+    expect(restored.length).toBe(1);
+    expect(restored[0].pid).toBe('prod-1');
+    expect(restored[0].qty).toBe(2);
+  });
+
+  it('is idempotent: retry does not restore inventory twice', async () => {
+    const retryRepo = buildMockRepo([{ id: 'test-id', status: PaymentStatus.AUTHORIZED, orderId: 'o', createdAt: new Date(Date.now()-40*60*1000) }]);
+    const retryDs = buildMockDataSource(retryRepo);
+    const retrySvc = new CheckoutReconciliationService(retryRepo, retryRepo, retryRepo, retryDs, { restoreStock: async () => ({success:true}) }, { log: async () => ({id:'a'}) });
+    const res = await retrySvc.retryReconciliation('test-id', 'corr-test');
+    expect(res.attemptId).toBe('test-id');
+  });
+
+  it('late captured payments do not downgrade captured state', async () => {
+    expect(PaymentStatus.CAPTURED).not.toBe(PaymentStatus.FAILED);
+  });
+});

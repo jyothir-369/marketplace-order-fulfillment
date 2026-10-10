@@ -20,7 +20,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { editorialEyebrows } from "@/lib/theme";
 import type { OrderResponseDto } from "@/lib/types";
 
-const BUYER_ID = "00000000-0000-0000-0000-000000000001";
+// Phase 3.2: this is the LOGGED-IN buyer's order history — always resolved from
+// the bearer token via GET /orders/me, never from a hardcoded/anonymous buyer id.
 
 interface OrderRowProps {
   order: OrderResponseDto;
@@ -106,7 +107,7 @@ export default function OrdersPage() {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    getOrdersForBuyer(BUYER_ID)
+    getOrdersForBuyer()
       .then((data) => {
         if (cancelled) return;
         setOrders([...data].sort(

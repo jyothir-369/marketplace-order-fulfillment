@@ -20,6 +20,7 @@
 
 import type { Metadata } from "next";
 import "./globals.css";
+import { AuthProvider } from "@/lib/auth-context";
 
 const fontVars: React.CSSProperties = {
   ["--font-display" as string]:
@@ -41,7 +42,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full antialiased" style={fontVars}>
       <body className="min-h-full flex flex-col font-sans">
-        {children}
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );

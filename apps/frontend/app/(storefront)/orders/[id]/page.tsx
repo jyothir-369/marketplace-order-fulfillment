@@ -20,8 +20,11 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useState } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AlertTriangle } from "lucide-react";
 import { useOrderPolling } from "@/lib/hooks/use-order-polling";
+import { QUERY_CLIENT_CONFIG } from "@/lib/query-client";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PollingIndicator } from "@/components/order/PollingIndicator";
 import { OrderDetailSkeleton } from "@/components/ui/skeleton";
@@ -39,7 +42,7 @@ function hasAmbiguousLineItem(lineItems: { fulfillmentStatus: string }[]): boole
   return lineItems.some((li) => AMBIGUOUS_STATUSES.has(li.fulfillmentStatus));
 }
 
-export default function OrderConfirmationPage() {
+function OrderConfirmationPageInner() {
   const params = useParams<{ id: string }>();
   const orderId = params?.id ?? "";
 
@@ -245,19 +248,50 @@ export default function OrderConfirmationPage() {
       ))}
 
       {/* Footer actions */}
-      <div className="flex items-center justify-between text-sm pt-2">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
         <Link
           href="/products"
           className="text-sm font-semibold text-[var(--color-accent)] hover:text-[var(--color-foreground)] transition-colors"
         >
           Continue shopping
         </Link>
-        {isTerminal && (
-          <span className="text-xs text-[var(--color-warm-muted)]">
-            Status updates stopped (order is {order.status.toLowerCase()}).
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          <Link
+            href="/help"
+            className="text-sm font-medium text-[var(--color-warm-muted)] hover:text-[var(--color-foreground)] underline underline-offset-2"
+          >
+            Support / Return
+          </Link>
+          <Link
+            href="#"
+            onClick={(e) => { e.preventDefault(); alert("Reorder action: add all items back to cart."); }}
+            className="text-sm font-medium text-[var(--color-ink-navy)] hover:text-[var(--color-foreground)] underline underline-offset-2"
+          >
+            Reorder
+          </Link>
+          {isTerminal && (
+            <span className="text-xs text-[var(--color-warm-muted)]">
+              Status updates stopped (order is {order.status.toLowerCase()}).
+            </span>
+          )}
+        </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * useOrderPolling relies on TanStack Query — without a QueryClientProvider the
+ * page throws during SSR. A fresh client per render avoids sharing cache across
+ * requests (one order viewer must never see another's cached order).
+ */
+export default function OrderConfirmationPage() {
+  const [client] = useState(
+    () => new QueryClient({ defaultOptions: QUERY_CLIENT_CONFIG })
+  );
+  return (
+    <QueryClientProvider client={client}>
+      <OrderConfirmationPageInner />
+    </QueryClientProvider>
   );
 }

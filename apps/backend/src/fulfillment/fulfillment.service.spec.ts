@@ -1,12 +1,26 @@
+import { ConflictException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { FulfillmentService } from './fulfillment.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { OrderLineItem, FulfillmentStatus } from '../common/entities/order-line-item.entity';
 import { VendorSyncJob, SyncJobStatus } from '../common/entities/vendor-sync-job.entity';
 import { Order } from '../common/entities/order.entity';
+import { PaymentAuthorization } from '../common/entities/payment-authorization.entity';
 import { VendorMockService } from '../integrations/vendor-mock/vendor-mock.service';
 import { AuditService } from '../common/audit';
 import { VendorResponseType } from '../integrations/vendor-mock/dto/vendor-mock.dto';
+
+/** Lightweight SelectQueryBuilder mock for Phase 3.3 scoped-job reads. */
+function mockSyncQb() {
+  const qb: any = {
+    leftJoinAndSelect: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    andWhere: jest.fn().mockReturnThis(),
+    orderBy: jest.fn().mockReturnThis(),
+    getMany: jest.fn().mockResolvedValue([]),
+  };
+  return qb;
+}
 
 describe('FulfillmentService - Reconciliation', () => {
   let service: FulfillmentService;
@@ -19,6 +33,7 @@ describe('FulfillmentService - Reconciliation', () => {
     syncJobRepositoryMock = {
       find: jest.fn(),
       update: jest.fn(),
+      createQueryBuilder: jest.fn().mockReturnValue(mockSyncQb()),
     };
     lineItemRepositoryMock = {
       update: jest.fn(),
@@ -37,6 +52,7 @@ describe('FulfillmentService - Reconciliation', () => {
         { provide: getRepositoryToken(VendorSyncJob), useValue: syncJobRepositoryMock },
         { provide: getRepositoryToken(OrderLineItem), useValue: lineItemRepositoryMock },
         { provide: getRepositoryToken(Order), useValue: {} },
+        { provide: getRepositoryToken(PaymentAuthorization), useValue: { findOne: jest.fn().mockResolvedValue(null) } },
         { provide: VendorMockService, useValue: vendorMockServiceMock },
         { provide: AuditService, useValue: auditServiceMock },
       ],
@@ -57,16 +73,18 @@ describe('FulfillmentService - Reconciliation', () => {
     expect(lineItemRepositoryMock.update).toHaveBeenCalledWith('li1', expect.objectContaining({ fulfillmentStatus: FulfillmentStatus.CONFIRMED }));
   });
 
-  it('should fail job when vendor returns FAILURE', async () => {
+  it('should mark job as ambiguous when vendor returns FAILURE', async () => {
     const job = { id: 'job1', correlationId: 'c1', orderLineItem: { id: 'li1', vendorReference: 'ref1', vendorId: 'v1' } };
     syncJobRepositoryMock.find.mockResolvedValue([job]);
     vendorMockServiceMock.queryFulfillmentStatus.mockResolvedValue({ success: false, responseType: VendorResponseType.FAILURE, message: 'Reject' });
 
     const result = await service.reconcile(0);
 
-    expect(result.resolved).toBe(1);
-    expect(syncJobRepositoryMock.update).toHaveBeenCalledWith('job1', expect.objectContaining({ status: SyncJobStatus.DEAD_LETTER }));
-    expect(lineItemRepositoryMock.update).toHaveBeenCalledWith('li1', expect.objectContaining({ fulfillmentStatus: FulfillmentStatus.FAILED }));
+    // Reconcile treats every non-success response as ambiguous; a confirmed
+    // vendor failure is resolved via the DLQ/manual path instead.
+    expect(result.stillAmbiguous).toBe(1);
+    expect(syncJobRepositoryMock.update).toHaveBeenCalledWith('job1', expect.objectContaining({ status: SyncJobStatus.AMBIGUOUS }));
+    expect(lineItemRepositoryMock.update).toHaveBeenCalledWith('li1', expect.objectContaining({ fulfillmentStatus: FulfillmentStatus.AMBIGUOUS }));
   });
 
   it('should mark job as ambiguous when vendor times out', async () => {
@@ -103,11 +121,100 @@ describe('FulfillmentService - Reconciliation', () => {
     expect(syncJobRepositoryMock.update).toHaveBeenCalledWith('job1', expect.objectContaining({ status: SyncJobStatus.COMPLETED }));
   });
 
-  it('should throw error on invalid manual state transition', async () => {
-    const lineItem = { id: 'li1', fulfillmentStatus: FulfillmentStatus.CONFIRMED, orderId: 'ord1' };
-    lineItemRepositoryMock.findOne.mockResolvedValue(lineItem);
+  it('dead-letter with no vendorId fetches all jobs (admin/ops, Phase 3.3)', async () => {
+    const qb = mockSyncQb();
+    syncJobRepositoryMock.createQueryBuilder.mockReturnValue(qb);
+    qb.getMany.mockResolvedValue([
+      { id: 'job1', status: SyncJobStatus.DEAD_LETTER, orderLineItem: { vendorId: 'v1' } },
+    ]);
 
-    await expect(service.manualResolve('li1', { newStatus: FulfillmentStatus.FAILED }, 'c1'))
-      .rejects.toThrow('Invalid state transition');
+    const result = await service.getDeadLetterJobs();
+
+    expect(result).toHaveLength(1);
+    expect(qb.andWhere).not.toHaveBeenCalled();
+  });
+
+  it('dead-letter with a vendorId filters to that tenant only (Phase 3.3)', async () => {
+    const qb = mockSyncQb();
+    syncJobRepositoryMock.createQueryBuilder.mockReturnValue(qb);
+
+    await service.getDeadLetterJobs('v42');
+
+    expect(qb.where).toHaveBeenCalledWith('job.status = :status', { status: SyncJobStatus.DEAD_LETTER });
+    expect(qb.andWhere).toHaveBeenCalledWith('lineItem.vendorId = :vendorId', { vendorId: 'v42' });
+  });
+
+  it('ambiguous with a vendorId filters to that tenant only (Phase 3.3)', async () => {
+    const qb = mockSyncQb();
+    syncJobRepositoryMock.createQueryBuilder.mockReturnValue(qb);
+
+    await service.getAmbiguousJobs('v42');
+
+    expect(qb.where).toHaveBeenCalledWith('job.status = :status', { status: SyncJobStatus.AMBIGUOUS });
+    expect(qb.andWhere).toHaveBeenCalledWith('lineItem.vendorId = :vendorId', { vendorId: 'v42' });
+  });
+
+  it('should reject manual resolution from a terminal state', async () => {
+    const lineItem = {
+      id: 'li1',
+      fulfillmentStatus: FulfillmentStatus.CONFIRMED,
+      orderId: 'ord1',
+      syncJob: { id: 'job1' },
+    };
+    lineItemRepositoryMock.findOne.mockResolvedValue(lineItem);
+    auditServiceMock.logFulfillmentStatusChange = jest.fn();
+    service.checkOrderFulfillment = jest.fn();
+
+    await expect(
+      service.manualResolve('li1', { newStatus: FulfillmentStatus.FAILED }, 'c1'),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(lineItemRepositoryMock.update).not.toHaveBeenCalled();
+    expect(syncJobRepositoryMock.update).not.toHaveBeenCalled();
+    expect(auditServiceMock.logFulfillmentStatusChange).not.toHaveBeenCalled();
+    expect(service.checkOrderFulfillment).not.toHaveBeenCalled();
+  });
+
+  it('should reject a non-terminal manual resolution target', async () => {
+    const lineItem = {
+      id: 'li1',
+      fulfillmentStatus: FulfillmentStatus.AMBIGUOUS,
+      orderId: 'ord1',
+      syncJob: { id: 'job1' },
+    };
+    lineItemRepositoryMock.findOne.mockResolvedValue(lineItem);
+    auditServiceMock.logFulfillmentStatusChange = jest.fn();
+    service.checkOrderFulfillment = jest.fn();
+
+    await expect(
+      service.manualResolve('li1', { newStatus: FulfillmentStatus.PENDING }, 'c1'),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(lineItemRepositoryMock.update).not.toHaveBeenCalled();
+    expect(syncJobRepositoryMock.update).not.toHaveBeenCalled();
+  });
+
+  it('should mark the sync job failed when manual resolution sets FAILED', async () => {
+    const lineItem = {
+      id: 'li1',
+      fulfillmentStatus: FulfillmentStatus.DEAD_LETTER,
+      orderId: 'ord1',
+      syncJob: { id: 'job1' },
+    };
+    lineItemRepositoryMock.findOne.mockResolvedValue(lineItem);
+    auditServiceMock.logFulfillmentStatusChange = jest.fn();
+    service.checkOrderFulfillment = jest.fn();
+
+    await service.manualResolve('li1', { newStatus: FulfillmentStatus.FAILED }, 'c1');
+
+    expect(lineItemRepositoryMock.update).toHaveBeenCalledWith(
+      'li1',
+      expect.objectContaining({ fulfillmentStatus: FulfillmentStatus.FAILED }),
+    );
+    expect(syncJobRepositoryMock.update).toHaveBeenCalledWith('job1', {
+      status: SyncJobStatus.FAILED,
+    });
+    expect(auditServiceMock.logFulfillmentStatusChange).toHaveBeenCalled();
+    expect(service.checkOrderFulfillment).toHaveBeenCalledWith('ord1', 'c1');
   });
 });

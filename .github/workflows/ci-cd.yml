@@ -37,7 +37,27 @@ jobs:
         run: npx tsc --noEmit
       - name: Type check frontend
         working-directory: apps/frontend
-        run: npx tsc --noEmit || true
+        run: npx tsc --noEmit
+
+  # ============================================
+  # Unit Tests - Backend
+  # ============================================
+  test-backend:
+    name: Unit Tests (Backend)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+      - name: Install dependencies
+        run: npm ci
+      - name: Run backend unit tests
+        working-directory: apps/backend
+        run: npm test
 
   # ============================================
   # Build - Backend
@@ -169,9 +189,16 @@ jobs:
         uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
-            vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_FRONTEND_PROJECT_ID }}
           vercel-args: --prod
           working-directory: apps/frontend
 
-
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run build --workspaces --if-present

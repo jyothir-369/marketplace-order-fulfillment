@@ -26,7 +26,8 @@ import {
   Truck,
   XCircle,
 } from "lucide-react";
-import { VENDOR_ID, getVendorDashboard } from "@/lib/api";
+import { getVendorDashboard } from "@/lib/api";
+import { useVendorId } from "@/lib/hooks/use-vendor-id";
 import { ToastProvider, useToast } from "@/components/ui/toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TelemetryCard } from "@/components/operational/TelemetryCard";
@@ -35,15 +36,18 @@ import type { VendorDashboardDto } from "@/lib/types";
 
 function VendorDashboardInner() {
   const { push: toast } = useToast();
+  // Phase 3.2: resolve the tenant from the session, not a hardcoded constant.
+  const vendorId = useVendorId();
   const [data, setData] = useState<VendorDashboardDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = async () => {
+    if (!vendorId) return;
     setLoading(true);
     setError(null);
     try {
-      const result = await getVendorDashboard(VENDOR_ID);
+      const result = await getVendorDashboard(vendorId);
       setData(result);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to load vendor dashboard";
@@ -54,7 +58,7 @@ function VendorDashboardInner() {
     }
   };
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load(); }, [vendorId]);
 
   if (loading) {
     return (
