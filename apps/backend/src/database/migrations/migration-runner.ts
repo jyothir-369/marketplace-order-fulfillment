@@ -9,6 +9,11 @@ import { AddMissingForeignKeysAndIndexes1710000000006 } from './1710000000006-Ad
 import { AddProductDescriptionAndImages1710000000007 } from './1710000000007-AddProductDescriptionAndImages';
 import { AddOrderNumberSequence1710000000008 } from './1710000000008-AddOrderNumberSequence';
 import { AddPaymentAuthorizations1710000000009 } from './1710000000009-AddPaymentAuthorizations';
+import { BackfillProductCategory1710000000010 } from './1710000000010-BackfillProductCategory';
+import { FixAuditEntityEnum1710000000011 } from './1710000000011-FixAuditEntityEnum';
+import { AddReviewsTable1715000000000 } from './1715000000000-AddReviewsTable';
+import { AddRazorpayPaymentSupport1716000000000 } from './1716000000000-AddRazorpayPaymentSupport';
+import { AddWebhookEventIdempotency1717000000000 } from './1717000000000-AddWebhookEventIdempotency';
 
 const migrations = [
   Baseline1709999999999,
@@ -21,6 +26,11 @@ const migrations = [
   AddProductDescriptionAndImages1710000000007,
   AddOrderNumberSequence1710000000008,
   AddPaymentAuthorizations1710000000009,
+  BackfillProductCategory1710000000010,
+  FixAuditEntityEnum1710000000011,
+  AddReviewsTable1715000000000,
+  AddRazorpayPaymentSupport1716000000000,
+  AddWebhookEventIdempotency1717000000000,
 ];
 
 async function runMigrations() {

@@ -143,8 +143,27 @@ export async function getCatalogPage(query: CatalogQuery = {}): Promise<CatalogL
  * so existing callers (deals page, vendor detail page) keep working.
  */
 export async function getProducts(filter: { category?: string } = {}): Promise<ProductDto[]> {
-  const res = await getCatalogPage({ category: filter.category, pageSize: 1000 });
-  return res.items;
+  const pageSize = 100;
+
+  const firstPage = await getCatalogPage({
+    category: filter.category,
+    page: 1,
+    pageSize,
+  });
+
+  const products: ProductDto[] = [...firstPage.items];
+
+  // Fetch remaining pages using the backend's maximum allowed page size.
+  for (let page = 2; page <= firstPage.totalPages; page += 1) {
+    const result = await getCatalogPage({
+      category: filter.category,
+      page,
+      pageSize,
+    });
+    products.push(...result.items);
+  }
+
+  return products;
 }
 
 export const getCatalog = getProducts;

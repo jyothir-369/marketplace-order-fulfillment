@@ -9,6 +9,8 @@ export interface AuthenticatedUser {
   id: string;
   email: string;
   role: UserRole;
+  displayName?: string | null;
+  createdAt?: Date;
   /** Present for VENDOR role; scopes that vendor's data to their tenant. */
   vendorId: string | null;
 }
@@ -18,5 +20,7 @@ export interface AuthJwtPayload {
   sub: string;
   email: string;
   role: UserRole;
+  displayName?: string | null;
+  createdAt?: Date;
   vendorId: string | null;
 }

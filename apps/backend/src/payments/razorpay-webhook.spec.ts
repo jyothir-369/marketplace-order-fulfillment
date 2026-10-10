@@ -8,7 +8,7 @@ import { Order, OrderStatus } from '../common/entities/order.entity';
 
 function mockDataSource(): Partial<DataSource> {
   const repo = { findOne: () => Promise.resolve(null), create: (e: any) => e, save: (e: any) => Promise.resolve({ ...e, id: 'evt-test' }), find: () => Promise.resolve([]), update: () => Promise.resolve({ raw: [] }) };
-  return { transaction: async (fn: any) => fn({ getRepository: () => repo, findOne: () => Promise.resolve(null), findOne: () => Promise.resolve(null), update: () => Promise.resolve({ raw: [] }), save: () => Promise.resolve({ raw: [] }) }) } as any;
+  return { transaction: async (fn: any) => fn({ getRepository: () => repo, findOne: () => Promise.resolve(null), update: () => Promise.resolve({ raw: [] }), save: () => Promise.resolve({ raw: [] }) }) } as any;
 }
 
 describe('RazorpayWebhookController', () => {

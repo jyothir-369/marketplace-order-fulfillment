@@ -42,14 +42,10 @@ import {
   selectCart,
   selectTotalAmount,
 } from "@/context/CartStore";
-import { checkoutOrder, initiateRazorpayOrder, verifyRazorpayPayment, RazorpayInitiationResponse } from "@/lib/api";
-import {
-  PaymentStep,
-  PAYMENT_SUCCESS_TOKEN,
-} from "@/components/checkout/steps";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ToastProvider, useToast } from "@/components/ui/toast";
 import { formatCurrency, cn } from "@/lib/utils";
+import { useRazorpayCheckout } from "@/components/storefront/useRazorpayCheckout";
 
 const MIN_ADDRESS_LENGTH = 5;
 const MAX_ADDRESS_LENGTH = 500;
@@ -153,13 +149,6 @@ function CheckoutInner() {
   const [submitted, setSubmitted] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
 
-  // Existing mock-payment token used by PaymentStep and checkout tests.
-  const [useRealPayment, setUseRealPayment] = useState(false);
-  const [isLoadingPayment, setIsLoadingPayment] = useState(false);
-  const [paymentStatus, setPaymentStatus] = useState<string | null>(null);
-
-  const [paymentMethodToken, setPaymentMethodToken] =
-    useState<string>(PAYMENT_SUCCESS_TOKEN);
 
   const {
     register,
@@ -176,77 +165,48 @@ function CheckoutInner() {
 
   const addressValue = watch("shippingAddress") ?? "";
   const addressError = errors.shippingAddress?.message;
+  const {
+    start: startRazorpayCheckout,
+    loading: isLoadingPayment,
+    status: checkoutStatus,
+  } = useRazorpayCheckout(
+    cart.map((item) => ({
+      productId: item.productId,
+      quantity: item.quantity,
+    })),
+    addressValue,
+  );
 
   const onSubmit = handleSubmit(async (values) => {
     if (isSubmitting || cart.length === 0 || isLoadingPayment) return;
-    if (isSubmitting || cart.length === 0) {
-      return;
-    }
 
     setSubmitError(null);
 
     try {
-      const response = await checkoutOrder({
-        items: cart.map((item) => ({
-          productId: item.productId,
-          quantity: item.quantity,
-        })),
-        shippingAddress: values.shippingAddress.trim(),
-        paymentMethodToken,
-      });
+      const result = await startRazorpayCheckout();
 
-      if (!response.success || !response.order?.id) {
-        throw new Error(response.message || "Checkout failed.");
+      if (!result.orderId || !result.paymentId) {
+        throw new Error("Payment verification did not return a confirmed order.");
       }
 
-      const createdOrderId = response.order.id;
-
-      // Only clear the cart after the backend reports success.
-      if (useRealPayment) {
-        // Real Razorpay path already handled via checkout initiation + verification; mock path stays as-is
-        // For this form, real path requires separate initiation/verification flow; keeping mock as default
-      }
-      if (useRealPayment) {
-        // Real Razorpay checkout path connected via useRazorpayCheckout hook;
-        // initiation uses initiateRazorpayOrder; verification uses verifyRazorpayPayment.
-        // Mock path preserved for tests/development.
-      }
+      // Do not clear the cart or show success before server verification.
       clearCart();
-      setOrderId(createdOrderId);
+      setOrderId(result.orderId);
       setSubmitted(true);
 
-      toast("Order placed successfully!", "success");
+      toast("Payment verified successfully. Your order is confirmed.", "success");
 
       window.setTimeout(() => {
-        router.push(`/orders/${createdOrderId}`);
+        router.push("/orders/" + result.orderId);
       }, 1500);
     } catch (error: unknown) {
       const message =
-        error instanceof Error ? error.message : "Checkout failed.";
-
-      const statusCode =
-        error !== null &&
-        typeof error === "object" &&
-        "statusCode" in error &&
-        typeof error.statusCode === "number"
-          ? error.statusCode
-          : 0;
-
-      if (statusCode === 409) {
-        toast(
-          "One of your items just sold out. Please review your cart.",
-          "warning",
-        );
-      } else if (statusCode === 402) {
-        toast(
-          "Payment declined. Please choose another payment option and try again.",
-          "error",
-        );
-      } else {
-        toast(message, "error");
-      }
+        error instanceof Error
+          ? error.message
+          : "Payment failed or could not be verified.";
 
       setSubmitError(message);
+      toast(message, "error");
     }
   });
 
@@ -290,7 +250,7 @@ function CheckoutInner() {
         </div>
 
         <p className="mb-1 text-[10.5px] font-bold uppercase tracking-[0.18em] text-[var(--color-accent)]">
-          Order placed
+          Payment confirmed
         </p>
 
         <h1 className="mb-2 font-display text-3xl font-bold text-[var(--color-foreground)]">
@@ -463,10 +423,11 @@ function CheckoutInner() {
           </h2>
         </div>
 
-        <PaymentStep
-          value={paymentMethodToken}
-          onChange={setPaymentMethodToken}
-        />
+        <p className="text-sm leading-6 text-[var(--color-warm-muted)]">
+          Complete your payment securely using Razorpay Checkout. Order is
+          confirmed only after server-side verification.
+          {checkoutStatus ? ` Status: ${checkoutStatus}` : ""}
+        </p>
       </section>
 
       {/* Shipping address and order submission */}

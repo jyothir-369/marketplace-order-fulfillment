@@ -35,6 +35,7 @@ export class CheckoutRequestDto {
 export class CheckoutDto {
   @IsUUID()
   buyerId: string;
+  buyerUserId?: string | null;
 
   @IsArray()
   @ArrayMinSize(1)
@@ -69,6 +70,7 @@ export class OrderResponseDto {
   id: string;
   orderNumber: string | null;
   buyerId: string;
+  buyerUserId?: string | null;
   status: OrderStatus;
   totalAmount: number;
   correlationId: string;

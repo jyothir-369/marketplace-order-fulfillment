@@ -92,11 +92,17 @@ export class OrdersController {
   }
 
   @Get(':id')
+  @UseGuards(AuthGuard)
   async getOrder(
     @Param('id', ParseUUIDPipe) id: string,
     @CorrelationId() correlationId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<OrderResponseDto> {
-    return this.ordersService.getOrderById(id, correlationId);
+    const order = await this.ordersService.getOrderById(id, correlationId);
+    if (user.role !== UserRole.ADMIN && user.role !== UserRole.OPERATIONS && order.buyerId !== user.id && order.buyerUserId !== user.id) {
+      throw new ForbiddenException('You do not have access to this order');
+    }
+    return order;
   }
 
   /** Admin/operations audit trail for an order (Phase 1.5). */
@@ -111,10 +117,16 @@ export class OrdersController {
 
   @Post(':id/cancel')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthGuard)
   async cancelOrder(
     @Param('id', ParseUUIDPipe) id: string,
     @CorrelationId() correlationId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<OrderResponseDto> {
+    const order = await this.ordersService.getOrderById(id, correlationId);
+    if (user.role !== UserRole.ADMIN && user.role !== UserRole.OPERATIONS && order.buyerId !== user.id && order.buyerUserId !== user.id) {
+      throw new ForbiddenException('You do not have access to this order');
+    }
     return this.ordersService.cancelOrder(id, correlationId);
   }
 

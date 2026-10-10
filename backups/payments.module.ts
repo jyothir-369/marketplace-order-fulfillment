@@ -13,9 +13,6 @@ import { RazorpayInitiationService } from './razorpay-initiation.service';
 import { RazorpayVerificationService } from './razorpay-verification.service';
 import { RazorpayInitiationController } from './razorpay-initiation.controller';
 import { RazorpayVerificationController } from './razorpay-verification.controller';
-import { CheckoutReconciliationService } from './checkout-reconciliation.service';
-import { RazorpayWebhookController } from './razorpay-webhook.controller';
-import { InventoryModule } from '../inventory/inventory.module';
 
 @Module({
   imports: [
@@ -27,12 +24,10 @@ import { InventoryModule } from '../inventory/inventory.module';
       WebhookEvent,
     ]),
     AuditModule,
-    InventoryModule,
   ],
   controllers: [
     RazorpayInitiationController,
     RazorpayVerificationController,
-    RazorpayWebhookController,
   ],
   providers: [
     PaymentsService,
@@ -40,7 +35,6 @@ import { InventoryModule } from '../inventory/inventory.module';
     RazorpayProviderService,
     RazorpayInitiationService,
     RazorpayVerificationService,
-    CheckoutReconciliationService,
   ],
   exports: [
     PaymentsService,
@@ -48,7 +42,6 @@ import { InventoryModule } from '../inventory/inventory.module';
     RazorpayProviderService,
     RazorpayInitiationService,
     RazorpayVerificationService,
-    CheckoutReconciliationService,
   ],
 })
 export class PaymentsModule {}
