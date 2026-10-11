@@ -274,7 +274,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          mkdir -p .vercel
+          mkdir -p apps/frontend/.vercel
 
           node -e '
             const fs = require("fs");
