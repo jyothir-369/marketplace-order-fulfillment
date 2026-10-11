@@ -12,7 +12,7 @@ import { AppModule } from './app.module';
  * errors and muted uncaughtException/unhandledRejection for them. Now that all
  * BullMQ connections share the same lazyConnect/retry config
  * (`getBullMQConnectionOptions`), Redis-down behaviour is bounded and
- * predictable, so we no longer need to hide anything from stderr — instead we
+ * predictable, so we no longer need to hide anything from stderr Ã¢â‚¬â€ instead we
  * LOG connection notes through the app logger (rate-bounded) and still let
  * genuine non-Redis errors crash loudly.
  */
@@ -82,7 +82,8 @@ async function bootstrap(): Promise<void> {
   const allowedOrigins = [
     'http://localhost:3000',
     'http://127.0.0.1:3000',
-  'https://marketplace-order-fulfillment-frontend-b3aj4m0p8.vercel.app',
+    'https://marketplace-order-fulfillment-frontend-b3aj4m0p8.vercel.app',
+    'https://marketplace-order-fulfillment-frontend-4ybyxg41w.vercel.app',
   ];
 
   app.enableCors({
