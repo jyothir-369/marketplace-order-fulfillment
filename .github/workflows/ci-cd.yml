@@ -151,31 +151,9 @@ jobs:
       - name: Build frontend
         working-directory: apps/frontend
         run: npm run build
-
-      - name: Verify frontend build output
-        shell: bash
-        run: |
-          echo "Checking frontend build output..."
-          if [ -d "apps/frontend/.next" ]; then
-            echo "Next.js build output found."
-            ls -la apps/frontend/.next
-          else
-            echo "::error::apps/frontend/.next was not created."
-            echo "Checking alternative output directories..."
-            find apps/frontend -maxdepth 2 -type d \
-              \( -name .next -o -name standalone -o -name out \) \
-              -print
-            exit 1
-          fi
-
-      - name: Upload frontend build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-next
-          path: apps/frontend/.next/
-          if-no-files-found: error
-          retention-days: 7
-
+      - name: Build frontend
+        working-directory: apps/frontend
+        run: npm run build
   # ============================================
   # Docker Build and Push
   # Main branch pushes only
