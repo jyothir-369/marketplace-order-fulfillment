@@ -35,7 +35,7 @@ describe('BullMQ regression (unit, mocked Queue/Worker, no external Redis)', () 
       providers: [
         VendorWorkerRegistryService,
         { provide: FulfillmentService, useValue: { processSyncJob: jest.fn() } },
-        { provide: ConfigService, useValue: { get: () => ({ host: 'test', port: 6379 }) } },
+        { provide: ConfigService, useValue: { get: (key: string, defaultValue?: unknown) => key === 'REDIS_URL' ? undefined : defaultValue ?? (key === 'REDIS_HOST' ? 'test' : key === 'REDIS_PORT' ? 6379 : undefined) } },
       ],
     }).compile();
     reg = mod.get(VendorWorkerRegistryService);
