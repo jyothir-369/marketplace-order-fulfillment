@@ -100,7 +100,7 @@ export class InventoryService {
   }
 
   async getStockInfo(productId: string): Promise<StockInfoDto> {
-    var product = await this.productRepository.findOne({ where: { id: productId } });
+    const product = await this.productRepository.findOne({ where: { id: productId } });
     if (!product) {
       throw new BadRequestException('Product ' + productId + ' not found');
     }

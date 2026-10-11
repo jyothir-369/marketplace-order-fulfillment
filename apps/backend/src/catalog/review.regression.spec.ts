@@ -1,6 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { CatalogService } from './catalog.service';
+import { Product } from '../common/entities/product.entity';
+import { Vendor } from '../common/entities/vendor.entity';
+import { Category } from '../common/entities/category.entity';
 import { Review } from '../common/entities/review.entity';
 import { OrderLineItem } from '../common/entities/order-line-item.entity';
 import { Order } from '../common/entities/order.entity';
@@ -41,9 +44,9 @@ describe('CatalogService — reviews (regression)', () => {
         { provide: getRepositoryToken(OrderLineItem), useValue: lineItemRepo },
         { provide: getRepositoryToken(Order), useValue: orderRepo },
         // Minimal stubs for other repos required by CatalogService constructor
-        { provide: getRepositoryToken(require('../common/entities/product.entity').Product), useValue: { createQueryBuilder: () => ({ getManyAndCount: () => [[], 0] }) } },
-        { provide: getRepositoryToken(require('../common/entities/vendor.entity').Vendor), useValue: {} },
-        { provide: getRepositoryToken(require('../common/entities/category.entity').Category), useValue: {} },
+        { provide: getRepositoryToken(Product), useValue: { createQueryBuilder: () => ({ getManyAndCount: () => [[], 0] }) } },
+        { provide: getRepositoryToken(Vendor), useValue: {} },
+        { provide: getRepositoryToken(Category), useValue: {} },
       ],
     }).compile();
 

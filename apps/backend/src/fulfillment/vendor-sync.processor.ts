@@ -4,7 +4,7 @@ import { Job } from 'bullmq';
 import { FulfillmentService } from './fulfillment.service';
 import { AuditService } from '../common/audit';
 
-export var VENDOR_SYNC_QUEUE = 'vendor-sync';
+export const VENDOR_SYNC_QUEUE = 'vendor-sync';
 
 export interface VendorSyncJobData {
   jobId: string;
@@ -22,7 +22,7 @@ export class VendorSyncProcessor extends WorkerHost {
   }
 
   async process(job: Job<VendorSyncJobData>): Promise<void> {
-    var data = job.data;
+    const data = job.data;
     // Ensure correlation ID is propagated
     const correlationId = data.correlationId || 'vendor-sync-' + data.jobId;
 
@@ -39,7 +39,7 @@ export class VendorSyncProcessor extends WorkerHost {
         correlationId,
       );
     } catch (error) {
-      var errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(
         'Vendor sync job failed: ' + data.jobId + ' (vendor: ' + data.vendorId + ') - ' + errorMessage,
         error instanceof Error ? error.stack : undefined,
