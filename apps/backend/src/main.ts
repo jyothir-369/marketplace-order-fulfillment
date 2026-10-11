@@ -82,6 +82,7 @@ async function bootstrap(): Promise<void> {
   const allowedOrigins = [
     'http://localhost:3000',
     'http://127.0.0.1:3000',
+  'https://marketplace-order-fulfillment-frontend-b3aj4m0p8.vercel.app',
   ];
 
   app.enableCors({
