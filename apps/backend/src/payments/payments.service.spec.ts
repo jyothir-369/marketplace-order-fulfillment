@@ -4,6 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { PaymentAuthorization, PaymentStatus } from '../common/entities/payment-authorization.entity';
 import { MockPaymentService } from './mock-payment.service';
 import { AuditService } from '../common/audit';
+import { RazorpayProviderService } from './razorpay-provider.service';
 
 describe('PaymentsService', () => {
   let service: PaymentsService;
@@ -51,6 +52,7 @@ describe('PaymentsService', () => {
         { provide: getRepositoryToken(PaymentAuthorization), useValue: paymentRepository },
         { provide: MockPaymentService, useValue: mockPaymentService },
         { provide: AuditService, useValue: auditService },
+        { provide: RazorpayProviderService, useValue: { refundPayment: jest.fn() } },
       ],
     }).compile();
 
