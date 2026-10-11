@@ -1,4 +1,4 @@
-
+﻿
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
@@ -82,6 +82,8 @@ async function bootstrap(): Promise<void> {
 
     // Current Vercel production domain.
     'https://marketplace-order-fulfillment-front.vercel.app',
+    // Vercel deployment currently reporting CORS errors.
+    'https://marketplace-order-fulfillment-frontend-oberz36vs.vercel.app',
 
     // Existing Vercel deployment domains.
     'https://marketplace-order-fulfillment-frontend-b3aj4m0p8.vercel.app',
