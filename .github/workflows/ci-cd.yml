@@ -151,9 +151,16 @@ jobs:
       - name: Build frontend
         working-directory: apps/frontend
         run: npm run build
-      - name: Build frontend
+
+      - name: Verify frontend build output
         working-directory: apps/frontend
-        run: npm run build
+        shell: bash
+        run: |
+          if [ ! -d ".next" ]; then
+            echo "::error::Frontend build output apps/frontend/.next was not created."
+            exit 1
+          fi
+          echo "Frontend build output found."
   # ============================================
   # Docker Build and Push
   # Main branch pushes only
