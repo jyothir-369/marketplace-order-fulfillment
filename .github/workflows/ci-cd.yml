@@ -331,6 +331,7 @@ jobs:
 
           npx --yes vercel@latest build \
             --prod \
+            --yes \
             --token="$VERCEL_TOKEN"
 
       # Verify the exact artifact that will be deployed.
@@ -361,5 +362,7 @@ jobs:
           npx --yes vercel@latest deploy \
             --prebuilt \
             --prod \
+            --yes \
             --token="$VERCEL_TOKEN"
+
 
