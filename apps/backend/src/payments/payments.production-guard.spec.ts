@@ -2,6 +2,7 @@ import { ServiceUnavailableException } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { MockPaymentService } from './mock-payment.service';
 import { PaymentStatus } from '../common/entities/payment-authorization.entity';
+import { RazorpayProviderService } from './razorpay-provider.service';
 
 describe('Payment production safety guard', () => {
   const originalNodeEnv = process.env.NODE_ENV;
@@ -25,11 +26,15 @@ describe('Payment production safety guard', () => {
       logPaymentAuthorized: jest.fn(),
       logPaymentRefunded: jest.fn(),
     };
+    const razorpayProvider = {
+      refundPayment: jest.fn(),
+    };
 
     service = new PaymentsService(
       paymentRepository,
       mockPaymentService,
       auditService,
+      { refundPayment: jest.fn() } as any,
     );
   });
 
