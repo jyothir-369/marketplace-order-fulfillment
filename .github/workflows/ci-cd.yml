@@ -1,4 +1,4 @@
-# ============================================
+﻿# ============================================
 # GitHub Actions CI/CD Pipeline
 # Multi-workspace monorepo: @marketplace/backend + @marketplace/frontend
 # ============================================
@@ -202,3 +202,4 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run build --workspaces --if-present
+
