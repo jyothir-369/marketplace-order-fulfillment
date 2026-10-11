@@ -46,3 +46,5 @@ docker-compose*.yml
 .env
 .env.*
 !.env.example
+.vercel
+.env*
