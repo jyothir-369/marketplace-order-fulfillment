@@ -96,11 +96,17 @@ function ProductsPageInner() {
     getVendors().then(setVendors).catch(() => {});
   }, []);
 
-  // Load categories with live counts whenever search params change
+  // Load categories with live counts whenever search params change.
+  // Log failure visibly so empty-tab symptoms are distinguishable from real zero counts.
   useEffect(() => {
     getCategories()
-      .then(setCategories)
-      .catch(() => {});
+      .then((cats) => {
+        setCategories(cats);
+        console.info('[products] categories loaded:', cats.length);
+      })
+      .catch((e) => {
+        console.warn("[products] getCategories failed:", e instanceof Error ? e.message : e);
+      });
   }, [q, vendor, maxPrice]);
 
   // Load products via server-side query whenever any search param changes
