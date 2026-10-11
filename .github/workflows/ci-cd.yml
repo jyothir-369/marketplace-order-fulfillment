@@ -112,10 +112,11 @@ jobs:
       - name: Verify backend build output
         shell: bash
         run: |
-          if [ ! -d "apps/backend/dist" ]; then
+          set -euo pipefail
+          test -d apps/backend/dist || {
             echo "::error::Backend build output apps/backend/dist was not created."
             exit 1
-          fi
+          }
           echo "Backend build output found."
 
       - name: Upload backend build artifacts
@@ -156,11 +157,13 @@ jobs:
         working-directory: apps/frontend
         shell: bash
         run: |
-          if [ ! -d ".next" ]; then
+          set -euo pipefail
+          test -d .next || {
             echo "::error::Frontend build output apps/frontend/.next was not created."
             exit 1
-          fi
+          }
           echo "Frontend build output found."
+
   # ============================================
   # Docker Build and Push
   # Main branch pushes only
@@ -248,30 +251,38 @@ jobs:
         run: |
           set -euo pipefail
 
-          echo "WORKSPACE_ROOT=${GITHUB_WORKSPACE:-$(pwd)}"
-          echo "FRONTEND_DIR=$(pwd)/apps/frontend"
-          test -f apps/frontend/package.json || { echo "::error::Frontend package.json missing"; exit 1; }
-          test -f apps/frontend/next.config.ts || test -f apps/frontend/next.config.mjs || { echo "::error::Next config missing"; exit 1; }
-
-          [[ -n "$VERCEL_TOKEN" ]] || {
+          test -n "$VERCEL_TOKEN" || {
             echo "::error::Missing secret VERCEL_TOKEN"
             exit 1
           }
 
-          [[ -n "$VERCEL_ORG_ID" ]] || {
+          test -n "$VERCEL_ORG_ID" || {
             echo "::error::Missing secret VERCEL_ORG_ID"
             exit 1
           }
 
-          [[ -n "$VERCEL_PROJECT_ID" ]] || {
+          test -n "$VERCEL_PROJECT_ID" || {
             echo "::error::Missing secret VERCEL_FRONTEND_PROJECT_ID"
             exit 1
           }
 
-      # Link Vercel project at repo root (writes .vercel/project.json at root for CLI consistency);
-      # actual Vercel project root is apps/frontend configured in dashboard.
+          test -f apps/frontend/package.json || {
+            echo "::error::Frontend package.json is missing"
+            exit 1
+          }
+
+          test -f apps/frontend/vercel.json || {
+            echo "::error::apps/frontend/vercel.json is missing"
+            exit 1
+          }
+
+          echo "Required frontend files and Vercel secrets are present."
+
+      # Keep the Vercel project link inside the frontend directory.
+      # This prevents the repository-root link from being reused
+      # while the CLI runs inside apps/frontend.
       - name: Link Vercel project
-        working-directory: .
+        working-directory: apps/frontend
         shell: bash
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -293,34 +304,14 @@ jobs:
             );
           '
 
-          npx --yes vercel@latest project inspect \
-            "$VERCEL_PROJECT_ID" \
-            --token="$VERCEL_TOKEN"
+          echo "Vercel project link created in apps/frontend/.vercel."
 
-      # Safe diagnostics: no secrets, only pwd / rev / directory listings.
-      - name: Validate frontend source configuration
-        working-directory: apps/frontend
-        shell: bash
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        run: |
-          set -euo pipefail
-          echo "pwd=$(pwd)"
-          echo "rev=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
-          echo "SOURCEDIR=$(pwd)"
-          ls -A "." | grep -v '^\.vercel$' | head -15 || true
-          test -f package.json || { echo "::error::frontend package.json missing"; exit 1; }
-          test -f "vercel.json" || { echo "::error::vercel.json missing at frontend root"; exit 1; }
-          echo "frontend root verified; no secrets printed"
-
-      # Pull production env from Vercel using frontend root (not repo root).
+      # Pull production environment variables for this linked project.
       - name: Pull Vercel Production Settings
         working-directory: apps/frontend
         shell: bash
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_FRONTEND_PROJECT_ID }}
         run: |
           set -euo pipefail
 
@@ -329,16 +320,12 @@ jobs:
             --environment=production \
             --token="$VERCEL_TOKEN"
 
-      # Build from frontend root using Vercel's configured Root Directory (apps/frontend).
-      # Note: --prebuilt omitted; Vercel builds from source. System env vars not available at build;
-      # NEXT_PUBLIC_* vars come from .env.production.local pulled above.
+      # Build with Vercel so the output is compatible with deploy --prebuilt.
       - name: Build Frontend for Production
         working-directory: apps/frontend
         shell: bash
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_FRONTEND_PROJECT_ID }}
         run: |
           set -euo pipefail
 
@@ -346,33 +333,32 @@ jobs:
             --prod \
             --token="$VERCEL_TOKEN"
 
-      # Verify actual build artifact exists before deploying; fail if missing.
+      # Verify the exact artifact that will be deployed.
       - name: Verify frontend build artifact
         working-directory: apps/frontend
         shell: bash
         run: |
           set -euo pipefail
-          echo "pwd=$(pwd)"
-          echo "Checking .vercel/output (Next.js Build Output API, static or server)..."
-          if [ ! -d ".vercel/output" ]; then
-            echo "::error::No .vercel/output directory (build failed or not produced)"
-            exit 1
-          fi
-          # Accept either static output or server runtime; don't assume static/index.html.
-          ls -la ".vercel/output" | head -10 || true
-          echo "Frontend build output verified at .vercel/output"
 
-      # Deploy source-built frontend (no --prebuilt) so artifact is the actual build.
+          test -d .vercel/output || {
+            echo "::error::Vercel build did not create apps/frontend/.vercel/output"
+            exit 1
+          }
+
+          echo "Vercel build output verified."
+          ls -la .vercel/output | head -10
+
+      # Deploy the verified build, without asking Vercel to rebuild
+      # or resolve the frontend root a second time.
       - name: Deploy Frontend to Vercel
         working-directory: apps/frontend
         shell: bash
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_FRONTEND_PROJECT_ID }}
         run: |
           set -euo pipefail
 
           npx --yes vercel@latest deploy \
+            --prebuilt \
             --prod \
             --token="$VERCEL_TOKEN"
