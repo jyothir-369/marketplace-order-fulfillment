@@ -1,4 +1,4 @@
-
+﻿
 # ============================================
 # GitHub Actions CI/CD Pipeline
 # Monorepo: @marketplace/backend + @marketplace/frontend
@@ -351,7 +351,7 @@ jobs:
       # Deploy the verified build, without asking Vercel to rebuild
       # or resolve the frontend root a second time.
       - name: Deploy Frontend to Vercel
-        working-directory: apps/frontend
+        working-directory: .
         shell: bash
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -362,3 +362,4 @@ jobs:
             --prebuilt \
             --prod \
             --token="$VERCEL_TOKEN"
+
