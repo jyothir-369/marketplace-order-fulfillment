@@ -84,6 +84,7 @@ async function bootstrap(): Promise<void> {
     'http://127.0.0.1:3000',
     'https://marketplace-order-fulfillment-frontend-b3aj4m0p8.vercel.app',
     'https://marketplace-order-fulfillment-frontend-4ybyxg41w.vercel.app',
+    'https://marketplace-order-fulfillment-frontend-2cdwuacb9.vercel.app',
   ];
 
   app.enableCors({
@@ -96,7 +97,7 @@ async function bootstrap(): Promise<void> {
         return callback(null, true);
       }
 
-      return callback(new Error('Not allowed by CORS'), false);
+      return callback(null, false);
     },
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
