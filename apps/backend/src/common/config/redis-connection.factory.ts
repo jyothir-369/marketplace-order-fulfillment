@@ -1,20 +1,45 @@
 import { ConfigService } from '@nestjs/config';
 import { ConnectionOptions } from 'bullmq';
 
-/**
- * Single source of truth for BullMQ/ioredis connection options (Phase 1.3).
- *
- * Every Queue / QueueEvents / Worker in the app must be built from these
- * options so behaviour under Redis unavailability is consistent across the
- * legacy shared queue, per-vendor queues, and their workers: lazyConnect,
- * no request retries, and a bounded reconnect backoff that gives up after a
- * few attempts instead of hanging or crashing.
- */
-export function getBullMQConnectionOptions(configService: ConfigService): ConnectionOptions {
+export function getBullMQConnectionOptions(
+  configService: ConfigService,
+): ConnectionOptions {
+  const redisUrl = configService.get<string>('REDIS_URL');
+
+  let connection: ConnectionOptions;
+
+  if (redisUrl) {
+    const parsed = new URL(redisUrl);
+
+    if (parsed.protocol !== 'redis:' && parsed.protocol !== 'rediss:') {
+      throw new Error('REDIS_URL must use redis:// or rediss://');
+    }
+
+    connection = {
+      host: parsed.hostname,
+      port: Number(parsed.port || 6379),
+      ...(parsed.password
+        ? { password: decodeURIComponent(parsed.password) }
+        : {}),
+      ...(parsed.username
+        ? { username: decodeURIComponent(parsed.username) }
+        : {}),
+      ...(parsed.protocol === 'rediss:' ? { tls: {} } : {}),
+    };
+  } else {
+    const tlsEnabled =
+      configService.get<string>('REDIS_TLS', 'false').toLowerCase() === 'true';
+
+    connection = {
+      host: configService.get('REDIS_HOST', 'localhost'),
+      port: Number(configService.get('REDIS_PORT', 6379)),
+      password: configService.get('REDIS_PASSWORD') || undefined,
+      ...(tlsEnabled ? { tls: {} } : {}),
+    };
+  }
+
   return {
-    host: configService.get('REDIS_HOST', 'localhost'),
-    port: configService.get('REDIS_PORT', 6379),
-    password: configService.get('REDIS_PASSWORD') || undefined,
+    ...connection,
     maxRetriesPerRequest: null,
     enableOfflineQueue: false,
     lazyConnect: true,
