@@ -1,6 +1,3 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "npx turbo run build --filter=@marketplace/frontend...",
-  "installCommand": "npm install",
-  "framework": "nextjs"
+  "$schema": "https://openapi.vercel.sh/vercel.json"
 }
