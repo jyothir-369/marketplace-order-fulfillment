@@ -248,6 +248,11 @@ jobs:
         run: |
           set -euo pipefail
 
+          echo "WORKSPACE_ROOT=${GITHUB_WORKSPACE:-$(pwd)}"
+          echo "FRONTEND_DIR=$(pwd)/apps/frontend"
+          test -f apps/frontend/package.json || { echo "::error::Frontend package.json missing"; exit 1; }
+          test -f apps/frontend/next.config.ts || test -f apps/frontend/next.config.mjs || { echo "::error::Next config missing"; exit 1; }
+
           [[ -n "$VERCEL_TOKEN" ]] || {
             echo "::error::Missing secret VERCEL_TOKEN"
             exit 1
@@ -290,6 +295,20 @@ jobs:
           npx --yes vercel@latest project inspect \
             "$VERCEL_PROJECT_ID" \
             --token="$VERCEL_TOKEN"
+
+      # Diagnostic validation before production build/deploy.
+      - name: Validate prebuilt path and project config
+        working-directory: apps/frontend
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "CWD=$(pwd)"
+          echo "FRONTEND_ROOT=$(pwd)"
+          test -f .vercel/project.json || { echo "::error::.vercel/project.json missing"; exit 1; }
+          echo "Project config found at .vercel/project.json"
+          echo "No secrets shown."
 
       # Pull production environment variables and settings.
       - name: Pull Vercel Production Settings
