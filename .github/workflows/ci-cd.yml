@@ -1,4 +1,4 @@
-﻿# ============================================
+# ============================================
 # GitHub Actions CI/CD Pipeline
 # Multi-workspace monorepo: @marketplace/backend + @marketplace/frontend
 # ============================================
@@ -106,13 +106,6 @@ jobs:
       - name: Build frontend
         working-directory: apps/frontend
         run: npm run build
-      - name: Upload frontend build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-next
-          path: apps/frontend/.next/
-          retention-days: 7
-
   # ============================================
   # Docker Build & Push - Backend Only
   # Runs only on main branch pushes
@@ -202,4 +195,3 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run build --workspaces --if-present
-
