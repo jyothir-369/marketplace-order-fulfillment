@@ -198,4 +198,18 @@ export class RazorpayProviderService {
       timingSafeEqual(expected, supplied)
     );
   }
+
+  async refundPayment(
+    paymentId: string,
+    amountPaise?: number,
+  ): Promise<{ id: string; status: string }> {
+    const credentials = this.getCredentials();
+    const keyId = credentials.keyId;
+    const keySecret = credentials.keySecret;
+    if (!keyId || !keySecret || /replace|placeholder|your[_ -]?key/i.test(keySecret) || !keyId.startsWith('rzp_test_')) {
+      throw new ServiceUnavailableException('Valid Razorpay test credentials required for refund');
+    }
+    const client = this.getClient();
+    return client.payments.refund(paymentId, { amount: amountPaise || 0, notes: { refund_type: 'full' } });
+  }
 }

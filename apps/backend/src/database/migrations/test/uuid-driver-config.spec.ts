@@ -1,4 +1,5 @@
 import { PostgresDriver } from 'typeorm/driver/postgres/PostgresDriver';
+import { migrationDataSource } from '../datasource';
 
 describe('TypeORM PostgreSQL UUID driver config', () => {
   it('pgcrypto option produces gen_random_uuid; default uuid-ossp produces uuid_generate_v4', () => {
@@ -9,7 +10,7 @@ describe('TypeORM PostgreSQL UUID driver config', () => {
   });
 
   it('datasource sets uuidExtension to pgcrypto', () => {
-    const { migrationDataSource } = require('../datasource');
+    // datasource statically imported
     expect((migrationDataSource.options as any).uuidExtension).toBe('pgcrypto');
   });
 });

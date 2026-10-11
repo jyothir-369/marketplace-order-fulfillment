@@ -5,6 +5,7 @@ import { VendorWorkerRegistryService } from './vendor-worker-registry.service';
 import { VendorQueueService, VendorQueueJobData } from './vendor-queue.service';
 import { FulfillmentService } from './fulfillment.service';
 
+import { FulfillmentModule } from './fulfillment.module';
 jest.mock('bullmq', () => {
   const MockWorker = jest.fn().mockImplementation((n: string, p: any, opts?: any) => ({
     on: jest.fn().mockReturnThis(), close: jest.fn().mockResolvedValue(undefined), concurrency: (opts?.concurrency ?? 3),
@@ -83,6 +84,6 @@ describe('BullMQ regression (unit, mocked Queue/Worker, no external Redis)', () 
     expect(reg.getWorker('v-sh')).toBeUndefined();
   });
   it('8. legacy vendor-sync module preserved', () => {
-    expect(require('./fulfillment.module').FulfillmentModule).toBeDefined();
+    expect(FulfillmentModule).toBeDefined();
   });
 });

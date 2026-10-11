@@ -19,7 +19,7 @@ export enum SyncJobStatus {
   DEAD_LETTER = 'dead_letter',
 }
 
-export var MAX_RETRY_ATTEMPTS = 5;
+export const MAX_RETRY_ATTEMPTS = 5;
 
 @Entity('vendor_sync_jobs')
 @Index(['status', 'lastAttemptedAt'])

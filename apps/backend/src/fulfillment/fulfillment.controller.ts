@@ -28,14 +28,14 @@ export class FulfillmentController {
     @Body() body: { orderId: string; vendorId: string },
     @CorrelationId() correlationId: string,
   ): Promise<{ message: string; jobId: string; vendorId: string; queueName: string }> {
-    var syncJob = await this.fulfillmentService.createSyncJob({
+    const syncJob = await this.fulfillmentService.createSyncJob({
       orderLineItemId: orderLineItemId,
       orderId: body.orderId,
       vendorId: body.vendorId,
       correlationId: correlationId,
     });
 
-    var jobData: VendorSyncJobData = {
+    const jobData: VendorSyncJobData = {
       jobId: syncJob.id,
       orderLineItemId: orderLineItemId,
       vendorId: body.vendorId,
@@ -44,7 +44,7 @@ export class FulfillmentController {
 
     await this.vendorQueueService.addJobToVendorQueue(body.vendorId, jobData);
     
-    var queueName = this.vendorQueueService.getQueueName(body.vendorId);
+    const queueName = this.vendorQueueService.getQueueName(body.vendorId);
 
     return {
       message: 'Sync job enqueued to vendor-specific queue',
@@ -60,14 +60,14 @@ export class FulfillmentController {
     @Body() body: { orderId: string; vendorId: string },
     @CorrelationId() correlationId: string,
   ): Promise<{ message: string; jobId: string; queueName: string }> {
-    var syncJob = await this.fulfillmentService.createSyncJob({
+    const syncJob = await this.fulfillmentService.createSyncJob({
       orderLineItemId: orderLineItemId,
       orderId: body.orderId,
       vendorId: body.vendorId,
       correlationId: correlationId,
     });
 
-    var jobData: VendorSyncJobData = {
+    const jobData: VendorSyncJobData = {
       jobId: syncJob.id,
       orderLineItemId: orderLineItemId,
       vendorId: body.vendorId,

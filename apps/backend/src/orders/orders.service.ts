@@ -8,7 +8,7 @@ import { CheckoutDto, CheckoutResponseDto, OrderResponseDto, OrderLineItemRespon
 import { InventoryService } from '../inventory/inventory.service';
 import { AuditService, AuditLog, AuditEntityType } from '../common/audit';
 import { PaymentsService } from '../payments/payments.service';
-import { PaymentAuthorization, PaymentStatus } from '\.\./common/entities/payment-authorization.entity';
+import { PaymentAuthorization, PaymentStatus } from '../common/entities/payment-authorization.entity';
 
 @Injectable()
 export class OrdersService {

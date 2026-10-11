@@ -12,4 +12,13 @@ export class CorrelationIdMiddleware implements NestMiddleware {
     req.correlationId = correlationId as string;
     next();
   }
-}declare global { namespace Express { interface Request { correlationId?: string } } }
+}
+
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace Express {
+    interface Request {
+      correlationId?: string;
+    }
+  }
+}

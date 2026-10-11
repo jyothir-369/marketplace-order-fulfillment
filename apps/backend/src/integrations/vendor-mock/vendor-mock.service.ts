@@ -28,11 +28,10 @@ export class VendorMockService {
   }
 
   async requestFulfillment(request: VendorFulfillmentRequestDto, correlationId: string): Promise<VendorFulfillmentResponseDto> {
-    var config = this.simulationConfigs.get(request.vendorId) || this.simulationConfigs.get('default');
+    const config = this.simulationConfigs.get(request.vendorId) || this.simulationConfigs.get('default');
 
     this.logger.log('Vendor ' + request.vendorId + ' receiving fulfillment request for order ' + request.orderId, VendorMockService.name, correlationId);
 
-    var self = this;
     await this.sleep(config.timeoutMs);
 
     if (config.forcedResponse) {

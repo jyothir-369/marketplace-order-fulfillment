@@ -27,24 +27,24 @@ export class AdminService {
   ) {}
 
   async getDashboard(correlationId: string): Promise<AdminDashboardDto> {
-    var totalOrders = await this.orderRepository.count();
-    var deadLetterJobs = await this.syncJobRepository.count({ where: { status: SyncJobStatus.DEAD_LETTER } });
-    var ambiguousJobs = await this.syncJobRepository.count({ where: { status: SyncJobStatus.AMBIGUOUS } });
-    var statusCounts = await this.orderRepository
+    const totalOrders = await this.orderRepository.count();
+    const deadLetterJobs = await this.syncJobRepository.count({ where: { status: SyncJobStatus.DEAD_LETTER } });
+    const ambiguousJobs = await this.syncJobRepository.count({ where: { status: SyncJobStatus.AMBIGUOUS } });
+    const statusCounts = await this.orderRepository
       .createQueryBuilder('order')
       .select('order.status', 'status')
       .addSelect('COUNT(*)', 'count')
       .groupBy('order.status')
       .getRawMany();
-    var countsByStatus = new Map();
-    for (var i = 0; i < statusCounts.length; i++) {
-      var s = statusCounts[i];
+    const countsByStatus = new Map();
+    for (let i = 0; i < statusCounts.length; i++) {
+      const s = statusCounts[i];
       countsByStatus.set(s.status, parseInt(s.count, 10));
     }
     // Revenue rule: recognized revenue = orders with CAPTURED payment authorization
     // (status CONFIRMED / FULFILLING / FULFILLED). CANCELLED orders with REFUNDED
     // payments are excluded; FAILED payments never contribute.
-    var revenueResult = await this.orderRepository
+    const revenueResult = await this.orderRepository
       .createQueryBuilder('order')
       .innerJoin('payment_authorizations', 'pa', 'pa.order_id = order.id')
       .select('COALESCE(SUM(order.totalAmount), 0)', 'total')
@@ -57,7 +57,7 @@ export class AdminService {
         ],
       })
       .getRawOne();
-    var totalRevenue = parseFloat(revenueResult?.total ?? '0');
+    const totalRevenue = parseFloat(revenueResult?.total ?? '0');
     return {
       totalOrders: totalOrders,
       totalRevenue: totalRevenue,
@@ -210,7 +210,7 @@ export class AdminService {
   }
 
   async retryDeadLetterJob(jobId: string, correlationId: string): Promise<void> {
-    var job = await this.syncJobRepository.findOne({ where: { id: jobId } });
+    const job = await this.syncJobRepository.findOne({ where: { id: jobId } });
     if (!job) {
       throw new NotFoundException('Job ' + jobId + ' not found');
     }

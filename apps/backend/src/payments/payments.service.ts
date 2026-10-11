@@ -1,4 +1,5 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { RazorpayProviderService } from './razorpay-provider.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import {
@@ -25,6 +26,7 @@ export class PaymentsService {
     private readonly paymentRepository: Repository<PaymentAuthorization>,
     private readonly mockPaymentService: MockPaymentService,
     private readonly auditService: AuditService,
+    private readonly razorpayProvider: RazorpayProviderService,
   ) {}
 
   /**
@@ -138,15 +140,6 @@ export class PaymentsService {
   }
 
   async refundViaRazorpay(paymentId: string, amountPaise?: number): Promise<{ id: string; status: string }> {
-    // Fail closed: no placeholder credentials; require validated provider credentials
-    const { RazorpayProviderService } = require('./razorpay-provider.service');
-    const provider = new RazorpayProviderService();
-    const keyId = process.env.RAZORPAY_KEY_ID?.trim();
-    const keySecret = process.env.RAZORPAY_KEY_SECRET?.trim();
-    if (!keyId || !keySecret || /replace|placeholder|your[_ -]?key/i.test(keySecret) || !keyId.startsWith('rzp_test_')) {
-      throw new Error('Valid Razorpay test credentials required for refund');
-    }
-    const client = new (require('razorpay'))({ key_id: keyId, key_secret: keySecret });
-    return client.payments.refund(paymentId, { amount: amountPaise || 0, notes: { refund_type: 'full' } });
+    return this.razorpayProvider.refundPayment(paymentId, amountPaise);
   }
 }
