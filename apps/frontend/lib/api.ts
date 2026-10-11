@@ -41,7 +41,7 @@ import { getAccessToken } from "@/lib/auth-token";
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ??
   process.env.NEXT_PUBLIC_API_URL ??
-  'http://localhost:3001/api';
+  (process.env.NODE_ENV === 'production' ? 'https://marketplace-backend-api-7cqo.onrender.com/api' : 'http://localhost:3001/api');
 
 export const VENDOR_ID = "11111111-1111-1111-1111-111111111111";
 
