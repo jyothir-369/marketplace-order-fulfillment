@@ -98,13 +98,13 @@ export function AccountMenu() {
       <div className="hidden items-center gap-1.5 sm:flex">
         <Link
           href={`/login?redirect=${encodeURIComponent(pathname ?? '')}`}
-          className="rounded-lg px-3 py-2 text-sm font-medium text-[var(--color-foreground)] hover:bg-[var(--color-cream)]/60 transition-colors"
+          className="rounded-lg px-3 py-2 text-sm font-medium text-[var(--color-foreground)] hover:bg-[var(--color-card)]/60 transition-colors"
         >
           Sign in
         </Link>
         <Link
           href="/register"
-          className="rounded-lg px-3 py-2 text-sm font-semibold text-[var(--color-ink-navy)] border border-[var(--color-ink-navy)] hover:bg-[var(--color-cream)]/80 transition-colors"
+          className="rounded-lg px-3 py-2 text-sm font-semibold text-[var(--color-ink-navy)] border border-[var(--color-ink-navy)] hover:bg-[var(--color-card)]/80 transition-colors"
         >
           Create account
         </Link>
@@ -132,7 +132,7 @@ export function AccountMenu() {
         aria-expanded={open}
         className={cn(
           "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium",
-          "text-[var(--color-foreground)] hover:bg-[var(--color-cream)]/60 transition-colors",
+          "text-[var(--color-foreground)] hover:bg-[var(--color-card)]/60 transition-colors",
           "focus:outline-none focus:ring-2 focus:ring-[var(--color-brass)]/40",
         )}
       >
@@ -147,7 +147,7 @@ export function AccountMenu() {
       {open && createPortal(
         <div
           role="menu"
-          className="fixed w-56 overflow-hidden rounded-xl border-2 border-[var(--color-ink-navy)] bg-[var(--color-cream)] shadow-[0_25px_60px_rgba(0,0,0,0.35)] z-[9999]"
+          className="fixed w-56 overflow-hidden rounded-xl border-2 border-[var(--color-ink-navy)] bg-[var(--color-card)] shadow-[0_25px_60px_rgba(0,0,0,0.35)] z-[var(--z-dropdown)]"
           style={{
             position: "fixed",
             top: dropdownPos.top,
@@ -191,7 +191,7 @@ export function AccountMenu() {
 }
 
 const menuItemClasses =
-  "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-[var(--color-foreground)] hover:bg-[var(--color-cream)]/70 transition-colors";
+  "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-[var(--color-foreground)] hover:bg-[var(--color-card)]/70 transition-colors";
 
 function MenuItem({
   href,

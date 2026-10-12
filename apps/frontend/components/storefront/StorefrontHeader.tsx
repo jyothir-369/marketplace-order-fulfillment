@@ -72,7 +72,7 @@ export function StorefrontHeader() {
   return (
     <header
       className={cn(
-        "relative w-full",
+        "relative w-full sticky top-0 z-[var(--z-header)]",
         "backdrop-blur-md bg-[var(--color-ivory)]/90",
         "border-b border-[var(--color-warm-border)]",
         "shadow-v2 transition-all duration-200"
@@ -115,7 +115,7 @@ export function StorefrontHeader() {
             </Link>
             <div
               className={cn(
-                "absolute top-full left-0 mt-1 w-72 rounded-xl border border-[var(--color-warm-border)] bg-[var(--color-card)] shadow-v2-lg overflow-hidden transition-all duration-200 ease-out z-50",
+                "absolute top-full left-0 mt-1 w-72 rounded-xl border border-[var(--color-warm-border)] bg-[var(--color-card)] shadow-v2-lg overflow-hidden transition-all duration-200 ease-out z-[var(--z-dropdown)]",
                 megaOpen ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-1 pointer-events-none"
               )}
               aria-label="Shop categories"
@@ -308,7 +308,7 @@ export function StorefrontHeader() {
         )}
       >
         <div className="max-w-7xl mx-auto px-6 py-1.5 text-center text-xs text-[var(--color-warm-muted)]">
-          Free shipping on orders over $50&nbsp; Â·&nbsp; from vendors you can trust
+          Free shipping on orders over $50 · from vendors you can trust
         </div>
       </div>
     </header>
