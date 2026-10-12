@@ -27,6 +27,8 @@ type ProductFormValues = {
   category: string;
   price: string;
   stockCount: string;
+  description: string;
+  images: string;
 };
 
 const EMPTY_FORM: ProductFormValues = {
@@ -34,6 +36,8 @@ const EMPTY_FORM: ProductFormValues = {
   category: "",
   price: "",
   stockCount: "0",
+  description: "",
+  images: "",
 };
 
 function errorMessage(error: unknown): string {
@@ -101,6 +105,8 @@ export default function VendorProductsPage() {
       category: product.category ?? "",
       price: String(product.price),
       stockCount: String(product.stockCount),
+      description: product.description ?? "",
+      images: Array.isArray(product.images) ? product.images.join(", ") : "",
     });
     setFormError(null);
     setEditor({ product });
@@ -120,6 +126,9 @@ export default function VendorProductsPage() {
     const price = Number(form.price);
     const stockCount = Number(form.stockCount);
     const category = form.category.trim();
+    const description = form.description.trim() || undefined;
+    const imagesRaw = form.images.trim();
+    const images = imagesRaw ? imagesRaw.split(",").map((s) => s.trim()).filter(Boolean) : undefined;
 
     if (!name) {
       setFormError("Product name is required.");
@@ -146,6 +155,8 @@ export default function VendorProductsPage() {
           category: category || undefined,
           price,
           stockCount,
+          ...(description ? { description } : {}),
+          ...(images ? { images } : {}),
         });
 
         toast("Product updated successfully.", "success");
@@ -156,6 +167,8 @@ export default function VendorProductsPage() {
           price,
           stockCount,
           ...(category ? { category } : {}),
+          ...(description ? { description } : {}),
+          ...(images ? { images } : {}),
         };
 
         await createProduct(payload);
@@ -349,6 +362,39 @@ export default function VendorProductsPage() {
                   }
                   disabled={saving}
                   placeholder="e.g. Accessories"
+                  className="w-full rounded-lg border border-[var(--color-border)] bg-transparent px-3 py-2.5 text-sm"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label htmlFor="product-description" className="mb-1 block text-sm font-semibold">
+                  Description
+                </label>
+                <textarea
+                  id="product-description"
+                  rows={3}
+                  value={form.description}
+                  onChange={(event) =>
+                    setForm((previous) => ({ ...previous, description: event.target.value }))
+                  }
+                  disabled={saving}
+                  placeholder="What makes this product special?"
+                  className="w-full rounded-lg border border-[var(--color-border)] bg-transparent px-3 py-2.5 text-sm"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label htmlFor="product-images" className="mb-1 block text-sm font-semibold">
+                  Image URLs (comma-separated)
+                </label>
+                <input
+                  id="product-images"
+                  value={form.images}
+                  onChange={(event) =>
+                    setForm((previous) => ({ ...previous, images: event.target.value }))
+                  }
+                  disabled={saving}
+                  placeholder="https://example.com/img1.jpg, https://example.com/img2.jpg"
                   className="w-full rounded-lg border border-[var(--color-border)] bg-transparent px-3 py-2.5 text-sm"
                 />
               </div>

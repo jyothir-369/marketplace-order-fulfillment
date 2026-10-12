@@ -1,7 +1,9 @@
 import { Type } from 'class-transformer';
 import {
+  IsNotEmpty,
   IsString,
   IsNumber,
+  IsInt,
   IsUUID,
   IsOptional,
   Min,
@@ -26,13 +28,15 @@ export class CreateProductDto {
   vendorId: string;
 
   @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
   name: string;
 
   @IsNumber()
   @Min(0)
   price: number;
 
-  @IsNumber()
+  @IsInt()
   @Min(0)
   stockCount: number;
 
@@ -71,7 +75,7 @@ export class UpdateProductDto {
   price?: number;
 
   @IsOptional()
-  @IsNumber()
+  @IsInt()
   @Min(0)
   stockCount?: number;
 

@@ -83,6 +83,14 @@ export class CatalogService {
       throw new ForbiddenException('A vendor account must be linked to a vendor to create products');
     }
 
+    // D4: validate category exists in categories table; return 400-style error cleanly.
+    if (dto.category) {
+      const cat = await this.categoryRepository.findOne({ where: { name: dto.category } });
+      if (!cat) {
+        throw new NotFoundException('Category "' + dto.category + '" not found; create it first or use an existing category');
+      }
+    }
+
     const vendor = await this.vendorRepository.findOne({ where: { id: effectiveVendorId } });
     if (!vendor) {
       throw new NotFoundException('Vendor with ID ' + effectiveVendorId + ' not found');
@@ -93,9 +101,11 @@ export class CatalogService {
       name: dto.name,
       slug: dto.slug ?? this.slugify(dto.name),
       category: dto.category ?? null,
-      price: dto.price,
+      price: parseFloat(Number(dto.price).toFixed(2)),
       stockCount: dto.stockCount,
       isActive: true,
+      description: dto.description ?? null,
+      images: dto.images ?? null,
     });
 
     const saved = await this.productRepository.save(product);
@@ -573,11 +583,10 @@ export class CatalogService {
   private async getVendorFulfillmentCounts(vendorId: string): Promise<{ pending: number; deadLetter: number; ambiguous: number }> {
     const row = await this.lineItemRepository
       .createQueryBuilder('line_item')
-      .select("SUM(CASE WHEN line_item.fulfillment_status IN ('pending', 'syncing') THEN 1 ELSE 0 END)", 'pending')
-      .select("SUM(CASE WHEN line_item.fulfillment_status = 'dead_letter' THEN 1 ELSE 0 END)", 'dead')
-      .select("SUM(CASE WHEN line_item.fulfillment_status = 'ambiguous' THEN 1 ELSE 0 END)", 'amb')
+      .select("SUM(CASE WHEN line_item.fulfillment_status IN ('pending','syncing') THEN 1 ELSE 0 END)", 'pending')
+      .addSelect("SUM(CASE WHEN line_item.fulfillment_status = 'dead_letter' THEN 1 ELSE 0 END)", 'dead')
+      .addSelect("SUM(CASE WHEN line_item.fulfillment_status = 'ambiguous' THEN 1 ELSE 0 END)", 'amb')
       .where('line_item.vendor_id = :vendorId', { vendorId })
-      .groupBy('line_item.vendor_id')
       .getRawOne();
 
     return {

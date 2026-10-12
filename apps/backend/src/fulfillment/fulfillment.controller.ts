@@ -23,10 +23,13 @@ export class FulfillmentController {
   ) {}
 
   @Post('sync/:orderLineItemId')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.OPERATIONS, UserRole.VENDOR)
   async enqueueSyncJob(
     @Param('orderLineItemId', ParseUUIDPipe) orderLineItemId: string,
     @Body() body: { orderId: string; vendorId: string },
     @CorrelationId() correlationId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<{ message: string; jobId: string; vendorId: string; queueName: string }> {
     const syncJob = await this.fulfillmentService.createSyncJob({
       orderLineItemId: orderLineItemId,
@@ -55,10 +58,13 @@ export class FulfillmentController {
   }
 
   @Post('sync/:orderLineItemId/legacy')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.OPERATIONS, UserRole.VENDOR)
   async enqueueSyncJobLegacy(
     @Param('orderLineItemId', ParseUUIDPipe) orderLineItemId: string,
     @Body() body: { orderId: string; vendorId: string },
     @CorrelationId() correlationId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<{ message: string; jobId: string; queueName: string }> {
     const syncJob = await this.fulfillmentService.createSyncJob({
       orderLineItemId: orderLineItemId,
