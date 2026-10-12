@@ -2,7 +2,7 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, EntityManager } from 'typeorm';
 import { Product } from '../common/entities/product.entity';
-import { DecrementStockDto, StockOperationResult, StockInfoDto } from './dto/inventory.dto';
+import { DecrementStockDto, AdjustStockDto, StockOperationResult, StockInfoDto } from './dto/inventory.dto';
 import { AuditService } from '../common/audit';
 
 @Injectable()
@@ -109,6 +109,77 @@ export class InventoryService {
       currentStock: product.stockCount,
       isAvailable: product.isActive && product.stockCount > 0,
     };
+  }
+
+  async adjustStock(
+    productId: string,
+    delta: number,
+    reason: string,
+    correlationId: string,
+    manager?: EntityManager,
+  ): Promise<StockOperationResult> {
+    this.logger.log('Adjusting stock for product ' + productId + ' by delta ' + delta + ' | reason: ' + reason, InventoryService.name, correlationId);
+
+    return this.runInTransaction(manager, async (m) => {
+      const product = await (m as any).createQueryBuilder(Product, 'product')
+        .setLock('pessimistic_write')
+        .where('product.id = :id', { id: productId })
+        .getOne();
+
+      if (!product) {
+        throw new BadRequestException('Product ' + productId + ' not found');
+      }
+
+      if (!product.isActive) {
+        return {
+          success: false,
+          productId,
+          previousStock: product.stockCount,
+          newStock: product.stockCount,
+          requestedQuantity: Math.abs(delta),
+          message: 'Product is not active',
+        };
+      }
+
+      const previousStock = product.stockCount;
+      const newStock = previousStock + delta;
+
+      if (newStock < 0) {
+        return {
+          success: false,
+          productId,
+          previousStock,
+          newStock: previousStock,
+          requestedQuantity: Math.abs(delta),
+          message: 'Insufficient stock for delta adjustment: would result in negative stock',
+        };
+      }
+
+      await (m as any).createQueryBuilder()
+        .update(Product)
+        .set({ stockCount: newStock })
+        .where('id = :id', { id: productId })
+        .execute();
+
+      // Reuse existing audit actions by sign; no new enum value required (decision A: reuse by sign).
+      if (delta < 0) {
+        await this.auditService.logInventoryDecrement(
+          correlationId, productId, previousStock, newStock, Math.abs(delta), undefined,
+        );
+      } else if (delta > 0) {
+        await this.auditService.logInventoryRestore(
+          correlationId, productId, previousStock, newStock, delta, reason,
+        );
+      }
+
+      return {
+        success: true,
+        productId,
+        previousStock,
+        newStock,
+        requestedQuantity: Math.abs(delta),
+      };
+    });
   }
 
   async restoreStock(
