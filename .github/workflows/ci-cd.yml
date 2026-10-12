@@ -1,4 +1,3 @@
-
 # ============================================
 # GitHub Actions CI/CD Pipeline
 # Monorepo: @marketplace/backend + @marketplace/frontend
@@ -25,6 +24,7 @@ env:
   NODE_VERSION: "24"
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  VERCEL_CLI_VERSION: "63.1.2"
 
 jobs:
   # ============================================
@@ -219,6 +219,11 @@ jobs:
   # ============================================
   # Deploy Frontend to Vercel
   # Main branch pushes only
+  #
+  # IMPORTANT: Every Vercel CLI command runs from the REPOSITORY ROOT.
+  # The Vercel project's "Root Directory" setting (apps/frontend) is
+  # applied by Vercel itself. Running the CLI from inside apps/frontend
+  # would make it resolve apps/frontend/apps/frontend and fail.
   # ============================================
   deploy-frontend:
     name: Deploy Frontend to Vercel
@@ -271,21 +276,12 @@ jobs:
             exit 1
           }
 
-          test -f apps/frontend/vercel.json || {
-            echo "::error::apps/frontend/vercel.json is missing"
-            exit 1
-          }
-
           echo "Required frontend files and Vercel secrets are present."
 
-      # Keep the Vercel project link inside the frontend directory.
-      # This prevents the repository-root link from being reused
-      # while the CLI runs inside apps/frontend.
+      # Link the project at the repository root (no working-directory).
       - name: Link Vercel project
-        working-directory: apps/frontend
         shell: bash
         env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_FRONTEND_PROJECT_ID }}
         run: |
@@ -304,62 +300,60 @@ jobs:
             );
           '
 
-          echo "Vercel project link created in apps/frontend/.vercel."
+          echo "Vercel project link created at repository root."
 
-      # Pull production environment variables for this linked project.
       - name: Pull Vercel Production Settings
-        working-directory: apps/frontend
         shell: bash
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_FRONTEND_PROJECT_ID }}
         run: |
           set -euo pipefail
 
-          npx --yes vercel@latest pull \
+          npx --yes vercel@"$VERCEL_CLI_VERSION" pull \
             --yes \
             --environment=production \
             --token="$VERCEL_TOKEN"
 
       # Build with Vercel so the output is compatible with deploy --prebuilt.
       - name: Build Frontend for Production
-        working-directory: apps/frontend
         shell: bash
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_FRONTEND_PROJECT_ID }}
         run: |
           set -euo pipefail
 
-          npx --yes vercel@latest build \
+          npx --yes vercel@"$VERCEL_CLI_VERSION" build \
             --prod \
             --yes \
             --token="$VERCEL_TOKEN"
 
-      # Verify the exact artifact that will be deployed.
       - name: Verify frontend build artifact
-        working-directory: apps/frontend
         shell: bash
         run: |
           set -euo pipefail
 
           test -d .vercel/output || {
-            echo "::error::Vercel build did not create apps/frontend/.vercel/output"
+            echo "::error::Vercel build did not create .vercel/output"
             exit 1
           }
 
           echo "Vercel build output verified."
           ls -la .vercel/output | head -10
 
-      # Deploy the verified build, without asking Vercel to rebuild
-      # or resolve the frontend root a second time.
       - name: Deploy Frontend to Vercel
-        working-directory: apps/frontend
         shell: bash
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_FRONTEND_PROJECT_ID }}
         run: |
           set -euo pipefail
 
-          npx --yes vercel@latest deploy \
+          npx --yes vercel@"$VERCEL_CLI_VERSION" deploy \
             --prebuilt \
             --prod \
             --yes \
