@@ -67,3 +67,14 @@ export class AdminAuditLogResponseDto {
   total: number;
   logs: AdminAuditLogDto[];
 }
+export class LinkUserDto {
+  @IsString()
+  email: string;
+}
+
+export class LinkedUserDto {
+  id: string;
+  email: string;
+  role: string;
+  vendorId: string | null;
+}

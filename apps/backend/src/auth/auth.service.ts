@@ -141,6 +141,14 @@ export class AuthService {
       .execute();
   }
 
+  async revokeAllForUser(userId: string): Promise<number> {
+    const result = await this.refreshTokenRepository.update(
+      { userId, revokedAt: null as any },
+      { revokedAt: new Date() },
+    );
+    return result.affected ?? 0;
+  }
+
   /** Housekeeping for expired refresh tokens (called from the module onStartup or the reconciliation scheduler). */
   async purgeExpiredRefreshTokens(): Promise<number> {
     const result = await this.refreshTokenRepository.delete({
