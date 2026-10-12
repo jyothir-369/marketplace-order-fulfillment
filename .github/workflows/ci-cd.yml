@@ -302,49 +302,11 @@ jobs:
 
           echo "Vercel project link created at repository root."
 
-      - name: Pull Vercel Production Settings
-        shell: bash
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_FRONTEND_PROJECT_ID }}
-        run: |
-          set -euo pipefail
-
-          npx --yes vercel@"$VERCEL_CLI_VERSION" pull \
-            --yes \
-            --environment=production \
-            --token="$VERCEL_TOKEN"
-
-      # Build with Vercel so the output is compatible with deploy --prebuilt.
-      - name: Build Frontend for Production
-        shell: bash
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_FRONTEND_PROJECT_ID }}
-        run: |
-          set -euo pipefail
-
-          npx --yes vercel@"$VERCEL_CLI_VERSION" build \
-            --prod \
-            --yes \
-            --token="$VERCEL_TOKEN"
-
-      - name: Verify frontend build artifact
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          test -d .vercel/output || {
-            echo "::error::Vercel build did not create .vercel/output"
-            exit 1
-          }
-
-          echo "Vercel build output verified."
-          ls -la .vercel/output | head -10
-
+      # Let Vercel build remotely using the project's dashboard settings
+      # (Framework Preset, Root Directory = apps/frontend, env vars).
+      # No --prebuilt: the local build output is not used.
       - name: Deploy Frontend to Vercel
+        id: deploy
         shell: bash
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -353,8 +315,35 @@ jobs:
         run: |
           set -euo pipefail
 
-          npx --yes vercel@"$VERCEL_CLI_VERSION" deploy \
-            --prebuilt \
+          url="$(npx --yes vercel@"$VERCEL_CLI_VERSION" deploy \
             --prod \
             --yes \
-            --token="$VERCEL_TOKEN"
+            --token="$VERCEL_TOKEN" | tail -n 1)"
+
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Deployed: $url"
+
+      # Fail the job if the deployment is empty (404) or broken (5xx).
+      # 401/403 only means Vercel deployment protection is on, so warn.
+      - name: Smoke test deployment
+        shell: bash
+        env:
+          DEPLOY_URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          set -euo pipefail
+
+          code="$(curl -sS -o /dev/null -w '%{http_code}' \
+            --retry 3 --retry-delay 5 --retry-all-errors \
+            "$DEPLOY_URL" || echo 000)"
+
+          echo "GET $DEPLOY_URL -> HTTP $code"
+
+          case "$code" in
+            404|5*|000)
+              echo "::error::Deployment is not serving correctly (HTTP $code)."
+              exit 1
+              ;;
+            401|403)
+              echo "::warning::HTTP $code - Vercel deployment protection is on; could not verify content."
+              ;;
+          esac
