@@ -147,7 +147,7 @@ export function AccountMenu() {
       {open && createPortal(
         <div
           role="menu"
-          className="fixed w-56 overflow-hidden rounded-xl border-2 border-[var(--color-ink-navy)] bg-[var(--color-card)] shadow-[0_25px_60px_rgba(0,0,0,0.35)] z-[var(--z-dropdown)]"
+          className="fixed w-56 overflow-hidden rounded-xl border-2 border-[var(--color-ink-navy)] bg-[var(--color-card)] shadow-[0_25px_60px_rgba(0,0,0,0.35)] z-[9999]"
           style={{
             position: "fixed",
             top: dropdownPos.top,

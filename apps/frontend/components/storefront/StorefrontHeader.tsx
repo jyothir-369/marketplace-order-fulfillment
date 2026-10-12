@@ -16,7 +16,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, type FormEvent, useEffect } from "react";
+import { useState, type FormEvent } from "react";
 import { ShoppingCart, Package, ShoppingBag, Store, Search, BadgePercent, Heart, Star, Building2 } from "lucide-react";
 import {
   useCartStore,
@@ -58,7 +58,6 @@ export function StorefrontHeader() {
     if (!q) return;
     router.push("/products?q=" + encodeURIComponent(q));
   };
-  const [categories, setCategories] = useState<CategorySummaryDto[]>([]);
   const hydrated = useCartHydration();
   const totalItems = useCartStore(selectTotalItems);
   const openDrawer = useCartStore((s) => s.openDrawer);
