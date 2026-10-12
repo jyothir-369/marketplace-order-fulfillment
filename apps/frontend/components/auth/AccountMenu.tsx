@@ -1,17 +1,9 @@
-/**
- * components/auth/AccountMenu.tsx — storefront header account control (Phase 1).
- *
- *   - Unauthenticated: "Sign in" / "Create account" links.
- *   - Authenticated: a user avatar dropdown showing the account email plus
- *     role-aware portals (Vendor Portal for vendors, Admin Console for
- *     admin/operations) and a Sign out action.
- */
-
 "use client";
 
+import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
 import {
   UserRound,
   ChevronDown,
@@ -25,7 +17,6 @@ import {
   MapPin,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
 export function AccountMenu() {
@@ -33,52 +24,57 @@ export function AccountMenu() {
   const router = useRouter();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const [dropdownPos, setDropdownPos] = useState({ top: 0, right: 0 });
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
 
-  // Click-outside + route-change close.
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const portalRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { setMounted(true); }, []);
+
+  const computePos = useCallback(() => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setPos({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    computePos();
+    const onResize = () => computePos();
+    const onScroll = () => computePos();
+    window.addEventListener("resize", onResize);
+    window.addEventListener("scroll", onScroll, true);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("scroll", onScroll, true);
+    };
+  }, [open, computePos]);
+
+  // Click outside (trigger + portal)
   useEffect(() => {
     if (!open) return;
     function onClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target) || portalRef.current?.contains(target)) return;
+      setOpen(false);
     }
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, [open]);
-  useEffect(() => setOpen(false), [pathname]);
 
-  // Dynamic portal positioning anchored to button; close on scroll/resize
-  useEffect(() => {
-    if (!open || !buttonRef.current) return;
-    const rect = buttonRef.current.getBoundingClientRect();
-    setDropdownPos({
-      top: rect.bottom + window.scrollY + 8,
-      right: window.innerWidth - rect.right,
-    });
-    const onResize = () => {
-      if (!buttonRef.current) return;
-      const r = buttonRef.current.getBoundingClientRect();
-      setDropdownPos({ top: r.bottom + window.scrollY + 8, right: window.innerWidth - r.right });
-    };
-    const onScroll = () => setOpen(false);
-    window.addEventListener("resize", onResize);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      window.removeEventListener("resize", onResize);
-      window.removeEventListener("scroll", onScroll);
-    };
-  }, [open]);
-
-  // Escape to close
+  // Escape
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
+
+  // Route change close
+  useEffect(() => { setOpen(false); }, [pathname]);
 
   const loading = status === "idle" || status === "loading";
 
@@ -97,14 +93,14 @@ export function AccountMenu() {
     return (
       <div className="hidden items-center gap-1.5 sm:flex">
         <Link
-          href={`/login?redirect=${encodeURIComponent(pathname ?? '')}`}
-          className="rounded-lg px-3 py-2 text-sm font-medium text-[var(--color-foreground)] hover:bg-[var(--color-card)]/60 transition-colors"
+          href={`/login?redirect=${encodeURIComponent(pathname ?? "/")}`}
+          className="rounded-lg px-3 py-2 text-sm font-medium text-[var(--color-foreground)] hover:bg-[var(--color-cream)]/60 transition-colors"
         >
           Sign in
         </Link>
         <Link
           href="/register"
-          className="rounded-lg px-3 py-2 text-sm font-semibold text-[var(--color-ink-navy)] border border-[var(--color-ink-navy)] hover:bg-[var(--color-card)]/80 transition-colors"
+          className="rounded-lg px-3 py-2 text-sm font-semibold text-[var(--color-ink-navy)] border border-[var(--color-ink-navy)] hover:bg-[var(--color-cream)]/80 transition-colors"
         >
           Create account
         </Link>
@@ -123,16 +119,16 @@ export function AccountMenu() {
   }
 
   return (
-    <div className="relative" ref={menuRef}>
+    <div className="relative">
       <button
+        ref={triggerRef}
         type="button"
-        ref={buttonRef}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => { setOpen((v) => !v); if (!open) setTimeout(computePos, 0); }}
         aria-haspopup="menu"
         aria-expanded={open}
         className={cn(
           "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium",
-          "text-[var(--color-foreground)] hover:bg-[var(--color-card)]/60 transition-colors",
+          "text-[var(--color-foreground)] hover:bg-[var(--color-cream)]/60 transition-colors",
           "focus:outline-none focus:ring-2 focus:ring-[var(--color-brass)]/40",
         )}
       >
@@ -144,15 +140,12 @@ export function AccountMenu() {
         />
       </button>
 
-      {open && createPortal(
+      {mounted && open && pos && createPortal(
         <div
+          ref={portalRef}
           role="menu"
-          className="fixed w-56 overflow-hidden rounded-xl border-2 border-[var(--color-ink-navy)] bg-[var(--color-card)] shadow-[0_25px_60px_rgba(0,0,0,0.35)] z-[9999]"
-          style={{
-            position: "fixed",
-            top: dropdownPos.top,
-            right: dropdownPos.right,
-          }}
+          style={{ position: "fixed", top: pos.top, right: pos.right, zIndex: 9999 }}
+          className="w-56 overflow-hidden rounded-xl border border-[var(--color-warm-border)] bg-white shadow-2xl"
         >
           <div className="border-b border-[var(--color-warm-border)] px-3.5 py-2.5">
             <p className="truncate text-sm font-medium text-[var(--color-foreground)]">
@@ -166,7 +159,7 @@ export function AccountMenu() {
             <MenuItem href="/wishlist" icon={Heart} label="Wishlist" onNavigate={() => setOpen(false)} />
             <MenuItem href="/notifications" icon={Bell} label="Notifications" onNavigate={() => setOpen(false)} />
             <MenuItem href="/account" icon={User} label="Account" onNavigate={() => setOpen(false)} />
-            <MenuItem href="/account" icon={MapPin} label="Saved Addresses" onNavigate={() => setOpen(false)} />
+            <MenuItem href="/account/addresses" icon={MapPin} label="Saved Addresses" onNavigate={() => setOpen(false)} />
             {showVendorPortal && (
               <MenuItem href="/vendor/dashboard" icon={Store} label="Vendor Portal" onNavigate={() => setOpen(false)} />
             )}
@@ -176,22 +169,22 @@ export function AccountMenu() {
             <button
               type="button"
               role="menuitem"
-              onClick={handleSignOut}
-              className={cn(menuItemClasses)}
+              onClick={() => { handleSignOut(); setOpen(false); }}
+              className={menuItemClasses}
             >
               <LogOut className="h-4 w-4" aria-hidden />
               Sign out
             </button>
           </div>
         </div>,
-        (typeof document !== "undefined" && document.body ? document.body : document.createElement("div")) as Element
+        document.body
       )}
     </div>
   );
 }
 
 const menuItemClasses =
-  "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-[var(--color-foreground)] hover:bg-[var(--color-card)]/70 transition-colors";
+  "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-[var(--color-foreground)] hover:bg-[var(--color-cream)]/70 transition-colors";
 
 function MenuItem({
   href,
