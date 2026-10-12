@@ -1,4 +1,3 @@
-﻿
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
@@ -50,8 +49,56 @@ function attachGlobalErrorSafety(): void {
 
 attachGlobalErrorSafety();
 
+/**
+ * CORS configuration.
+ *
+ * Allowed browser origins come from three places:
+ *  1. Fixed defaults below (local development + stable production domain).
+ *  2. The optional CORS_ORIGINS environment variable (comma-separated),
+ *     e.g. CORS_ORIGINS=https://my-domain.com,https://www.my-domain.com
+ *  3. Vercel per-deployment / preview URLs of THIS project, matched by
+ *     pattern, because Vercel generates a new random URL on every deploy.
+ *
+ * Set CORS_ALLOW_VERCEL_DEPLOYMENTS=false on Render to disable (3) and
+ * accept only the explicit origins from (1) and (2).
+ */
+const DEFAULT_ALLOWED_ORIGINS: string[] = [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+
+  // Stable Vercel production domain (always points at the latest deploy).
+  'https://marketplace-order-fulfillment-front.vercel.app',
+];
+
+const VERCEL_DEPLOYMENT_PATTERNS: RegExp[] = [
+  // Per-deployment URL, short form:
+  //   https://marketplace-order-fulfillment-frontend-8fq8zg8ga.vercel.app
+  /^https:\/\/marketplace-order-fulfillment-frontend-[a-z0-9]{9}\.vercel\.app$/,
+
+  // Deployment / branch preview URLs that end with this Vercel team slug.
+  // The team slug makes these impossible for other accounts to imitate:
+  //   https://marketplace-order-fulfillment-frontend-<hash>-<team>.vercel.app
+  //   https://marketplace-order-git-<branch>-<team>.vercel.app
+  /^https:\/\/marketplace-order-[a-z0-9-]+-jyothir-raghavalu-bhogis-projects\.vercel\.app$/,
+];
+
+function normalizeOrigin(value: string): string {
+  return value.trim().replace(/\/+$/, '').toLowerCase();
+}
+
+function buildAllowedOrigins(): Set<string> {
+  const fromEnv = (process.env.CORS_ORIGINS ?? '').split(',');
+
+  return new Set(
+    [...DEFAULT_ALLOWED_ORIGINS, ...fromEnv]
+      .map(normalizeOrigin)
+      .filter((origin) => origin.length > 0),
+  );
+}
+
 async function bootstrap(): Promise<void> {
   const logger = new Logger('Bootstrap');
+  const corsLogger = new Logger('CORS');
 
   const app = await NestFactory.create<NestExpressApplication>(
     AppModule,
@@ -75,25 +122,31 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  // Production and development frontend origins.
-  const allowedOrigins = new Set([
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
+  const allowedOrigins = buildAllowedOrigins();
+  const allowVercelDeployments =
+    (process.env.CORS_ALLOW_VERCEL_DEPLOYMENTS ?? 'true').toLowerCase() !==
+    'false';
 
-    // Current Vercel production domain.
-    'https://marketplace-order-fulfillment-front.vercel.app',
-    // Vercel deployment currently reporting CORS errors.
-    'https://marketplace-order-fulfillment-frontend-oberz36vs.vercel.app',
+  // Remember blocked origins so each one is logged only once.
+  const warnedOrigins = new Set<string>();
 
-    // Existing Vercel deployment domains.
-    'https://marketplace-order-fulfillment-frontend-b3aj4m0p8.vercel.app',
-    'https://marketplace-order-fulfillment-frontend-4ybyxg41w.vercel.app',
-    'https://marketplace-order-fulfillment-frontend-2cdwuacb9.vercel.app',
+  const isAllowedOrigin = (origin: string): boolean => {
+    const normalized = normalizeOrigin(origin);
 
-    // Current deployment aliases provided for this project.
-    'https://marketplace-order-git-69db56-jyothir-raghavalu-bhogis-projects.vercel.app',
-    'https://marketplace-order-fulfillment-frontend-n06vwx2v3.vercel.app',
-  ]);
+    if (allowedOrigins.has(normalized)) {
+      return true;
+    }
+
+    return (
+      allowVercelDeployments &&
+      VERCEL_DEPLOYMENT_PATTERNS.some((pattern) => pattern.test(normalized))
+    );
+  };
+
+  corsLogger.log(
+    `Allowed origins: ${[...allowedOrigins].join(', ')} ` +
+      `(Vercel deployment URLs ${allowVercelDeployments ? 'allowed' : 'blocked'})`,
+  );
 
   app.enableCors({
     origin: (origin, callback) => {
@@ -103,22 +156,26 @@ async function bootstrap(): Promise<void> {
         return callback(null, true);
       }
 
-      if (allowedOrigins.has(origin)) {
+      if (isAllowedOrigin(origin)) {
         return callback(null, true);
+      }
+
+      if (!warnedOrigins.has(origin)) {
+        warnedOrigins.add(origin);
+        corsLogger.warn(
+          `Blocked origin: ${origin}. Add it to CORS_ORIGINS if it should be allowed.`,
+        );
       }
 
       // Reject unlisted browser origins without throwing a server error.
       return callback(null, false);
     },
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders: [
-      'Content-Type',
-      'Authorization',
-      'Accept',
-      'Origin',
-      'X-Requested-With',
-    ],
+    // allowedHeaders is intentionally omitted: the cors middleware then
+    // reflects whatever headers the browser asks for in its preflight, so a
+    // new custom request header can never break the API with a CORS error.
     credentials: true,
+    maxAge: 86400,
     optionsSuccessStatus: 204,
   });
 
