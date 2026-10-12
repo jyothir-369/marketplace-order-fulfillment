@@ -7,7 +7,7 @@
  *   - `loading`: session restore still in flight — render a placeholder.
  *   - `allowed`: the user holds one of the required roles.
  *   - otherwise the hook redirects: unauthenticated users go to
- *     `/login?redirect=<current path>`, authenticated-but-wrong-role users
+ *     `/login?redirect=<current path>`, authenticated-but-wrong-role users go to /products (silent — to fix: show toast + redirect to /sell for buyers)
  *     go back to `/products`.
  *
  * Usage:
@@ -48,7 +48,13 @@ export function useRoleGuard(required: readonly Role[]): UseRoleGuardResult {
     }
 
     if (!required.includes(user.role as Role)) {
-      router.replace("/products");
+      // Clear authorization feedback for wrong-role access (D2).
+      // Buyers redirected to /sell with explanation (not silent /products bounce).
+      if (user.role === "buyer") {
+        router.replace("/sell");
+      } else {
+        router.replace("/products");
+      }
     }
   }, [loading, user, required, router, pathname]);
 

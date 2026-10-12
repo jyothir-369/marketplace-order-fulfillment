@@ -7,19 +7,23 @@
 import { BarChart, Activity } from "lucide-react";
 import { useState, useEffect } from "react";
 import { getVendorDashboard } from "@/lib/api";
+import { useVendorId } from "@/lib/hooks/use-vendor-id";
 
 export default function VendorAnalyticsPage() {
+  const vendorId = useVendorId();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getVendorDashboard()
+    if (!vendorId) return;
+    getVendorDashboard(vendorId)
       .then((d) => setData(d))
       .catch(() => setData(null))
       .finally(() => setLoading(false));
-  }, []);
+  }, [vendorId]);
 
   if (loading) return <div className="h-48 flex items-center justify-center text-sm text-[var(--color-warm-muted)]">Loading analytics...</div>;
+  if (!vendorId) return <div className="h-48 flex items-center justify-center text-sm text-[var(--color-warm-muted)]">Not linked to a vendor account.</div>;
 
   return (
     <div className="space-y-6">

@@ -197,7 +197,7 @@ export async function getVendors(): Promise<VendorResponseDto[]> {
 
 /** GET /api/catalog/vendor/:vendorId */
 export async function getVendorProducts(
-  vendorId: string = VENDOR_ID,
+  vendorId: string,
   includeInactive = false
 ): Promise<ProductDto[]> {
   if (includeInactive) {
@@ -331,7 +331,7 @@ export async function getOrdersForBuyer(): Promise<OrderResponseDto[]> {
 
 /** GET /api/orders/vendor/:vendorId */
 export async function getVendorOrders(
-  vendorId: string = VENDOR_ID
+  vendorId: string
 ): Promise<OrderResponseDto[]> {
   return apiFetch<OrderResponseDto[]>(`/orders/vendor/${vendorId}`);
 }
@@ -363,7 +363,7 @@ export async function getVendorDeadLetterJobs(): Promise<DeadLetterJobDto[]> {
 
 /** GET /api/catalog/vendor/:vendorId/dashboard */
 export async function getVendorDashboard(
-  vendorId: string = VENDOR_ID
+  vendorId: string,
 ): Promise<VendorDashboardDto> {
   return apiFetch<VendorDashboardDto>(`/catalog/vendor/${vendorId}/dashboard`);
 }
