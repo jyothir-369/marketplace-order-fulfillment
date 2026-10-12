@@ -24,8 +24,6 @@ import {
 } from "@/context/CartStore";
 import { useCartHydration } from "@/lib/hooks/use-cart-hydration";
 import { AccountMenu } from "@/components/auth/AccountMenu";
-import { getCategories } from "@/lib/api";
-import type { CategorySummaryDto } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const NAV_LINKS: Array<{
@@ -61,10 +59,6 @@ export function StorefrontHeader() {
     router.push("/products?q=" + encodeURIComponent(q));
   };
   const [categories, setCategories] = useState<CategorySummaryDto[]>([]);
-  const [megaOpen, setMegaOpen] = useState(false);
-  useEffect(() => {
-    getCategories().then(setCategories).catch(() => setCategories([]));
-  }, []);
   const hydrated = useCartHydration();
   const totalItems = useCartStore(selectTotalItems);
   const openDrawer = useCartStore((s) => s.openDrawer);
@@ -94,12 +88,6 @@ export function StorefrontHeader() {
             </span>
           </Link>
 
-            {/* Shop mega menu with live categories */}
-          <div
-            className="relative hidden sm:block"
-            onMouseEnter={() => setMegaOpen(true)}
-            onMouseLeave={() => setMegaOpen(false)}
-          >
             <Link
               href="/products"
               className={cn(
@@ -113,36 +101,6 @@ export function StorefrontHeader() {
               <span>Shop</span>
               <span aria-hidden className="absolute -bottom-[16px] left-0 right-0 h-[2px] rounded-full bg-[var(--color-brass)] opacity-100 scale-x-100" />
             </Link>
-            <div
-              className={cn(
-                "absolute top-full left-0 mt-1 w-72 rounded-xl border border-[var(--color-warm-border)] bg-[var(--color-card)] shadow-v2-lg overflow-hidden transition-all duration-200 ease-out z-[var(--z-dropdown)]",
-                megaOpen ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-1 pointer-events-none"
-              )}
-              aria-label="Shop categories"
-            >
-              <div className="p-3">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--color-warm-muted)] mb-2">Categories</h4>
-                {categories.length === 0 ? (
-                  <p className="text-sm text-[var(--color-warm-muted)]">Loading categories...</p>
-                ) : (
-                  <ul className="space-y-1">
-                    {categories.map((cat) => (
-                      <li key={cat.name}>
-                        <Link
-                          href={`/products?category=${encodeURIComponent(cat.name)}`}
-                          className="flex items-center justify-between rounded-lg px-2.5 py-1.5 text-sm text-[var(--color-foreground)] hover:bg-[var(--color-cream)]/60 transition-colors"
-                          onClick={() => setMegaOpen(false)}
-                        >
-                          <span>{cat.name}</span>
-                          <span className="text-xs text-[var(--color-warm-subtle)] tabular-nums">{cat.productCount ?? 0}</span>
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
-          </div>
 
           <nav aria-label="Primary" className="hidden sm:flex items-center gap-7">
             {NAV_LINKS.filter((n) => n.href !== "/products").map(({ href, label, Icon }) => {
