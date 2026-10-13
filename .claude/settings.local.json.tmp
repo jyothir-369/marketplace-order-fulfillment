@@ -1,0 +1,6 @@
+{
+  "skillOverrides": {
+    "phase5-verification": "off",
+    "relentless-debugger": "off"
+  }
+}
