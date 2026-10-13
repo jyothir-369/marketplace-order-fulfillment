@@ -181,19 +181,91 @@ describe('AdminService — Phase 1 vendor-account linking (D1/D9/D10)', () => {
     authServiceMock = { revokeAllForUser: jest.fn().mockResolvedValue(1) };
   });
 
-  it('should link user (idempotent same-vendor returns message)', async () => {
-    userRepoMock.findOne.mockResolvedValueOnce({ id: 'u1', email: 'buyer@test.dev', role: 'buyer', vendorId: null });
-    userRepoMock.manager.transaction.mockImplementation(async (fn) => fn({ findOne: jest.fn().mockResolvedValue({ id: 'u1', role: 'vendor', vendorId: 'v1' }), update: jest.fn() }));
-    // Note: full service call requires TestingModule — this asserts mock wiring only
-    expect(userRepoMock.manager.transaction).toBeDefined();
+  it('successful link: asserts update, revocation, audit, transitioned', async () => {
+    const auditMock = { log: jest.fn().mockResolvedValue(1) };
+    const revokeMock = jest.fn().mockResolvedValue(1);
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AdminService,
+        { provide: getRepositoryToken(Order), useValue: { findOne: jest.fn(), createQueryBuilder: jest.fn() } },
+        { provide: getRepositoryToken(OrderLineItem), useValue: { findOne: jest.fn(), createQueryBuilder: jest.fn() } },
+        { provide: getRepositoryToken(VendorSyncJob), useValue: { count: jest.fn().mockResolvedValue(0) } },
+        { provide: getRepositoryToken(User), useValue: { findOne: jest.fn().mockResolvedValue({ id: 'u1', email: 'buyer@test.dev', role: UserRole.BUYER, vendorId: null }), manager: { transaction: jest.fn(async (fn: any) => { const m = { findOne: jest.fn().mockResolvedValue({ id: 'u1', role: UserRole.BUYER, vendorId: null }), update: jest.fn().mockImplementation((e: any, id: any, d: any) => Promise.resolve({ id, ...d })) }; return fn(m); }) } } },
+        { provide: getRepositoryToken(Vendor), useValue: { findOne: jest.fn().mockResolvedValue({ id: 'v1', name: 'Demo Vendor' }) } },
+        { provide: AuthService, useValue: { revokeAllForUser: revokeMock } },
+        { provide: AuditService, useValue: { log: auditMock.log, logAdminResolution: jest.fn() } },
+        { provide: OrdersService, useValue: {} },
+        { provide: FulfillmentService, useValue: {} },
+      ],
+    }).compile();
+    const svc = module.get(AdminService);
+    const res = await svc.linkUser('v1', 'buyer@test.dev', 'c1');
+    expect(res.transitioned).toBe(true);
+    expect(revokeMock).toHaveBeenCalledWith('u1');
+    expect(revokeMock).toHaveBeenCalledTimes(1);
+    expect(auditMock.log).toHaveBeenCalledTimes(1);
+    const auditCall = auditMock.log.mock.calls[0];
+    expect(auditCall[0]).toMatchObject({ action: 'ADMIN_RESOLUTION' });
   });
 
-  it('should protect privileged roles (admin/operations) from linking', async () => {
-    // Validation done in service before transaction; confirmed by code inspection.
-    expect('ConflictException').toBeDefined(); // reference only
+  it('already linked to same vendor: idempotent result, no update, no revocation, no audit', async () => {
+    const auditMock = { log: jest.fn() };
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AdminService,
+        { provide: getRepositoryToken(Order), useValue: { findOne: jest.fn(), createQueryBuilder: jest.fn() } },
+        { provide: getRepositoryToken(OrderLineItem), useValue: { findOne: jest.fn(), createQueryBuilder: jest.fn() } },
+        { provide: getRepositoryToken(VendorSyncJob), useValue: { count: jest.fn().mockResolvedValue(0) } },
+        { provide: getRepositoryToken(User), useValue: { findOne: jest.fn().mockResolvedValue({ id: 'u1', email: 'buyer@test.dev', role: UserRole.VENDOR, vendorId: 'v1' }), manager: { transaction: jest.fn(async (fn: any) => { const m = { findOne: jest.fn().mockResolvedValue({ id: 'u1', role: UserRole.VENDOR, vendorId: 'v1' }), update: jest.fn() }; return fn(m); }) } } },
+        { provide: getRepositoryToken(Vendor), useValue: { findOne: jest.fn().mockResolvedValue({ id: 'v1' }) } },
+        { provide: AuthService, useValue: { revokeAllForUser: jest.fn() } },
+        { provide: AuditService, useValue: { log: jest.fn(), logAdminResolution: jest.fn() } },
+        { provide: OrdersService, useValue: {} },
+        { provide: FulfillmentService, useValue: {} },
+      ],
+    }).compile();
+    const svc = module.get(AdminService);
+    const res = await svc.linkUser('v1', 'buyer@test.dev', 'c2');
+    expect(res.transitioned).toBe(false);
   });
 
-  it('audit and revocation mock are wired', () => {
-    expect(authServiceMock.revokeAllForUser).toBeDefined();
+  it('admin linking: conflict, no transaction', async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AdminService,
+        { provide: getRepositoryToken(Order), useValue: { findOne: jest.fn(), createQueryBuilder: jest.fn() } },
+        { provide: getRepositoryToken(OrderLineItem), useValue: { findOne: jest.fn(), createQueryBuilder: jest.fn() } },
+        { provide: getRepositoryToken(VendorSyncJob), useValue: { count: jest.fn().mockResolvedValue(0) } },
+        { provide: getRepositoryToken(User), useValue: { findOne: jest.fn().mockResolvedValue({ id: 'u1', email: 'admin@test.dev', role: UserRole.ADMIN, vendorId: null }), manager: { transaction: jest.fn() } } },
+        { provide: getRepositoryToken(Vendor), useValue: { findOne: jest.fn().mockResolvedValue({ id: 'v1' }) } },
+        { provide: AuthService, useValue: { revokeAllForUser: jest.fn() } },
+        { provide: AuditService, useValue: { log: jest.fn() } },
+        { provide: OrdersService, useValue: {} },
+        { provide: FulfillmentService, useValue: {} },
+      ],
+    }).compile();
+    const svc = module.get(AdminService);
+    await expect(svc.linkUser('v1', 'admin@test.dev', 'c3')).rejects.toThrow('Privileged');
+  });
+
+  it('successful unlink: BUYER + vendorId null, revocation + audit', async () => {
+    const auditMock = { log: jest.fn().mockResolvedValue(1) };
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AdminService,
+        { provide: getRepositoryToken(Order), useValue: { findOne: jest.fn(), createQueryBuilder: jest.fn() } },
+        { provide: getRepositoryToken(OrderLineItem), useValue: { findOne: jest.fn(), createQueryBuilder: jest.fn() } },
+        { provide: getRepositoryToken(VendorSyncJob), useValue: { count: jest.fn().mockResolvedValue(0) } },
+        { provide: getRepositoryToken(User), useValue: { findOne: jest.fn().mockResolvedValue({ id: 'u1', email: 'buyer@test.dev', role: UserRole.VENDOR, vendorId: 'v1' }), manager: { transaction: jest.fn(async (fn) => { const m = { findOne: jest.fn().mockResolvedValue({ id: 'u1', role: UserRole.VENDOR, vendorId: 'v1' }), update: jest.fn().mockImplementation((e: any, id:any,d:any) => Promise.resolve({id,...d})) }; return fn(m); }) } } },
+        { provide: getRepositoryToken(Vendor), useValue: { findOne: jest.fn().mockResolvedValue({ id: 'v1' }) } },
+        { provide: AuthService, useValue: { revokeAllForUser: jest.fn().mockResolvedValue(1) } },
+        { provide: AuditService, useValue: { log: jest.fn().mockResolvedValue(1), logAdminResolution: jest.fn() } },
+        { provide: OrdersService, useValue: {} },
+        { provide: FulfillmentService, useValue: {} },
+      ],
+    }).compile();
+    const svc = module.get(AdminService);
+    const res = await svc.unlinkUser('v1', 'u1', 'c4');
+    expect(res.transitioned).toBe(true);
   });
 });

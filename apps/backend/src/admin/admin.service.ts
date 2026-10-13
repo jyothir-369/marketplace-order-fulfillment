@@ -266,7 +266,7 @@ export class AdminService {
     return users.map(u => ({ id: u.id, email: u.email, role: u.role, vendorId: u.vendorId }));
   }
 
-  async linkUser(vendorId: string, email: string, correlationId: string): Promise<{ message: string }> {
+  async linkUser(vendorId: string, email: string, correlationId: string): Promise<{ message: string; transitioned: boolean }> {
     const vendor = await this.vendorRepository.findOne({ where: { id: vendorId } });
     if (!vendor) throw new NotFoundException('Vendor not found');
     const user = await this.userRepository.findOne({ where: { email: email.toLowerCase() } });
@@ -275,11 +275,12 @@ export class AdminService {
       throw new ConflictException('Privileged roles cannot be demoted via vendor linking');
     }
     if (user.vendorId === vendorId) {
-      return { message: 'User already linked to this vendor' };
+      return { message: 'User already linked to this vendor', transitioned: false };
     }
     if (user.vendorId && user.vendorId !== vendorId) {
       throw new ConflictException('User already linked to a different vendor');
     }
+    let transitioned = false;
     await this.userRepository.manager.transaction(async (manager) => {
       const locked = await manager.findOne(User, { where: { id: user.id }, lock: { mode: 'pessimistic_write' } });
       if (!locked) throw new NotFoundException('User disappeared during link');
@@ -287,28 +288,30 @@ export class AdminService {
         throw new ConflictException('Privileged roles cannot be demoted');
       }
       if (locked.vendorId === vendorId && locked.role === UserRole.VENDOR) {
-        return; // idempotent — already correct
+        transitioned = false; // idempotent
+        return;
       }
       if (locked.vendorId && locked.vendorId !== vendorId) {
         throw new ConflictException('User already linked to different vendor');
       }
       await manager.update(User, user.id, { role: UserRole.VENDOR, vendorId: vendorId });
+      transitioned = true;
     });
-    if (user.vendorId === vendorId && user.role === UserRole.VENDOR) {
-      return { message: 'User already linked to this vendor' };
+    if (transitioned) {
+      await this.authService.revokeAllForUser(user.id);
+      await this.auditService.log({
+        correlationId,
+        action: AuditAction.ADMIN_RESOLUTION,
+        entityType: AuditEntityType.ORDER,
+        entityId: user.id,
+        message: `Vendor link: ${user.email} -> ${vendorId}`,
+      });
+      return { message: 'User linked', transitioned: true };
     }
-    await this.authService.revokeAllForUser(user.id);
-    await this.auditService.log({
-      correlationId,
-      action: AuditAction.ADMIN_RESOLUTION,
-      entityType: AuditEntityType.PRODUCT,
-      entityId: user.id,
-      message: `Vendor link: ${user.email} -> ${vendorId}`,
-    });
-    return { message: 'User linked' };
+    return { message: 'User already linked to this vendor', transitioned: false };
   }
 
-  async unlinkUser(vendorId: string, userId: string, correlationId: string): Promise<{ message: string }> {
+  async unlinkUser(vendorId: string, userId: string, correlationId: string): Promise<{ message: string; transitioned: boolean }> {
     const vendor = await this.vendorRepository.findOne({ where: { id: vendorId } });
     if (!vendor) throw new NotFoundException('Vendor not found');
     const user = await this.userRepository.findOne({ where: { id: userId } });
@@ -316,22 +319,26 @@ export class AdminService {
     if (user.vendorId !== vendorId) {
       throw new ConflictException('User is not linked to this vendor');
     }
+    let transitioned = false;
     await this.userRepository.manager.transaction(async (manager) => {
-      const locked = await manager.findOne(User, { where: { id: user.id }, lock: { mode: 'pessimistic_write' } });
+      const locked = await manager.findOne(User, { where: { id: userId }, lock: { mode: 'pessimistic_write' } });
       if (!locked) throw new NotFoundException('User disappeared during unlink');
       if (locked.vendorId !== vendorId) {
         throw new ConflictException('User is not linked to this vendor');
       }
-      await manager.update(User, user.id, { role: UserRole.BUYER, vendorId: null });
+      await manager.update(User, userId, { role: UserRole.BUYER, vendorId: null });
+      transitioned = true;
     });
-    await this.authService.revokeAllForUser(user.id);
-    await this.auditService.log({
-      correlationId,
-      action: AuditAction.ADMIN_ORDER_CANCEL,
-      entityType: AuditEntityType.PRODUCT,
-      entityId: user.id,
-      message: `Vendor unlink: ${user.email} from ${vendorId}`,
-    });
-    return { message: 'User unlinked' };
+    if (transitioned) {
+      await this.authService.revokeAllForUser(userId);
+      await this.auditService.log({
+        correlationId,
+        action: AuditAction.ADMIN_RESOLUTION,
+        entityType: AuditEntityType.ORDER_LINE_ITEM,
+        entityId: userId,
+        message: `Vendor unlink: ${user.email} from ${vendorId}`,
+      });
+    }
+    return { message: 'User unlinked', transitioned };
   }
 }
