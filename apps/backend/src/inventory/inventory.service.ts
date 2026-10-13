@@ -1,8 +1,10 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, EntityManager } from 'typeorm';
 import { Product } from '../common/entities/product.entity';
 import { DecrementStockDto, AdjustStockDto, StockOperationResult, StockInfoDto } from './dto/inventory.dto';
+import { UserRole } from '../common/entities/user.entity';
+import { AuthenticatedUser } from '../auth/auth.types';
 import { AuditService } from '../common/audit';
 
 @Injectable()
@@ -117,6 +119,7 @@ export class InventoryService {
     reason: string,
     correlationId: string,
     manager?: EntityManager,
+    caller?: AuthenticatedUser,
   ): Promise<StockOperationResult> {
     this.logger.log('Adjusting stock for product ' + productId + ' by delta ' + delta + ' | reason: ' + reason, InventoryService.name, correlationId);
 
@@ -128,6 +131,23 @@ export class InventoryService {
 
       if (!product) {
         throw new BadRequestException('Product ' + productId + ' not found');
+      }
+
+      // Ownership enforcement: VENDOR may only adjust products of their own vendor.
+      // Reject if caller.vendorId missing, product.vendorId missing, or IDs differ.
+      // ADMIN (any non-VENDOR) bypasses the service-level vendor ownership check only;
+      // endpoint access itself is restricted by the controller's AuthGuard/RolesGuard.
+      // No caller means no enforcement (controller always passes user).
+      if (caller && caller.role === UserRole.VENDOR) {
+        if (!caller.vendorId) {
+          throw new ForbiddenException('Vendor identity missing');
+        }
+        if (!product.vendorId) {
+          throw new ForbiddenException('Product vendor association missing');
+        }
+        if (caller.vendorId !== product.vendorId) {
+          throw new ForbiddenException('You do not have access to this product');
+        }
       }
 
       if (!product.isActive) {

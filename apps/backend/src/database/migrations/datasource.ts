@@ -1,4 +1,4 @@
-import { AddWebhookEventIdempotency1717000000000 } from './1717000000000-AddWebhookEventIdempotency';
+﻿import { AddWebhookEventIdempotency1717000000000 } from './1717000000000-AddWebhookEventIdempotency';
 import { DataSource } from 'typeorm';
 import { Baseline1709999999999 } from './1709999999999-Baseline';
 import { AddShippingAddressToOrders1710000000001 } from './1710000000001-AddShippingAddressToOrders';
@@ -14,6 +14,9 @@ import { BackfillProductCategory1710000000010 } from './1710000000010-BackfillPr
 import { FixAuditEntityEnum1710000000011 } from './1710000000011-FixAuditEntityEnum';
 import { AddReviewsTable1715000000000 } from './1715000000000-AddReviewsTable';
 import { AddRazorpayPaymentSupport1716000000000 } from './1716000000000-AddRazorpayPaymentSupport';
+import { AddVendorApplicationTable1749624000000 } from './1749624000000-AddVendorApplicationTable';
+import { AddPartialUniquePendingApplicantIndex2026101300000 } from './20261013-AddPartialUniquePendingApplicantIndex';
+import { AddVendorUserConstraints2026101300000 } from './20261013-AddVendorUserConstraints';
 
 const dbUrl = process.env.DATABASE_URL || '';
 const isCloudDb =
@@ -56,6 +59,9 @@ export const migrationDataSource = new DataSource({
     AddReviewsTable1715000000000,
     AddRazorpayPaymentSupport1716000000000,
     AddWebhookEventIdempotency1717000000000,
+    AddVendorApplicationTable1749624000000,
+    AddPartialUniquePendingApplicantIndex2026101300000,
+    AddVendorUserConstraints2026101300000,
   ],
   synchronize: false,
   logging: true,

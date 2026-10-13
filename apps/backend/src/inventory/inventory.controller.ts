@@ -34,6 +34,8 @@ export class InventoryController {
       dto.delta,
       dto.reason,
       correlationId,
+      undefined,
+      user,
     );
   }
 
