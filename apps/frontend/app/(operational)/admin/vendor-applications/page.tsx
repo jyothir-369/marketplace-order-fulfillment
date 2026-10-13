@@ -1,0 +1,96 @@
+"use client";
+import { useState, useEffect, useCallback } from "react";
+import { getPendingVendorApplications, approveVendorApplication, rejectVendorApplication } from "@/lib/api";
+import { getAccessToken } from "@/lib/auth-token";
+
+export default function VendorApplicationsPage() {
+  const [apps, setApps] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [actionId, setActionId] = useState<string | null>(null);
+
+  const fetchApps = useCallback(async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      const token = getAccessToken();
+      const data = await getPendingVendorApplications();
+      setApps(Array.isArray(data) ? data : []);
+    } catch (e: any) {
+      setError(e.message || "Failed to load applications.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchApps(); }, [fetchApps]);
+
+  const doAction = async (id: string, decision: "approve" | "reject") => {
+    if (actionId) return;
+    setActionId(id);
+    setError(null);
+    try {
+      if (decision === "approve") {
+        await approveVendorApplication(id, { decision: "approve" });
+      } else {
+        await rejectVendorApplication(id, { decision: "reject" });
+      }
+      await fetchApps();
+    } catch (e: any) {
+      setError(e.message || "Action failed.");
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  if (loading && apps.length === 0) return <main style={{ padding: "2rem" }}><p>Loading applications...</p></main>;
+  if (error && apps.length === 0) return <main style={{ padding: "2rem" }}><p role="alert" style={{ color: "#b91c1c" }}>{error}</p><button onClick={fetchApps}>Retry</button></main>;
+
+  return (
+    <main style={{ padding: "2rem 1rem", maxWidth: 960, margin: "0 auto", fontFamily: "system-ui" }}>
+      <h1 style={{ color: "#0a1128", fontSize: "1.75rem" }}>Vendor Applications</h1>
+      {error && <div role="alert" style={{ color: "#b91c1c", background: "#fee2e2", padding: "0.75rem 1rem", borderRadius: 6, marginBottom: "1rem" }}>{error}</div>}
+      {error && error.toLowerCase().includes("approved") && (
+        <div role="status" style={{ padding: "0.75rem 1rem", background: "#ecfdf5", border: "1px solid #22c55e", borderRadius: 6, fontSize: "0.9rem", color: "#15803d", marginBottom: "1rem" }}>
+          <strong>Approved.</strong> The applicant must <strong>re-login</strong> or refresh their session to receive their vendor role and access the dashboard.
+        </div>
+      )}
+      {apps.length === 0 && !loading && <p>No pending applications.</p>}
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9rem" }} aria-label="Pending vendor applications">
+        <thead>
+          <tr style={{ borderBottom: "2px solid #0a1128" }}>
+            <th style={{ textAlign: "left", padding: "0.5rem" }}>Email</th>
+            <th style={{ textAlign: "left", padding: "0.5rem" }}>Business</th>
+            <th style={{ textAlign: "left", padding: "0.5rem" }}>Reason</th>
+            <th style={{ textAlign: "left", padding: "0.5rem" }}>Status</th>
+            <th style={{ textAlign: "left", padding: "0.5rem" }}>Date</th>
+            <th style={{ textAlign: "left", padding: "0.5rem" }}>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {apps.map((a: any) => (
+            <tr key={a.id} style={{ borderBottom: "1px solid #ddd" }}>
+              <td style={{ padding: "0.5rem" }}>{a.email}</td>
+              <td style={{ padding: "0.5rem" }}>{a.businessName}</td>
+              <td style={{ padding: "0.5rem", maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis" }}>{a.reason}</td>
+              <td style={{ padding: "0.5rem" }}>{a.status}</td>
+              <td style={{ padding: "0.5rem" }}>{new Date(a.createdAt).toLocaleString()}</td>
+              <td style={{ padding: "0.5rem" }}>
+                <button
+                  onClick={() => doAction(a.id, "approve")}
+                  disabled={!!actionId}
+                  style={{ marginRight: 8, padding: ".35rem .7rem", background: "#c5a047", color: "#fff", border: "none", borderRadius: 4, cursor: actionId ? "not-allowed" : "pointer" }}
+                >Approve</button>
+                <button
+                  onClick={() => doAction(a.id, "reject")}
+                  disabled={!!actionId}
+                  style={{ padding: ".35rem .7rem", background: "#334155", color: "#fff", border: "none", borderRadius: 4, cursor: actionId ? "not-allowed" : "pointer" }}
+                >Reject</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </main>
+  );
+}

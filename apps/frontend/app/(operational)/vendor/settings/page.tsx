@@ -11,7 +11,7 @@ export default function VendorSettingsPage() {
     <div className="space-y-6">
       <h1 className="font-display text-2xl font-bold text-[var(--color-foreground)] flex items-center gap-2"><Settings className="h-6 w-6 text-[var(--color-brass)]" /> Settings</h1>
       <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-card)] p-6 shadow-v2">
-        <p className="text-sm text-[var(--color-warm-muted)]">Vendor profile settings are coming soon. Contact support to update store details.</p>
+        <p className="text-sm text-[var(--color-warm-muted)]">Vendor profile settings are <strong>Coming soon</strong>. Contact support to update store details — no save functionality is available yet.</p>
       </div>
     </div>
   );

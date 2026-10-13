@@ -6,7 +6,7 @@
 
 import { FormEvent, useEffect, useState } from "react"
 import { Building2, Plus, RefreshCw, X } from "lucide-react"
-import { getAdminVendors, createVendor } from "@/lib/api"
+import { getAdminVendors, createVendor, getLinkedUsers, linkVendorUser, unlinkVendorUser } from "@/lib/api"
 import { ToastProvider, useToast } from "@/components/ui/toast"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
@@ -38,6 +38,19 @@ function AdminVendorsInner() {
 
   useEffect(() => { void load() }, [])
 
+  const [linked, setLinked] = useState<Array<{ id: string; email: string; role: string; vendorId: string | null }>>([])
+  const [linkedLoading, setLinkedLoading] = useState(false)
+  const [selectedVendorId, setSelectedVendorId] = useState<string | null>(null)
+  const [linkEmail, setLinkEmail] = useState("")
+  const [linkBusy, setLinkBusy] = useState(false)
+
+  const loadLinked = async (vId: string) => {
+    setLinkedLoading(true)
+    try { setLinked(await getLinkedUsers(vId)) } catch { setLinked([]) } finally { setLinkedLoading(false) }
+  }
+
+  useEffect(() => { if (selectedVendorId) loadLinked(selectedVendorId) }, [selectedVendorId])
+
   const handleCreate = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!newName.trim()) { toast("Vendor name is required.", "error"); return }
@@ -54,6 +67,24 @@ function AdminVendorsInner() {
     } finally {
       setCreating(false)
     }
+  }
+
+  const handleLink = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    if (!selectedVendorId) { toast("Select a vendor", "error"); return }
+    if (!linkEmail.trim()) { toast("Email required", "error"); return }
+    setLinkBusy(true)
+    try {
+      const res = await linkVendorUser(selectedVendorId, { email: linkEmail.trim() })
+      toast(res.message, res.transitioned ? "success" : "info")
+      setLinkEmail("")
+      await loadLinked(selectedVendorId)
+    } catch (err) { toast(err instanceof Error ? err.message : "Link failed", "error") } finally { setLinkBusy(false) }
+  }
+
+  const handleUnlink = async (uid: string) => {
+    if (!selectedVendorId) return
+    try { const res = await unlinkVendorUser(selectedVendorId, uid); toast(res.message, res.transitioned ? "success" : "info"); await loadLinked(selectedVendorId) } catch (err) { toast(err instanceof Error ? err.message : "Unlink failed", "error") }
   }
 
   const totalProducts = vendors.reduce((s, v) => s + v.productCount, 0)
@@ -118,6 +149,7 @@ function AdminVendorsInner() {
               </thead>
               <tbody className="divide-y divide-[var(--color-border)]">
                 {vendors.map((v) => {
+                  const isSelected = false // placeholder for selection; panel shows per-vendor
                   const isEmpty = v.productCount === 0
                   const status = isEmpty
                     ? { label: "Empty", cls: "bg-[var(--color-muted)] text-[var(--color-muted-foreground)]" }
@@ -127,8 +159,8 @@ function AdminVendorsInner() {
                         ? { label: "Attention", cls: "bg-[var(--color-warning)]/10 text-[var(--color-warning)]" }
                         : { label: "Healthy", cls: "bg-[var(--color-success)]/10 text-[var(--color-success)]" }
                   return (
-                    <tr key={v.id} className="hover:bg-[var(--color-muted)]/40">
-                      <td className="px-4 py-2.5 font-medium text-[var(--color-foreground)]">{v.name}</td>
+                    <tr key={v.id} className="hover:bg-[var(--color-muted)]/40" onClick={() => setSelectedVendorId(v.id)}>
+                      <td className="px-4 py-2.5 font-medium text-[var(--color-foreground)]">{v.name}{selectedVendorId === v.id ? " ✓" : ""}</td>
                       <td className="px-4 py-2.5 font-mono text-xs text-[var(--color-muted-foreground)]">{v.id.slice(0, 8)}</td>
                       <td className="px-4 py-2.5 text-right tabular-nums text-[var(--color-foreground)]">{v.productCount}</td>
                       <td className="px-4 py-2.5 text-right tabular-nums text-[var(--color-success)]">{v.activeProductCount}</td>
@@ -156,6 +188,37 @@ function AdminVendorsInner() {
             </table>
           </div>
         )}
+      </div>
+
+      <div className={cn("rounded-xl border bg-[var(--color-card)] shadow-sm mt-6","border-[var(--color-border)]")}>
+        <div className="flex items-center gap-2 border-b border-[var(--color-border)] px-4 py-3">
+          <h2 className="text-sm font-semibold">Linked Accounts</h2>
+          <span className="text-xs text-[var(--color-muted-foreground)]">Select vendor above to manage links</span>
+        </div>
+        <div className="p-4 space-y-4">
+          {!selectedVendorId ? (
+            <p className="text-sm text-[var(--color-muted-foreground)]">No vendor selected.</p>
+          ) : linkedLoading ? (
+            <div className="space-y-2">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} height="2rem" className="rounded" />)}</div>
+          ) : linked.length === 0 ? (
+            <p className="text-sm text-[var(--color-muted-foreground)]">No linked accounts.</p>
+          ) : (
+            <ul className="divide-y divide-[var(--color-border)]">
+              {linked.map((u) => (
+                <li key={u.id} className="flex items-center justify-between py-2 text-sm">
+                  <div><span className="font-medium">{u.email}</span> <span className="text-xs text-[var(--color-muted-foreground)]">({u.role})</span></div>
+                  <button onClick={() => handleUnlink(u.id)} className="text-xs text-[var(--color-destructive)] hover:underline">Unlink</button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {selectedVendorId && (
+            <form onSubmit={handleLink} className="flex gap-2 pt-2">
+              <input type="email" value={linkEmail} onChange={e => setLinkEmail(e.target.value)} placeholder="user@email.com" className={cn("flex-1 rounded border px-3 py-1.5 text-sm","border-[var(--color-border)] bg-[var(--color-background)]")} />
+              <button disabled={linkBusy || !linkEmail.trim()} className="rounded px-3 py-1.5 text-sm bg-[var(--color-primary)] text-[var(--color-primary-foreground)]">Link</button>
+            </form>
+          )}
+        </div>
       </div>
 
       {modalOpen && (
