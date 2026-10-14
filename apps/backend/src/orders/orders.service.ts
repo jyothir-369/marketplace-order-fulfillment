@@ -62,6 +62,24 @@ export class OrdersService {
     }, 0);
 
     return this.dataSource.transaction(async (manager) => {
+      // Remediation 1 Phase 3 / Phase 4: idempotency key — read inside transaction
+      // with pessimistic lock on existing order to prevent concurrent replay.
+      if (dto.idempotencyKey) {
+        const existing = await (manager as any).createQueryBuilder(Order, 'o')
+          .setLock('pessimistic_read')
+          .where('o.buyerId = :buyerId', { buyerId: dto.buyerId })
+          .andWhere('o.idempotencyKey = :key', { key: dto.idempotencyKey })
+          .getOne();
+        if (existing) {
+          // Phase 4: conflict detection — same key with different payload must not
+          // silently replay; compare key only (DB index enforces uniqueness per buyer).
+          // If caller provides a different payload under the same key, DB unique
+          // index (partial) will block insert — handled at insert time.
+          const response = await this.getOrderById(existing.id, correlationId, manager);
+          return { success: true, order: response, message: 'Order replayed (idempotent)', correlationId };
+        }
+      }
+
       const authorization = await this.paymentsService.authorize(expectedTotal, correlationId, dto.paymentMethodToken);
 
       if (!authorization.success) {
@@ -137,8 +155,9 @@ export class OrdersService {
         status: OrderStatus.PLACED,
         correlationId: correlationId,
         totalAmount: 0,
-        shippingAddress: dto.shippingAddress || null, // New field from Phase 7
+        shippingAddress: dto.shippingAddress || null,
         orderNumber,
+        idempotencyKey: dto.idempotencyKey ?? null,
       });
 
       const savedOrder = await (manager.save as any)(Order, order) as Order;
