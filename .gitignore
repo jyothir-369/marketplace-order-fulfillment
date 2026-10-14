@@ -48,3 +48,28 @@ docker-compose*.yml
 !.env.example
 .vercel
 .env*
+
+# Claude Code skills
+.claude/skills/
+
+# Agent skills
+.agents/skills/
+
+# Local AI memory
+MEMORY.md
+memory/
+
+# Local reports and remediation documents
+MARKETPLACE-RECOVERY-REPORT.md
+PHASE6_REMEDIATION_PLAN.md
+REMEDIATION*_ACTUAL_REPORT.md
+apps/REMEDIATION*_ACTUAL_REPORT.md
+feature-gap-checklist.md
+reports/
+
+# Local backup files
+*.phase1-backup-*
+
+# Ignore all Markdown files
+*.md
+!README.md
