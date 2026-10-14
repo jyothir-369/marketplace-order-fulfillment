@@ -64,6 +64,8 @@ export class Order {
    */
   @Column({ type: 'varchar', length: 500, nullable: true, name: 'shipping_address' })
   shippingAddress: string;
+  @Column({ type: 'varchar', length: 255, nullable: true, name: 'idempotency_key' })
+  idempotencyKey: string | null;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

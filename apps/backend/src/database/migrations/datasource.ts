@@ -1,4 +1,5 @@
-﻿import { AddWebhookEventIdempotency1717000000000 } from './1717000000000-AddWebhookEventIdempotency';
+﻿import { AddFulfillmentOperationRecord1710000000005 } from './1710000000005-AddFulfillmentOperationRecord';
+import { AddWebhookEventIdempotency1717000000000 } from './1717000000000-AddWebhookEventIdempotency';
 import { DataSource } from 'typeorm';
 import { Baseline1709999999999 } from './1709999999999-Baseline';
 import { AddShippingAddressToOrders1710000000001 } from './1710000000001-AddShippingAddressToOrders';
@@ -50,6 +51,7 @@ export const migrationDataSource = new DataSource({
     AddOrderNumber1710000000003,
     AddUsersAndRefreshTokens1710000000004,
     CategoriesAndCatalogContract1710000000005,
+    AddFulfillmentOperationRecord1710000000005,
     AddMissingForeignKeysAndIndexes1710000000006,
     AddProductDescriptionAndImages1710000000007,
     AddOrderNumberSequence1710000000008,

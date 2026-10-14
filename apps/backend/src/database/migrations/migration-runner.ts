@@ -14,6 +14,10 @@ import { FixAuditEntityEnum1710000000011 } from './1710000000011-FixAuditEntityE
 import { AddReviewsTable1715000000000 } from './1715000000000-AddReviewsTable';
 import { AddRazorpayPaymentSupport1716000000000 } from './1716000000000-AddRazorpayPaymentSupport';
 import { AddWebhookEventIdempotency1717000000000 } from './1717000000000-AddWebhookEventIdempotency';
+import { AddFulfillmentOperationRecord1710000000005 } from './1710000000005-AddFulfillmentOperationRecord';
+import { AddVendorApplicationTable1749624000000 } from './1749624000000-AddVendorApplicationTable';
+import { AddPartialUniquePendingApplicantIndex2026101300000 } from './20261013-AddPartialUniquePendingApplicantIndex';
+import { AddVendorUserConstraints2026101300000 } from './20261013-AddVendorUserConstraints';
 
 const migrations = [
   Baseline1709999999999,
@@ -22,6 +26,7 @@ const migrations = [
   AddOrderNumber1710000000003,
   AddUsersAndRefreshTokens1710000000004,
   CategoriesAndCatalogContract1710000000005,
+  AddFulfillmentOperationRecord1710000000005,
   AddMissingForeignKeysAndIndexes1710000000006,
   AddProductDescriptionAndImages1710000000007,
   AddOrderNumberSequence1710000000008,
@@ -31,6 +36,9 @@ const migrations = [
   AddReviewsTable1715000000000,
   AddRazorpayPaymentSupport1716000000000,
   AddWebhookEventIdempotency1717000000000,
+  AddVendorApplicationTable1749624000000,
+  AddPartialUniquePendingApplicantIndex2026101300000,
+  AddVendorUserConstraints2026101300000,
 ];
 
 async function runMigrations() {
