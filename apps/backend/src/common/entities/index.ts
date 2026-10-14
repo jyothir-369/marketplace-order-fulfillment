@@ -7,3 +7,4 @@ export * from './vendor-sync-job.entity';
 export * from './user.entity';
 export * from './refresh-token.entity';
 export * from './payment-authorization.entity';
+export * from './fulfillment-operation-record.entity';

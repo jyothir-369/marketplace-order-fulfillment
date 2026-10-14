@@ -32,7 +32,7 @@ export class CreateProductDto {
   @MaxLength(255)
   name: string;
 
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   price: number;
 
@@ -70,7 +70,7 @@ export class UpdateProductDto {
   name?: string;
 
   @IsOptional()
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   price?: number;
 
