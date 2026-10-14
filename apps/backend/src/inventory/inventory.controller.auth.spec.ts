@@ -4,6 +4,8 @@ import { UserRole } from '../common/entities/user.entity';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 
+import { InventoryController } from './inventory.controller';
+
 describe('Inventory adjust endpoint — authorization (real behavior)', () => {
   let guard: AuthGuard;
   let rolesGuard: RolesGuard;
@@ -57,7 +59,6 @@ describe('Inventory adjust endpoint — authorization (real behavior)', () => {
   });
 
   it('controller adjustStock passes expected args to service: productId, delta, reason, correlationId, manager=undefined, user=auth user', async () => {
-    const InventoryController = require('./inventory.controller').InventoryController;
     const MockInventoryService = { adjustStock: jest.fn().mockResolvedValue({ success: true, productId: 'p-1', previousStock: 0, newStock: 5, requestedQuantity: 5 }) };
     const ctrl = new InventoryController(MockInventoryService as any);
     const result = await ctrl.adjustStock('p-1', { delta: 5, reason: 'Restock' }, { role: UserRole.ADMIN, vendorId: null, id: 'a-1', email: 'a@x' } as any, 'corr-ctrl-1');
