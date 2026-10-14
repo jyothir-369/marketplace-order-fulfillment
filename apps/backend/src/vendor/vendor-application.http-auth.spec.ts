@@ -98,7 +98,7 @@ describe('Vendor application HTTP authentication', () => {
     expect(serviceMock.submit).toHaveBeenCalled(); // OptionalAuthGuard allows anonymous submit
   });
 
-  it('rejects an invalid bearer token', async () => {
+  it('rejects an invalid bearer token with 401 (not silently downgraded to anonymous)', async () => {
     const response = await request(
       'POST',
       '/vendor-applications',
@@ -109,8 +109,8 @@ describe('Vendor application HTTP authentication', () => {
       },
     );
 
-    expect(response.status).toBe(201); // OptionalAuthGuard allows anonymous submit
-    expect(serviceMock.submit).toHaveBeenCalled(); // OptionalAuthGuard allows anonymous submit
+    expect(response.status).toBe(401); // OptionalAuthGuard now propagates invalid token errors
+    expect(serviceMock.submit).not.toHaveBeenCalled();
   });
 
   it('passes the verified JWT identity to the submission service', async () => {
