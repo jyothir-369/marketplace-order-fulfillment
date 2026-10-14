@@ -229,73 +229,31 @@ export class CatalogService {
   // ---------------------------------------------------------------------------
 
   async query(dto: CatalogQueryDto): Promise<CatalogListResponseDto> {
-    // Safe fallback: avoid broken createQueryBuilder join (vendor relation mapping / DB mismatch causes 500).
-    const where: any = {};
-    if (!dto.includeInactive) where.isActive = true;
-    if (dto.category) where.category = dto.category;
-    if (dto.vendor) where.vendorId = dto.vendor;
-    if (dto.minPrice !== undefined) where.minPrice = dto.minPrice;
-
-    // Build a safe base query that skips broken vendor join but keeps filters/sort.
-    const qb = this.productRepository.createQueryBuilder('product');
-    qb.leftJoinAndSelect('product.vendor', 'vendor')
+    const qb = this.productRepository.createQueryBuilder('product')
+      .leftJoinAndSelect('product.vendor', 'vendor')
+      .leftJoinAndSelect('product.categoryRelation', 'cat');
     if (!dto.includeInactive) qb.andWhere('product.isActive = :isActive', { isActive: true });
     if (dto.q) qb.andWhere('(product.name ILIKE :q OR product.slug ILIKE :q)', { q: `%${dto.q}%` });
     if (dto.category) qb.andWhere('product.category = :category', { category: dto.category });
     if (dto.vendor) qb.andWhere('product.vendorId = :vendor', { vendor: dto.vendor });
     if (dto.minPrice !== undefined) qb.andWhere('product.price >= :minPrice', { minPrice: dto.minPrice });
     if (dto.maxPrice !== undefined) qb.andWhere('product.price <= :maxPrice', { maxPrice: dto.maxPrice });
-
-    // facets moved into try
     this.applySort(qb, dto.sort);
-
     const page = Math.max(1, dto.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, dto.pageSize ?? 24));
     qb.skip((page - 1) * pageSize).take(pageSize);
-
-    try {
-      const facets = await this.buildFacets(dto);
-      const [items, total] = await qb.getManyAndCount();
-      const totalPages = Math.ceil(total / pageSize);
-      return {
-        items: items.map((p) => this.toResponseDto(p, p.vendor ? p.vendor.name : 'Unknown')),
-        total,
-        page,
-        pageSize,
-        totalPages,
-        facets: facets ?? { categories: [], totalProducts: 0, minPrice: 0, maxPrice: 0 },
-      };
-    } catch (err) {
-      // Fallback to raw SQL query using DB column names (snake_case) to avoid TypeORM column-mapping 500.
-      this.logger.error('Catalog query failed, using raw SQL fallback: ' + (err instanceof Error ? err.message : err));
-      const safe = await this.productRepository.query(
-        `SELECT id, "vendorId" AS "vendorId", name, slug, category, price, "stock_count" AS "stock_count", "isActive" AS "isActive", "createdAt" AS "createdAt", "updatedAt" AS "updatedAt", description, images FROM products WHERE "isActive" = true ORDER BY "createdAt" DESC LIMIT $1 OFFSET $2`,
-        [pageSize, (page - 1) * pageSize],
-      );
-      const countRow = await this.productRepository.query(`SELECT COUNT(*) as c FROM products WHERE "isActive" = true`);
-      const safeCount = parseInt(countRow[0]?.c ?? '0', 10);
-      return {
-        items: safe.map((row: any) => this.toResponseDto({
-          id: row.id,
-          vendorId: row.vendorId || row.vendor_id,
-          name: row.name,
-          slug: row.slug,
-          category: row.category,
-          price: Number(row.price),
-          stockCount: Number(row.stock_count ?? row.stockCount ?? 0),
-          isActive: row.isActive,
-          description: row.description ?? null,
-          images: row.images ?? null,
-          createdAt: row.createdAt ? new Date(row.createdAt) : new Date(),
-          updatedAt: row.updatedAt ? new Date(row.updatedAt) : new Date(),
-        } as Product, 'Unknown')),
-        total: safeCount,
-        page,
-        pageSize,
-        totalPages: Math.ceil(safeCount / pageSize),
-        facets: await this.buildFacets(dto),
-      };
-    }
+    const facets = await this.buildFacets(dto);
+    const [items, total] = await qb.getManyAndCount();
+    const totalPages = Math.ceil(total / pageSize);
+    this.logger.log("DEBUG query: items=" + items.length + " total=" + total + " page=" + page);
+    return {
+      items: items.map((p) => this.toResponseDto(p, p.vendor ? p.vendor.name : 'Unknown')),
+      total,
+      page,
+      pageSize,
+      totalPages,
+      facets: facets ?? { categories: [], totalProducts: 0, minPrice: 0, maxPrice: 0 },
+    };
   }
 
   private applySort(qb: SelectQueryBuilder<Product>, sort?: CatalogSort): void {
@@ -338,9 +296,6 @@ export class CatalogService {
     }
     if (dto.minPrice !== undefined) {
       base.andWhere('product.price >= :minPrice', { minPrice: dto.minPrice });
-    }
-    if (dto.maxPrice !== undefined) {
-      base.andWhere('product.price <= :maxPrice', { maxPrice: dto.maxPrice });
     }
     if (dto.maxPrice !== undefined) {
       base.andWhere('product.price <= :maxPrice', { maxPrice: dto.maxPrice });
