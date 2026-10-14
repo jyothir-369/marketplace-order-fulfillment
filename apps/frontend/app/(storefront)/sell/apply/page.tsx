@@ -62,7 +62,17 @@ export default function ApplyPage() {
           {errors.reason && <p style={{ color: "#b91c1c", fontSize: "0.8rem", marginTop: ".25rem" }}>{errors.reason}</p>}
         </div>
         <button type="submit" disabled={busy} style={{ padding: ".75rem 1.25rem", background: busy ? "#aaa" : "#c5a047", color: "#fff", border: "none", borderRadius: 6, fontWeight: 600, cursor: busy ? "not-allowed" : "pointer" }}>{busy ? "Submitting..." : "Submit application"}</button>
-        {message && <p role="alert" style={{ color: "#b91c1c", fontSize: "0.9rem", padding: ".5rem", background: "#fee2e2", borderRadius: 6 }}>{message}</p>}
+        {message && (
+          <p role="alert" style={{
+            color: message.includes("submitted") ? "#047857" : "#b91c1c",
+            fontSize: "0.9rem",
+            padding: ".5rem",
+            background: message.includes("submitted") ? "#d1fae5" : "#fee2e2",
+            borderRadius: 6,
+          }}>
+            {message}
+          </p>
+        )}
       </form>
     </main>
   );

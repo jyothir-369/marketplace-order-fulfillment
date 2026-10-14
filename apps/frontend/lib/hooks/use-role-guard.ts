@@ -47,6 +47,15 @@ export function useRoleGuard(required: readonly Role[]): UseRoleGuardResult {
       return;
     }
 
+    if (
+      required.includes("vendor") &&
+      user.role === "vendor" &&
+      !(typeof user.vendorId === "string" && user.vendorId.trim().length > 0)
+    ) {
+      router.replace("/sell?reason=vendor-assignment-missing");
+      return;
+    }
+
     if (!required.includes(user.role as Role)) {
       // Clear authorization feedback for wrong-role access (D2).
       // Buyers redirected to /sell with explanation (not silent /products bounce).
@@ -61,7 +70,7 @@ export function useRoleGuard(required: readonly Role[]): UseRoleGuardResult {
   const role = (user ? (user.role as Role) : null) as Role | null;
 
   const allowed = useMemo(
-    () => Boolean(user && role && required.includes(role)),
+    () => Boolean(user && role && required.includes(role) && (role !== "vendor" || (typeof user.vendorId === "string" && user.vendorId.trim().length > 0))),
     [user, role, required],
   );
 

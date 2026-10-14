@@ -39,6 +39,21 @@ export default function SellPage() {
   const pendingApp = apps?.find(a => a.status === "pending");
   const approvedApp = apps?.find(a => a.status === "approved");
 
+  if (isVendor && !(typeof user?.vendorId === "string" && user.vendorId.trim().length > 0)) {
+    return (
+      <main style={{ background: "#fdf8e8", padding: "3rem 1rem", maxWidth: 720, margin: "0 auto", fontFamily: "system-ui" }}>
+        <h1 style={{ color: "#0a1128", fontSize: "2rem" }}>Vendor account needs linking</h1>
+        <p role="alert" style={{ color: "#b91c1c", lineHeight: 1.6 }}>
+          Your vendor account is not linked to a vendor business yet. The vendor portal is unavailable until the marketplace team completes that link.
+        </p>
+        <p style={{ color: "#334155", lineHeight: 1.6 }}>
+          Contact support to resolve the account link. You do not need to submit another application just to fix this issue.
+        </p>
+        <Link href="/help" style={{ color: "#0a1128", textDecoration: "underline" }}>Contact support</Link>
+      </main>
+    );
+  }
+
   if (isVendor && user?.vendorId) {
     return (
       <main style={{ background: "#fdf8e8", padding: "3rem 1rem", maxWidth: 720, margin: "0 auto", fontFamily: "system-ui" }}>
