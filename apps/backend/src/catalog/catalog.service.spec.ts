@@ -168,7 +168,7 @@ describe('CatalogService', () => {
       await service.query({ vendor: vendorId });
 
       expect(qb.andWhere).toHaveBeenCalledWith(
-        expect.stringContaining('product.vendor_id = :vendor'),
+        expect.stringContaining('product.vendorId = :vendor'),
         { vendor: vendorId },
       );
     });
