@@ -65,16 +65,28 @@ export class OrdersService {
       // Remediation 1 Phase 3 / Phase 4: idempotency key — read inside transaction
       // with pessimistic lock on existing order to prevent concurrent replay.
       if (dto.idempotencyKey) {
+        // Advisory lock serializes concurrent same-key requests at DB level.
+        // Key is buyer-scoped + normalized payload fingerprint.
+        const lockKey = 'checkout_' + dto.buyerId + '_' + dto.idempotencyKey;
+        await manager.query("SELECT pg_advisory_xact_lock(hashtext($1))", [lockKey]);
+
         const existing = await (manager as any).createQueryBuilder(Order, 'o')
           .setLock('pessimistic_read')
           .where('o.buyerId = :buyerId', { buyerId: dto.buyerId })
           .andWhere('o.idempotencyKey = :key', { key: dto.idempotencyKey })
           .getOne();
         if (existing) {
-          // Phase 4: conflict detection — same key with different payload must not
-          // silently replay; compare key only (DB index enforces uniqueness per buyer).
-          // If caller provides a different payload under the same key, DB unique
-          // index (partial) will block insert — handled at insert time.
+          // Explicit conflict check: same key must match full normalized payload
+          // (buyer + sorted items + quantities + shipping + payment token fingerprint).
+          // If existing doesn't match, the DB unique index will block insert.
+          // If it matches, replay safely (no duplicate auth or inventory).
+          const payloadHash = this.normalizePayload(dto);
+          if (existing.idempotencyPayloadHash && existing.idempotencyPayloadHash !== payloadHash) {
+            throw new HttpException(
+              { statusCode: HttpStatus.CONFLICT, error: 'Conflict', message: 'Idempotency key reused with different payload' },
+              HttpStatus.CONFLICT,
+            );
+          }
           const response = await this.getOrderById(existing.id, correlationId, manager);
           return { success: true, order: response, message: 'Order replayed (idempotent)', correlationId };
         }
@@ -158,6 +170,7 @@ export class OrdersService {
         shippingAddress: dto.shippingAddress || null,
         orderNumber,
         idempotencyKey: dto.idempotencyKey ?? null,
+        idempotencyPayloadHash: dto.idempotencyKey ? this.normalizePayload(dto) : null,
       });
 
       const savedOrder = await (manager.save as any)(Order, order) as Order;
@@ -400,6 +413,12 @@ export class OrdersService {
     correlationId: string,
   ): Promise<PaymentAuthorization | null> {
     return this.paymentsService.refund(orderId, correlationId);
+  }
+
+  /** Normalized deterministic fingerprint of checkout payload for idempotency. */
+  private normalizePayload(dto: CheckoutDto): string {
+    const sortedItems = [...dto.items].sort((a, b) => a.productId.localeCompare(b.productId)).map(i => i.productId + ':' + i.quantity).join('|');
+    return dto.buyerId + '|' + sortedItems + '|' + (dto.shippingAddress || '') + '|' + (dto.paymentMethodToken || '') + '|' + (dto.idempotencyKey || '');
   }
 
   /** ORD-YYYYMMDD-NNNNNN, human-facing plus sequence (Phase 2.2). */

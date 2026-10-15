@@ -19,6 +19,7 @@ export enum OrderStatus {
 
 @Entity('orders')
 @Index(['buyerId', 'status'])
+@Index(['buyerId', 'idempotencyKey'], { unique: true })
 export class Order {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -66,6 +67,10 @@ export class Order {
   shippingAddress: string;
   @Column({ type: 'varchar', length: 255, nullable: true, name: 'idempotency_key' })
   idempotencyKey: string | null;
+
+  /** Persisted normalized fingerprint of the checkout payload for conflict detection. */
+  @Column({ type: 'varchar', length: 500, nullable: true, name: 'idempotency_payload_hash' })
+  idempotencyPayloadHash: string | null;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
