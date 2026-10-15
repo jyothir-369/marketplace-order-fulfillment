@@ -46,8 +46,8 @@ import { PaymentsModule } from './payments/payments.module';
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => {
-        const dbUrl = configService.get<string>('DATABASE_URL');
-        const isCloudDb = dbUrl && dbUrl.trim() !== '' && (dbUrl.includes('supabase') || dbUrl.includes('pooler') || dbUrl.includes('sslmode=require') || dbUrl.includes('.co'));
+        const dbUrl = (configService.get<string>('DATABASE_URL') || '').trim();
+        const isCloudDb = dbUrl !== '' && (dbUrl.includes('supabase') || dbUrl.includes('pooler') || dbUrl.includes('sslmode=require') || dbUrl.includes('.co'));
 
         if (dbUrl && dbUrl.trim() !== '' && isCloudDb) {
           return {
