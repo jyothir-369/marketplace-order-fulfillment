@@ -242,7 +242,7 @@ export class CatalogService {
     if (!dto.includeInactive) qb.andWhere('product.isActive = :isActive', { isActive: true });
     if (dto.q) qb.andWhere('(product.name ILIKE :q OR product.slug ILIKE :q)', { q: `%${dto.q}%` });
     if (dto.category) qb.andWhere('product.category = :category', { category: dto.category });
-    if (dto.vendor) qb.andWhere('product.vendor_id = :vendor', { vendor: dto.vendor });
+    if (dto.vendor) qb.andWhere('product.vendorId = :vendor', { vendor: dto.vendor });
     if (dto.minPrice !== undefined) qb.andWhere('product.price >= :minPrice', { minPrice: dto.minPrice });
     if (dto.maxPrice !== undefined) qb.andWhere('product.price <= :maxPrice', { maxPrice: dto.maxPrice });
     this.applySort(qb, dto.sort);
@@ -300,7 +300,7 @@ export class CatalogService {
         base.andWhere('(product.name ILIKE :q OR product.slug ILIKE :q)', { q: `%${dto.q}%` });
       }
       if (dto.vendor) {
-        base.andWhere('product.vendor_id = :vendor', { vendor: dto.vendor });
+        base.andWhere('product.vendorId = :vendor', { vendor: dto.vendor });
       }
       if (dto.minPrice !== undefined) {
         base.andWhere('product.price >= :minPrice', { minPrice: dto.minPrice });
@@ -427,7 +427,7 @@ export class CatalogService {
   private async getProductStatsByVendor(): Promise<Map<string, ProductStats>> {
     const rows = await this.productRepository
       .createQueryBuilder('product')
-      .select("product.vendor_id", "vendorId")
+      .select("product.vendorId", "vendorId")
       .addSelect('COUNT(product.id)', 'productCount')
       .addSelect('SUM(CASE WHEN product.isActive = TRUE THEN 1 ELSE 0 END)', 'activeCount')
       .addSelect('COALESCE(SUM(product.stockCount), 0)', 'totalStock')
@@ -437,7 +437,7 @@ export class CatalogService {
       )
       .addSelect('SUM(CASE WHEN product.stockCount = 0 THEN 1 ELSE 0 END)', 'outOfStock')
       .setParameter('lowThreshold', this.LOW_STOCK_THRESHOLD)
-      .groupBy("product.vendor_id")
+      .groupBy("product.vendorId")
       .getRawMany();
 
     const map = new Map<string, ProductStats>();

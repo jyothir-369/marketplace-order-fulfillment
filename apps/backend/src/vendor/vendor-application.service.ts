@@ -125,7 +125,7 @@ export class VendorApplicationService {
 
       if (dto.decision === 'approve') {
         if (!applicant) {
-          await appRepo.update(
+            await appRepo.update(
             { id },
             {
               status: VendorApplicationStatus.REJECTED,
@@ -154,7 +154,7 @@ export class VendorApplicationService {
           { role: UserRole.VENDOR, vendorId: vendor.id },
         );
 
-        await appRepo.update(
+            await appRepo.update(
           { id },
           {
             status: VendorApplicationStatus.APPROVED,
@@ -163,7 +163,7 @@ export class VendorApplicationService {
           },
         );
       } else if (dto.decision === 'reject') {
-        await appRepo.update(
+            await appRepo.update(
           { id },
           {
             status: VendorApplicationStatus.REJECTED,
