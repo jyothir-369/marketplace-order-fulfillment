@@ -226,7 +226,7 @@ export async function updateStock(
 /** PATCH /api/catalog/:id — update product (name, category, price, stock, active). Uses bearer auth, returns ProductDto. */
 export async function updateProduct(
   id: string,
-  payload: Partial<{ name: string; category: string; price: number; stockCount: number; isActive: boolean }>
+  payload: Partial<{ name: string; category: string; price: number; stockCount: number; isActive: boolean; images?: string[] }>
 ): Promise<ProductDto> {
   return apiFetch<ProductDto>(`/catalog/${id}`, {
     method: "PATCH",
@@ -637,6 +637,14 @@ export async function validateCoupon(code: string, orderTotal?: number): Promise
     method: "POST",
     body: JSON.stringify({ code, orderTotal }),
   }).catch(() => ({ valid: false, message: "Invalid coupon" }));
+}
+
+/** POST /api/auth/google — Google ID-token validation; returns AuthTokensDto. */
+export async function googleSignIn(payload: { idToken: string }): Promise<AuthTokensDto> {
+  return apiFetch<AuthTokensDto>("/auth/google", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 /** GET /api/auth/me — current authenticated user (requires a valid access token). */
