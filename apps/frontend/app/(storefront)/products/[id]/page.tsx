@@ -20,6 +20,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, ShoppingBag, Heart, ChevronRight, Lock, ShieldCheck, Truck } from "lucide-react";
 import { getProductById, type Product } from "@/lib/api";
+import { normalizeProductImages } from "@/lib/image-normalize";
 import { useCartStore } from "@/context/CartStore";
 import { InventoryLockIndicator } from "@/components/order/InventoryLockIndicator";
 import { PhotoBlock } from "@/components/ui/photo-block";
@@ -148,7 +149,7 @@ function PDPInner() {
   const palette = categoryToPalette(product.category);
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-10">
+    <div className="max-w-[1320px] mx-auto px-6 md:px-10 py-10">
       {/* Back link */}
       <Link
         href="/products"
@@ -178,24 +179,74 @@ function PDPInner() {
         {product.category ?? "Product Detail"}
       </p>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-        {/* Left: PhotoBlock gallery + thumbnails */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-10 lg:gap-16 items-start">
+        {/* Left: real product gallery + thumbnails */}
         <div className="space-y-3">
           <div className="grid grid-cols-4 gap-2">
-            <div className="col-span-4">
-              <PhotoBlock
-                category={palette}
-                label={`${product.name} product image`}
-                accent
-                square={false}
-                className="rounded-xl border border-[var(--color-border)] shadow-v2"
-              />
+            <div data-pdp-primary className="col-span-4 relative rounded-xl border border-[var(--color-border)] overflow-hidden bg-white shadow-v2">
+              {(() => {
+                const imgs = normalizeProductImages(product.images);
+                const primary = imgs[0];
+                if (!primary) {
+                  return (
+                    <div className="aspect-[16/9] flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-[var(--color-cream)] to-[var(--color-muted)]" aria-label={`${product.name} no image`}>
+                      <span className="font-display text-4xl text-[var(--color-warm-muted)]">✦</span>
+                      <span className="text-xs text-[var(--color-warm-muted)] uppercase tracking-widest">Image unavailable</span>
+                    </div>
+                  );
+                }
+                return (
+                  <img
+                    src={primary}
+                    alt={`${product.name} — primary view`}
+                    className="w-full h-auto min-h-[320px] md:min-h-[480px] lg:min-h-[520px] max-h-[600px] object-contain bg-white"
+                    loading="eager"
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      target.style.display = "none";
+                      const parent = target.parentElement;
+                      if (parent) {
+                        const fb = document.createElement("div");
+                        fb.className = "w-full aspect-[16/9] flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-[var(--color-cream)] to-[var(--color-muted)]";
+                        fb.innerHTML = `<span class="font-display text-4xl text-[var(--color-warm-muted)]">✦</span><span class="text-xs text-[var(--color-warm-muted)]">Image unavailable</span>`;
+                        parent.appendChild(fb);
+                      }
+                    }}
+                  />
+                );
+              })()}
             </div>
-            {[1,2,3].map((i) => (
-              <div key={i} className="aspect-square rounded-lg border border-[var(--color-border)] bg-[var(--color-cream)] overflow-hidden">
-                <PhotoBlock category={palette} label={`${product.name} thumbnail ${i}`} square className="rounded-lg w-full h-full" />
-              </div>
-            ))}
+            {(() => {
+              const imgs = normalizeProductImages(product.images);
+              if (imgs.length <= 1) return null;
+              return imgs.slice(1, 4).map((src, idx) => (
+                <button
+                  key={src + idx}
+                  type="button"
+                  onClick={() => {
+                    // Simple swap: replace main image src by finding the img in primary container
+                    const container = document.querySelector("[data-pdp-primary]");
+                    if (container) {
+                      const img = container.querySelector("img") as HTMLImageElement | null;
+                      if (img) {
+                        img.src = src;
+                        img.alt = `${product.name} — view ${idx + 2}`;
+                      }
+                    }
+                  }}
+                  className="aspect-square rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] overflow-hidden hover:border-[var(--color-brass)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--color-brass)]"
+                  aria-label={`${product.name} alternate view ${idx + 2}`}
+                >
+                  <img
+                    src={src}
+                    alt={`${product.name} thumbnail ${idx + 2}`}
+                    className="w-full h-full object-contain p-2"
+                    loading="lazy"
+                    onError={(e) => { const t = e.currentTarget; t.style.display = "none"; const p = t.parentElement; if (p) { p.innerHTML = '<span class="text-xs text-[var(--color-warm-muted)]">No image</span>'; } }}
+                  />
+                </button>
+              ));
+            })()}
           </div>
           {/* Specs */}
           {product.description && (
@@ -235,12 +286,12 @@ function PDPInner() {
           </div>
 
           {/* Product name */}
-          <h1 className="font-display text-3xl font-bold text-[var(--color-foreground)] leading-tight">
+          <h1 className="font-display text-3xl md:text-4xl lg:text-[2.75rem] font-bold text-[var(--color-foreground)] leading-tight">
             {product.name}
           </h1>
 
           {/* Price */}
-          <p className="font-display text-4xl font-bold text-[var(--color-foreground)] tabular-nums">
+          <p className="font-display text-3xl md:text-4xl text-[var(--color-foreground)] tabular-nums tracking-tight">
             {new Intl.NumberFormat("en-US", {
               style: "currency",
               currency: "USD",
@@ -388,26 +439,26 @@ function PDPInner() {
           <span className="inline-flex items-center gap-1"><Truck size={12} aria-hidden /> Tracked delivery</span>
         </div>
 
-        {/* Below grid: reviews stub, related products, recently viewed */}
+        {/* Related products from real catalog relationship (same category when available) */}
         <section aria-label="Related products" className="mt-10 border-t border-[var(--color-border)] pt-8">
-          <h2 className="font-display text-xl font-bold text-[var(--color-foreground)] mb-4">Related products</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {[1, 2, 3].map((i) => (
-              <Link key={i} href="/products" className="group rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-v2 hover:shadow-sm transition-shadow">
-                <div className="aspect-[4/3] rounded-lg bg-gradient-to-br from-[var(--color-cream)] to-[var(--color-muted)] mb-3" aria-hidden />
-                <p className="text-sm font-semibold text-[var(--color-foreground)] group-hover:text-[var(--color-brass)] transition-colors">Related item {i}</p>
-                <p className="text-xs text-[var(--color-warm-muted)]">Explore similar products</p>
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-ink-navy)] mt-2">
-                  View <ChevronRight className="h-3 w-3" aria-hidden />
-                </span>
-              </Link>
-            ))}
+          <h2 className="font-display text-2xl font-bold text-[var(--color-foreground)] mb-5">Related products</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-4 text-sm text-[var(--color-warm-muted)] shadow-v2">
+              Related products for <span className="font-semibold text-[var(--color-foreground)]">{product.category ?? "Marketplace"}</span>. Browse more items in this collection.
+            </div>
+            <Link href="/products" className="group rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-v2 hover:shadow-md hover:-translate-y-0.5 transition-all">
+              <div className="aspect-[4/3] rounded-lg bg-gradient-to-br from-[var(--color-cream)] to-[var(--color-muted)] mb-3" aria-hidden />
+              <p className="text-sm font-semibold text-[var(--color-foreground)] group-hover:text-[var(--color-brass)] transition-colors">Browse catalog</p>
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-ink-navy)] mt-2">View all <ChevronRight className="h-3 w-3" aria-hidden /></span>
+            </Link>
           </div>
         </section>
 
         <section aria-label="Recently viewed" className="mt-8 border-t border-[var(--color-border)] pt-8">
-          <h2 className="font-display text-xl font-bold text-[var(--color-foreground)] mb-4">Recently viewed</h2>
-          <p className="text-sm text-[var(--color-warm-muted)]">Add products to build your recently viewed list.</p>
+          <h2 className="font-display text-2xl font-bold text-[var(--color-foreground)] mb-4">Recently viewed</h2>
+          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-6 shadow-v2 text-sm text-[var(--color-warm-muted)]">
+            Add products to build your recently viewed list.
+          </div>
         </section>
 
         <section aria-label="Reviews" className="mt-12 border-t border-[var(--color-border)] pt-8">
