@@ -83,6 +83,14 @@ export class CatalogService {
       throw new ForbiddenException('A vendor account must be linked to a vendor to create products');
     }
 
+    // D4: validate category exists in categories table; return 400-style error cleanly.
+    if (dto.category) {
+      const cat = await this.categoryRepository.findOne({ where: { name: dto.category } });
+      if (!cat) {
+        throw new NotFoundException('Category "' + dto.category + '" not found; create it first or use an existing category');
+      }
+    }
+
     const vendor = await this.vendorRepository.findOne({ where: { id: effectiveVendorId } });
     if (!vendor) {
       throw new NotFoundException('Vendor with ID ' + effectiveVendorId + ' not found');
@@ -93,9 +101,11 @@ export class CatalogService {
       name: dto.name,
       slug: dto.slug ?? this.slugify(dto.name),
       category: dto.category ?? null,
-      price: dto.price,
+      price: parseFloat(Number(dto.price).toFixed(2)),
       stockCount: dto.stockCount,
       isActive: true,
+      description: dto.description ?? null,
+      images: dto.images ?? null,
     });
 
     const saved = await this.productRepository.save(product);
@@ -128,7 +138,14 @@ export class CatalogService {
     if (dto.slug !== undefined) { product.slug = dto.slug; }
     if (dto.category !== undefined) { product.category = dto.category; }
     if (dto.price !== undefined) { product.price = dto.price; }
-    if (dto.stockCount !== undefined) { product.stockCount = dto.stockCount; }
+    // Phase 3.2 / 3.3: vendors must not change stock via PATCH (use audited adjust endpoint instead);
+    // ADMIN is still permitted.
+    if (dto.stockCount !== undefined) {
+      if (currentUser.role === UserRole.VENDOR) {
+        throw new ForbiddenException('Stock adjustments must use the audited inventory endpoint');
+      }
+      product.stockCount = dto.stockCount;
+    }
     if (dto.isActive !== undefined) { product.isActive = dto.isActive; }
     if (dto.description !== undefined) { product.description = dto.description; }
     if (dto.images !== undefined) { product.images = dto.images; }
@@ -219,73 +236,31 @@ export class CatalogService {
   // ---------------------------------------------------------------------------
 
   async query(dto: CatalogQueryDto): Promise<CatalogListResponseDto> {
-    // Safe fallback: avoid broken createQueryBuilder join (vendor relation mapping / DB mismatch causes 500).
-    const where: any = {};
-    if (!dto.includeInactive) where.isActive = true;
-    if (dto.category) where.category = dto.category;
-    if (dto.vendor) where.vendorId = dto.vendor;
-    if (dto.minPrice !== undefined) where.minPrice = dto.minPrice;
-
-    // Build a safe base query that skips broken vendor join but keeps filters/sort.
-    const qb = this.productRepository.createQueryBuilder('product');
-    qb.leftJoinAndSelect('product.vendor', 'vendor')
+    const qb = this.productRepository.createQueryBuilder('product')
+      .leftJoinAndSelect('product.vendor', 'vendor')
+      .leftJoinAndSelect('product.categoryRelation', 'cat');
     if (!dto.includeInactive) qb.andWhere('product.isActive = :isActive', { isActive: true });
     if (dto.q) qb.andWhere('(product.name ILIKE :q OR product.slug ILIKE :q)', { q: `%${dto.q}%` });
     if (dto.category) qb.andWhere('product.category = :category', { category: dto.category });
     if (dto.vendor) qb.andWhere('product.vendorId = :vendor', { vendor: dto.vendor });
     if (dto.minPrice !== undefined) qb.andWhere('product.price >= :minPrice', { minPrice: dto.minPrice });
     if (dto.maxPrice !== undefined) qb.andWhere('product.price <= :maxPrice', { maxPrice: dto.maxPrice });
-
-    // facets moved into try
     this.applySort(qb, dto.sort);
-
     const page = Math.max(1, dto.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, dto.pageSize ?? 24));
     qb.skip((page - 1) * pageSize).take(pageSize);
-
-    try {
-      const facets = await this.buildFacets(dto);
-      const [items, total] = await qb.getManyAndCount();
-      const totalPages = Math.ceil(total / pageSize);
-      return {
-        items: items.map((p) => this.toResponseDto(p, p.vendor ? p.vendor.name : 'Unknown')),
-        total,
-        page,
-        pageSize,
-        totalPages,
-        facets: facets ?? { categories: [], totalProducts: 0, minPrice: 0, maxPrice: 0 },
-      };
-    } catch (err) {
-      // Fallback to raw SQL query using DB column names (snake_case) to avoid TypeORM column-mapping 500.
-      this.logger.error('Catalog query failed, using raw SQL fallback: ' + (err instanceof Error ? err.message : err));
-      const safe = await this.productRepository.query(
-        `SELECT id, "vendorId" AS "vendorId", name, slug, category, price, "stock_count" AS "stock_count", "isActive" AS "isActive", "createdAt" AS "createdAt", "updatedAt" AS "updatedAt", description, images FROM products WHERE "isActive" = true ORDER BY "createdAt" DESC LIMIT $1 OFFSET $2`,
-        [pageSize, (page - 1) * pageSize],
-      );
-      const countRow = await this.productRepository.query(`SELECT COUNT(*) as c FROM products WHERE "isActive" = true`);
-      const safeCount = parseInt(countRow[0]?.c ?? '0', 10);
-      return {
-        items: safe.map((row: any) => this.toResponseDto({
-          id: row.id,
-          vendorId: row.vendorId || row.vendor_id,
-          name: row.name,
-          slug: row.slug,
-          category: row.category,
-          price: Number(row.price),
-          stockCount: Number(row.stock_count ?? row.stockCount ?? 0),
-          isActive: row.isActive,
-          description: row.description ?? null,
-          images: row.images ?? null,
-          createdAt: row.createdAt ? new Date(row.createdAt) : new Date(),
-          updatedAt: row.updatedAt ? new Date(row.updatedAt) : new Date(),
-        } as Product, 'Unknown')),
-        total: safeCount,
-        page,
-        pageSize,
-        totalPages: Math.ceil(safeCount / pageSize),
-        facets: await this.buildFacets(dto),
-      };
-    }
+    const facets = await this.buildFacets(dto);
+    const [items, total] = await qb.getManyAndCount();
+    const totalPages = Math.ceil(total / pageSize);
+    this.logger.log("DEBUG query: items=" + items.length + " total=" + total + " page=" + page);
+    return {
+      items: items.map((p) => this.toResponseDto(p, p.vendor ? p.vendor.name : 'Unknown')),
+      total,
+      page,
+      pageSize,
+      totalPages,
+      facets: facets ?? { categories: [], totalProducts: 0, minPrice: 0, maxPrice: 0 },
+    };
   }
 
   private applySort(qb: SelectQueryBuilder<Product>, sort?: CatalogSort): void {
@@ -316,65 +291,62 @@ export class CatalogService {
    */
   private async buildFacets(dto: CatalogQueryDto): Promise<CatalogFacetsDto> {
     try {
-      const base = this.productRepository.createQueryBuilder('product');
-    if (!dto.includeInactive) {
-      base.andWhere('product.isActive = :isActive', { isActive: true });
-    }
-    if (dto.q) {
-      base.andWhere('(product.name ILIKE :q OR product.slug ILIKE :q)', { q: `%${dto.q}%` });
-    }
-    if (dto.vendor) {
-      base.andWhere('product.vendorId = :vendor', { vendor: dto.vendor });
-    }
-    if (dto.minPrice !== undefined) {
-      base.andWhere('product.price >= :minPrice', { minPrice: dto.minPrice });
-    }
-    if (dto.maxPrice !== undefined) {
-      base.andWhere('product.price <= :maxPrice', { maxPrice: dto.maxPrice });
-    }
-    if (dto.maxPrice !== undefined) {
-      base.andWhere('product.price <= :maxPrice', { maxPrice: dto.maxPrice });
-    }
+      const base = this.productRepository.createQueryBuilder('product')
+        .leftJoinAndSelect('product.categoryRelation', 'cat');
+      if (!dto.includeInactive) {
+        base.andWhere('product.isActive = :isActive', { isActive: true });
+      }
+      if (dto.q) {
+        base.andWhere('(product.name ILIKE :q OR product.slug ILIKE :q)', { q: `%${dto.q}%` });
+      }
+      if (dto.vendor) {
+        base.andWhere('product.vendorId = :vendor', { vendor: dto.vendor });
+      }
+      if (dto.minPrice !== undefined) {
+        base.andWhere('product.price >= :minPrice', { minPrice: dto.minPrice });
+      }
+      if (dto.maxPrice !== undefined) {
+        base.andWhere('product.price <= :maxPrice', { maxPrice: dto.maxPrice });
+      }
 
-    const [total, priceRange] = await Promise.all([
-      base.clone().getCount(),
-      base
+      const [total, priceRange] = await Promise.all([
+        base.clone().getCount(),
+        base
+          .clone()
+          .select('MIN(product.price)', 'min')
+          .addSelect('MAX(product.price)', 'max')
+          .getRawOne(),
+      ]);
+
+      const rows = await base
         .clone()
-        .select('MIN(product.price)', 'min')
-        .addSelect('MAX(product.price)', 'max')
-        .getRawOne(),
-    ]);
+        .select('product.category', 'catName')
+        .addSelect('cat.slug', 'slug')
+        .addSelect('COUNT(product.id)', 'productCount')
+        .addSelect('SUM(CASE WHEN product.isActive = TRUE THEN 1 ELSE 0 END)', 'activeCount')
+        .addSelect('SUM(product.stockCount)', 'totalStock')
+        .andWhere('product.category IS NOT NULL')
+        .groupBy("product.category")
+        .addGroupBy("cat.slug")
+        .getRawMany();
 
-    const rows = await base
-      .clone()
-      .select('product.category', 'catName')
-      .addSelect('cat.slug', 'slug')
-      .leftJoin(Category, 'cat', 'cat.name = product.category')
-      .addSelect('COUNT(product.id)', 'productCount')
-      .addSelect('SUM(CASE WHEN product.isActive = TRUE THEN 1 ELSE 0 END)', 'activeCount')
-      .addSelect('SUM(product.stockCount)', 'totalStock')
-      .andWhere('product.category IS NOT NULL')
-      .groupBy("product.category")
-      .addGroupBy("cat.slug")
-      .getRawMany();
+      const categories: CategorySummaryDto[] = rows
+        .filter((r) => r && r.catName)
+        .map((r) => ({
+          name: String(r.catName),
+          slug: r.slug ? String(r.slug) : null,
+          productCount: Number(r.productCount ?? 0),
+          activeProductCount: Number(r.activeCount ?? 0),
+          totalStock: Number(r.totalStock ?? 0),
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
 
-    const categories: CategorySummaryDto[] = rows
-      .filter((r) => r && r.catName)
-      .map((r) => ({
-        name: String(r.catName),
-        slug: r.slug ? String(r.slug) : null,
-        productCount: Number(r.productCount ?? 0),
-        activeProductCount: Number(r.activeCount ?? 0),
-        totalStock: Number(r.totalStock ?? 0),
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-
-    return {
-      categories,
-      totalProducts: total,
-      minPrice: Number(priceRange?.min ?? 0),
-      maxPrice: Number(priceRange?.max ?? 0),
-    };
+      return {
+        categories,
+        totalProducts: total,
+        minPrice: Number(priceRange?.min ?? 0),
+        maxPrice: Number(priceRange?.max ?? 0),
+      };
     } catch (err) {
       this.logger.error('buildFacets SQL error: ' + (err instanceof Error ? err.message : String(err)));
       throw err;
@@ -455,7 +427,7 @@ export class CatalogService {
   private async getProductStatsByVendor(): Promise<Map<string, ProductStats>> {
     const rows = await this.productRepository
       .createQueryBuilder('product')
-      .select('product.vendorId', 'vendorId')
+      .select("product.vendorId", "vendorId")
       .addSelect('COUNT(product.id)', 'productCount')
       .addSelect('SUM(CASE WHEN product.isActive = TRUE THEN 1 ELSE 0 END)', 'activeCount')
       .addSelect('COALESCE(SUM(product.stockCount), 0)', 'totalStock')
@@ -465,7 +437,7 @@ export class CatalogService {
       )
       .addSelect('SUM(CASE WHEN product.stockCount = 0 THEN 1 ELSE 0 END)', 'outOfStock')
       .setParameter('lowThreshold', this.LOW_STOCK_THRESHOLD)
-      .groupBy('product.vendorId')
+      .groupBy("product.vendorId")
       .getRawMany();
 
     const map = new Map<string, ProductStats>();
@@ -573,11 +545,10 @@ export class CatalogService {
   private async getVendorFulfillmentCounts(vendorId: string): Promise<{ pending: number; deadLetter: number; ambiguous: number }> {
     const row = await this.lineItemRepository
       .createQueryBuilder('line_item')
-      .select("SUM(CASE WHEN line_item.fulfillment_status IN ('pending', 'syncing') THEN 1 ELSE 0 END)", 'pending')
-      .select("SUM(CASE WHEN line_item.fulfillment_status = 'dead_letter' THEN 1 ELSE 0 END)", 'dead')
-      .select("SUM(CASE WHEN line_item.fulfillment_status = 'ambiguous' THEN 1 ELSE 0 END)", 'amb')
+      .select("SUM(CASE WHEN line_item.fulfillment_status IN ('pending','syncing') THEN 1 ELSE 0 END)", 'pending')
+      .addSelect("SUM(CASE WHEN line_item.fulfillment_status = 'dead_letter' THEN 1 ELSE 0 END)", 'dead')
+      .addSelect("SUM(CASE WHEN line_item.fulfillment_status = 'ambiguous' THEN 1 ELSE 0 END)", 'amb')
       .where('line_item.vendor_id = :vendorId', { vendorId })
-      .groupBy('line_item.vendor_id')
       .getRawOne();
 
     return {

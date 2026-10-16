@@ -5,6 +5,9 @@
  * Columns: Shop, Your account, Sell, Company, Support.
  */
 
+"use client";
+
+import { useAuth } from "@/lib/auth-context";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Lock, ShieldCheck, Truck, Receipt } from "lucide-react";
@@ -33,8 +36,7 @@ const FOOTER_NAV: ReadonlyArray<{
   {
     heading: "Sell",
     links: [
-      { href: "/vendor/dashboard", label: "Vendor Portal" },
-      { href: "/vendor/products", label: "Manage products" },
+      { href: "/sell", label: "Become a vendor" },
     ],
   },
   {
@@ -56,6 +58,11 @@ const FOOTER_NAV: ReadonlyArray<{
 ];
 
 export function StorefrontFooter() {
+  const { user, status } = useAuth();
+  const loading = status === "idle" || status === "loading";
+  const isVendor = Boolean(user && user.role === "vendor");
+  const hasVendorId = Boolean(user?.vendorId);
+
   return (
     <footer
       className={cn(

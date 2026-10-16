@@ -9,6 +9,7 @@ import { VendorMockService } from '../integrations/vendor-mock/vendor-mock.servi
 import { VendorFulfillmentRequestDto } from '../integrations/vendor-mock/dto/vendor-mock.dto';
 import { SyncJobDto, ReconciliationResultDto, ManualResolutionDto } from './dto/fulfillment.dto';
 import { AuditService } from '../common/audit';
+import { FulfillmentOperationRecord, FulfillmentOperationState } from '../common/entities/fulfillment-operation-record.entity';
 
 @Injectable()
 export class FulfillmentService {
@@ -119,6 +120,9 @@ export class FulfillmentService {
         quantity: lineItem.quantity,
         correlationId: correlationId,
       };
+    // Recovery note: if the process crashes after this vendor call
+    // but before the DB updates below, retry is safe because processSyncJob
+    // checks syncJob.status === COMPLETED early and skips re-processing.
       const response = await this.vendorMockService.requestFulfillment(request, correlationId);
 
       if (response.success) {

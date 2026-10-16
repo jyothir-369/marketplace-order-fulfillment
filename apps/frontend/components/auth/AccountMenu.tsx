@@ -1,17 +1,9 @@
-/**
- * components/auth/AccountMenu.tsx — storefront header account control (Phase 1).
- *
- *   - Unauthenticated: "Sign in" / "Create account" links.
- *   - Authenticated: a user avatar dropdown showing the account email plus
- *     role-aware portals (Vendor Portal for vendors, Admin Console for
- *     admin/operations) and a Sign out action.
- */
-
 "use client";
 
+import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
 import {
   UserRound,
   ChevronDown,
@@ -22,6 +14,7 @@ import {
   Heart,
   Bell,
   User,
+  MapPin,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
@@ -31,20 +24,57 @@ export function AccountMenu() {
   const router = useRouter();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
 
-  // Click-outside + route-change close.
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const portalRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { setMounted(true); }, []);
+
+  const computePos = useCallback(() => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setPos({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    computePos();
+    const onResize = () => computePos();
+    const onScroll = () => computePos();
+    window.addEventListener("resize", onResize);
+    window.addEventListener("scroll", onScroll, true);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("scroll", onScroll, true);
+    };
+  }, [open, computePos]);
+
+  // Click outside (trigger + portal)
   useEffect(() => {
     if (!open) return;
     function onClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target) || portalRef.current?.contains(target)) return;
+      setOpen(false);
     }
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, [open]);
-  useEffect(() => setOpen(false), [pathname]);
+
+  // Escape
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  // Route change close
+  useEffect(() => { setOpen(false); }, [pathname]);
 
   const loading = status === "idle" || status === "loading";
 
@@ -63,7 +93,7 @@ export function AccountMenu() {
     return (
       <div className="hidden items-center gap-1.5 sm:flex">
         <Link
-          href={`/login?redirect=${encodeURIComponent(pathname ?? '')}`}
+          href={`/login?redirect=${encodeURIComponent(pathname ?? "/")}`}
           className="rounded-lg px-3 py-2 text-sm font-medium text-[var(--color-foreground)] hover:bg-[var(--color-cream)]/60 transition-colors"
         >
           Sign in
@@ -89,10 +119,11 @@ export function AccountMenu() {
   }
 
   return (
-    <div className="relative" ref={menuRef}>
+    <div className="relative">
       <button
+        ref={triggerRef}
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => { setOpen((v) => !v); if (!open) setTimeout(computePos, 0); }}
         aria-haspopup="menu"
         aria-expanded={open}
         className={cn(
@@ -109,10 +140,12 @@ export function AccountMenu() {
         />
       </button>
 
-      {open && (
+      {mounted && open && pos && createPortal(
         <div
+          ref={portalRef}
           role="menu"
-          className="absolute right-0 mt-2 w-56 overflow-hidden rounded-xl border border-[var(--color-warm-border)] bg-[var(--color-card)] shadow-lg"
+          style={{ position: "fixed", top: pos.top, right: pos.right, zIndex: 9999 }}
+          className="w-56 overflow-hidden rounded-xl border border-[var(--color-warm-border)] bg-white shadow-2xl"
         >
           <div className="border-b border-[var(--color-warm-border)] px-3.5 py-2.5">
             <p className="truncate text-sm font-medium text-[var(--color-foreground)]">
@@ -126,6 +159,7 @@ export function AccountMenu() {
             <MenuItem href="/wishlist" icon={Heart} label="Wishlist" onNavigate={() => setOpen(false)} />
             <MenuItem href="/notifications" icon={Bell} label="Notifications" onNavigate={() => setOpen(false)} />
             <MenuItem href="/account" icon={User} label="Account" onNavigate={() => setOpen(false)} />
+            <MenuItem href="/account/addresses" icon={MapPin} label="Saved Addresses" onNavigate={() => setOpen(false)} />
             {showVendorPortal && (
               <MenuItem href="/vendor/dashboard" icon={Store} label="Vendor Portal" onNavigate={() => setOpen(false)} />
             )}
@@ -135,14 +169,15 @@ export function AccountMenu() {
             <button
               type="button"
               role="menuitem"
-              onClick={handleSignOut}
-              className={cn(menuItemClasses)}
+              onClick={() => { handleSignOut(); setOpen(false); }}
+              className={menuItemClasses}
             >
               <LogOut className="h-4 w-4" aria-hidden />
               Sign out
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

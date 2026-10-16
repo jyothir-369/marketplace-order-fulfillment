@@ -1,4 +1,7 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ConflictException } from '@nestjs/common';
+import { User, UserRole } from "../common/entities/user.entity";
+import { Vendor } from "../common/entities/vendor.entity";
+import { AuthService } from "../auth/auth.service";
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan, In } from 'typeorm';
 import { Order, OrderStatus } from '../common/entities/order.entity';
@@ -8,7 +11,7 @@ import { AdminResolveDto, AdminDashboardDto, StuckOrdersResponseDto, StuckOrderD
 import { OrdersService } from '../orders/orders.service';
 import { FulfillmentService } from '../fulfillment/fulfillment.service';
 import { AuditService, AuditLogQuery } from '../common/audit';
-import { AuditLog } from '../common/audit/audit-log.entity';
+import { AuditLog, AuditAction, AuditEntityType } from '../common/audit/audit-log.entity';
 
 @Injectable()
 export class AdminService {
@@ -21,9 +24,14 @@ export class AdminService {
     private readonly lineItemRepository: Repository<OrderLineItem>,
     @InjectRepository(VendorSyncJob)
     private readonly syncJobRepository: Repository<VendorSyncJob>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    @InjectRepository(Vendor)
+    private readonly vendorRepository: Repository<Vendor>,
     private readonly ordersService: OrdersService,
     private readonly fulfillmentService: FulfillmentService,
     private readonly auditService: AuditService,
+    private readonly authService: AuthService,
   ) {}
 
   async getDashboard(correlationId: string): Promise<AdminDashboardDto> {
@@ -245,5 +253,92 @@ export class AdminService {
 
   async getTrace(correlationId: string): Promise<AuditLog[]> {
     return this.auditService.getTrace(correlationId);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Phase 1 — Admin vendor-account linking (D1)
+  // ---------------------------------------------------------------------------
+
+  async listLinkedUsers(vendorId: string, correlationId: string): Promise<{ id: string; email: string; role: UserRole; vendorId: string | null }[]> {
+    const vendor = await this.vendorRepository.findOne({ where: { id: vendorId } });
+    if (!vendor) throw new NotFoundException('Vendor not found');
+    const users = await this.userRepository.find({ where: { vendorId } });
+    return users.map(u => ({ id: u.id, email: u.email, role: u.role, vendorId: u.vendorId }));
+  }
+
+  async linkUser(vendorId: string, email: string, correlationId: string): Promise<{ message: string; transitioned: boolean }> {
+    const vendor = await this.vendorRepository.findOne({ where: { id: vendorId } });
+    if (!vendor) throw new NotFoundException('Vendor not found');
+    const user = await this.userRepository.findOne({ where: { email: email.toLowerCase() } });
+    if (!user) throw new NotFoundException('User not found');
+    if ([UserRole.ADMIN, UserRole.OPERATIONS].includes(user.role)) {
+      throw new ConflictException('Privileged roles cannot be demoted via vendor linking');
+    }
+    if (user.vendorId === vendorId) {
+      return { message: 'User already linked to this vendor', transitioned: false };
+    }
+    if (user.vendorId && user.vendorId !== vendorId) {
+      throw new ConflictException('User already linked to a different vendor');
+    }
+    let transitioned = false;
+    await this.userRepository.manager.transaction(async (manager) => {
+      const locked = await manager.findOne(User, { where: { id: user.id }, lock: { mode: 'pessimistic_write' } });
+      if (!locked) throw new NotFoundException('User disappeared during link');
+      if (locked.role === UserRole.ADMIN || locked.role === UserRole.OPERATIONS) {
+        throw new ConflictException('Privileged roles cannot be demoted');
+      }
+      if (locked.vendorId === vendorId && locked.role === UserRole.VENDOR) {
+        transitioned = false; // idempotent
+        return;
+      }
+      if (locked.vendorId && locked.vendorId !== vendorId) {
+        throw new ConflictException('User already linked to different vendor');
+      }
+      await manager.update(User, user.id, { role: UserRole.VENDOR, vendorId: vendorId });
+      transitioned = true;
+    });
+    if (transitioned) {
+      await this.authService.revokeAllForUser(user.id);
+      await this.auditService.log({
+        correlationId,
+        action: AuditAction.ADMIN_RESOLUTION,
+        entityType: AuditEntityType.ORDER,
+        entityId: user.id,
+        message: `Vendor link: ${user.email} -> ${vendorId}`,
+      });
+      return { message: 'User linked', transitioned: true };
+    }
+    return { message: 'User already linked to this vendor', transitioned: false };
+  }
+
+  async unlinkUser(vendorId: string, userId: string, correlationId: string): Promise<{ message: string; transitioned: boolean }> {
+    const vendor = await this.vendorRepository.findOne({ where: { id: vendorId } });
+    if (!vendor) throw new NotFoundException('Vendor not found');
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+    if (user.vendorId !== vendorId) {
+      throw new ConflictException('User is not linked to this vendor');
+    }
+    let transitioned = false;
+    await this.userRepository.manager.transaction(async (manager) => {
+      const locked = await manager.findOne(User, { where: { id: userId }, lock: { mode: 'pessimistic_write' } });
+      if (!locked) throw new NotFoundException('User disappeared during unlink');
+      if (locked.vendorId !== vendorId) {
+        throw new ConflictException('User is not linked to this vendor');
+      }
+      await manager.update(User, userId, { role: UserRole.BUYER, vendorId: null });
+      transitioned = true;
+    });
+    if (transitioned) {
+      await this.authService.revokeAllForUser(userId);
+      await this.auditService.log({
+        correlationId,
+        action: AuditAction.ADMIN_RESOLUTION,
+        entityType: AuditEntityType.ORDER_LINE_ITEM,
+        entityId: userId,
+        message: `Vendor unlink: ${user.email} from ${vendorId}`,
+      });
+    }
+    return { message: 'User unlinked', transitioned };
   }
 }

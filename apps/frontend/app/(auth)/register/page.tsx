@@ -1,5 +1,5 @@
-/**
- * app/(auth)/register/page.tsx — Create account (Phase 1).
+﻿/**
+ * app/(auth)/register/page.tsx â€” Create account (Phase 1).
  *
  * Public BUYER self-registration. Reads the same sanitized `redirect` param
  * as the login page so a signup midway through a gated flow lands back where
@@ -11,6 +11,7 @@ import Link from "next/link";
 import { RegisterForm } from "@/components/auth/RegisterForm";
 
 export const metadata: Metadata = { title: "Create account" };
+export const dynamic = "force-dynamic";
 
 function safeRedirect(raw: string | undefined): string {
   if (!raw) return "/products";

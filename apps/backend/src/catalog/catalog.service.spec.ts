@@ -18,6 +18,7 @@ import { CatalogQueryDto, CatalogSort } from './dto/catalog.dto';
 function mockQb() {
   const qb: any = {
     leftJoinAndSelect: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
     andWhere: jest.fn().mockReturnThis(),
     orderBy: jest.fn().mockReturnThis(),
     skip: jest.fn().mockReturnThis(),
@@ -76,6 +77,7 @@ describe('CatalogService', () => {
   let productRepo: any;
   let vendorRepo: any;
   let categoryRepo: any;
+  let lineItemRepo: any;
   let qb: any;
 
   beforeEach(async () => {
@@ -101,7 +103,7 @@ describe('CatalogService', () => {
       findOne: jest.fn(),
     };
     // Phase 1.5: new admin/dashboard endpoints query line items + orders.
-    const lineItemRepo = { createQueryBuilder: jest.fn().mockReturnValue(mockQb()) };
+    lineItemRepo = { createQueryBuilder: jest.fn().mockReturnValue(mockQb()) };
     const orderRepo = {};
     const reviewRepo = {
       find: jest.fn().mockResolvedValue([]),
@@ -458,6 +460,41 @@ describe('CatalogService', () => {
         ),
       ).rejects.toThrow('must be linked to a vendor');
     });
+
+    it('rejects create when category does not exist (D4)', async () => {
+      vendorRepo.findOne.mockResolvedValue({ id: 'v-1', name: 'Vendor A' });
+      categoryRepo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.createProduct(
+          { vendorId: 'v-1', name: 'X', price: 1, stockCount: 1, category: 'FakeCategory' },
+          'corr-1',
+          adminUser(),
+        ),
+      ).rejects.toThrow('Category "FakeCategory" not found');
+      expect(productRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('allows create with valid existing category (D4)', async () => {
+      vendorRepo.findOne.mockResolvedValue({ id: 'v-1', name: 'Vendor A' });
+      categoryRepo.findOne.mockResolvedValue({ name: 'Electronics', slug: 'electronics' });
+      productRepo.save.mockImplementation(async (p) => ({ ...p, id: 'c-id' }));
+
+      const result = await service.createProduct(
+        { vendorId: 'v-1', name: 'Gadget', price: 99.99, stockCount: 5, category: 'Electronics', description: 'A gadget', images: ['img.jpg'] },
+        'corr-1',
+        adminUser(),
+      );
+
+      expect(result.name).toBe('Gadget');
+      expect(productRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: 'A gadget',
+          images: ['img.jpg'],
+          price: 99.99,
+        }),
+      );
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -488,6 +525,24 @@ describe('CatalogService', () => {
   // ---------------------------------------------------------------------------
   // getVendorsDirectory()
   // ---------------------------------------------------------------------------
+
+  describe('getVendorFulfillmentCounts (D3 regression)', () => {
+    it('uses .select + .addSelect (no groupBy) and returns all three counts', async () => {
+      const lineQb = mockQb();
+      lineItemRepo.createQueryBuilder.mockReturnValue(lineQb);
+      lineQb.getRawOne.mockResolvedValue({ pending: '2', dead: '1', amb: '3' });
+
+      // The private method is accessed via any cast for regression only.
+      const result = await (service as any).getVendorFulfillmentCounts('v-1');
+      expect(result.pending).toBe(2);
+      expect(result.deadLetter).toBe(1);
+      expect(result.ambiguous).toBe(3);
+      // Verify the query was built with select/addSelect, not chained .select
+      expect(lineQb.select).toHaveBeenCalledTimes(1);
+      expect(lineQb.addSelect).toHaveBeenCalledTimes(2);
+      expect(lineQb.groupBy).not.toHaveBeenCalled();
+    });
+  });
 
   describe('getVendorsDirectory()', () => {
     it('returns vendor directory with product counts', async () => {

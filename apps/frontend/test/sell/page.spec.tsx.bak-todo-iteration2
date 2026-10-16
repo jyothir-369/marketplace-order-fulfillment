@@ -1,0 +1,57 @@
+import React from 'react';
+import { render, screen } from '@testing-library/react';
+import SellPage from '../../app/(storefront)/sell/page';
+
+describe('SellPage', () => {
+  it('renders the informational Become a vendor heading', () => {
+    render(<SellPage />);
+    expect(screen.getByRole('heading', { name: /become a vendor/i })).toBeInTheDocument();
+  });
+
+  it('explains vendor accounts are set up by the marketplace team', () => {
+    render(<SellPage />);
+    expect(screen.getByText(/vendor accounts are set up by the marketplace team/i)).toBeInTheDocument();
+  });
+
+  it('directs interested sellers to contact support', () => {
+    render(<SellPage />);
+    expect(screen.getByText(/please reach out to our support team/i)).toBeInTheDocument();
+  });
+
+  it('renders a Contact support link to /contact-support', () => {
+    render(<SellPage />);
+    const link = screen.getByRole('link', { name: /contact support/i });
+    expect(link).toBeInTheDocument();
+    expect(link).toHaveAttribute('href', '/contact-support');
+  });
+
+  it('does not render a self-service vendor application form', () => {
+    render(<SellPage />);
+    expect(screen.queryByRole('form', { name: /vendor application/i })).not.toBeInTheDocument();
+  });
+
+  it('does not include old business-name or reason fields', () => {
+    render(<SellPage />);
+    expect(screen.queryByLabelText(/business name/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/why become/i)).not.toBeInTheDocument();
+  });
+
+  it('does not render an application submission button', () => {
+    render(<SellPage />);
+    expect(screen.queryByRole('button', { name: /submit/i })).not.toBeInTheDocument();
+  });
+
+  it('does not call submitVendorApplication', () => {
+    const api = require('../../lib/api');
+    const spy = jest.spyOn(api, 'submitVendorApplication').mockResolvedValue({ id: 'v-1' } as any);
+    render(<SellPage />);
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it('shows the informational content regardless of authentication state', () => {
+    render(<SellPage />);
+    expect(screen.getByRole('heading', { name: /become a vendor/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /contact support/i })).toBeInTheDocument();
+  });
+});

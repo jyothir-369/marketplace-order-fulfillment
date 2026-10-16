@@ -29,6 +29,9 @@ export class CheckoutRequestDto {
   @IsOptional()
   @IsIn([PAYMENT_SUCCESS_TOKEN, PAYMENT_DECLINE_TOKEN])
   paymentMethodToken?: string;
+  @IsOptional()
+  @IsString()
+  idempotencyKey?: string;
 }
 
 /** Internal checkout command (after controller verifies JWT identity). */
@@ -50,6 +53,9 @@ export class CheckoutDto {
   @IsOptional()
   @IsIn([PAYMENT_SUCCESS_TOKEN, PAYMENT_DECLINE_TOKEN])
   paymentMethodToken?: string;
+  @IsOptional()
+  @IsString()
+  idempotencyKey?: string;
 }
 
 export class OrderLineItemResponseDto {

@@ -53,3 +53,10 @@ docker-compose*.yml
 *.tmp
 *.temp
 .tmp
+# Generated Turbo cache
+.turbo
+
+# Generated Next.js output and cache
+**/.next
+
+cookies.txt

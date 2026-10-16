@@ -46,6 +46,12 @@ export class AuthUserDto {
   vendorId: string | null;
 }
 
+export class GoogleSignInDto {
+  @IsString()
+  @IsNotEmpty()
+  idToken: string;
+}
+
 export class AuthTokensDto extends AuthUserDto {
   accessToken: string;
   refreshToken: string;
