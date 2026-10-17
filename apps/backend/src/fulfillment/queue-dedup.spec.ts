@@ -6,10 +6,20 @@ import { VendorWorkerRegistryService } from './vendor-worker-registry.service';
 
 jest.mock('bullmq', () => {
   const mockAdd = jest.fn();
+
   return {
     ...jest.requireActual('bullmq'),
+
+    // Keep queue-dedup unit tests isolated from a live Redis server.
     Queue: jest.fn().mockImplementation(() => ({
       add: mockAdd,
+      on: jest.fn().mockReturnThis(),
+      close: jest.fn().mockResolvedValue(undefined),
+    })),
+
+    // VendorQueueService also creates QueueEvents. Mocking Queue alone
+    // leaves a real ioredis connection that fails when Redis is unavailable.
+    QueueEvents: jest.fn().mockImplementation(() => ({
       on: jest.fn().mockReturnThis(),
       close: jest.fn().mockResolvedValue(undefined),
     })),
@@ -18,13 +28,14 @@ jest.mock('bullmq', () => {
 
 describe('Queue dedup (Fix A)', () => {
   let service: VendorQueueService;
+  let testingModule: TestingModule;
   let mockQueueAdd: jest.Mock;
 
   beforeEach(async () => {
     const MockQueue = (require('bullmq') as any).Queue; // eslint-disable-line @typescript-eslint/no-var-requires
     mockQueueAdd = MockQueue.mock.results?.[0]?.value?.add || jest.fn();
     // Re-bind mock for fresh instance tracking isn't needed; we inspect args
-    const mod = await Test.createTestingModule({
+    testingModule = await Test.createTestingModule({
       providers: [
         VendorQueueService,
         { provide: ConfigService, useValue: { get: (k?: string) => (k === 'REDIS_URL' ? undefined : (k === 'REDIS_HOST' ? 'localhost' : (k === 'REDIS_PORT' ? 6379 : (k === 'REDIS_TLS' ? 'false' : undefined)))) } },
@@ -32,9 +43,14 @@ describe('Queue dedup (Fix A)', () => {
         { provide: 'BullQueue_vendor-sync-base', useValue: { add: mockQueueAdd, on: jest.fn().mockReturnThis(), close: jest.fn().mockResolvedValue(undefined) } },
       ],
     }).compile();
-    service = mod.get(VendorQueueService);
+    service = testingModule.get(VendorQueueService);
   });
 
+  afterEach(async () => {
+    if (testingModule) {
+      await testingModule.close();
+    }
+  });
   it('duplicate enqueue with same business jobId binds same BullMQ jobId', async () => {
     const data: VendorQueueJobData = { jobId: 'biz-1', vendorId: 'v1', orderLineItemId: 'i1', correlationId: 'c1' };
     await service.addJobToVendorQueue('v1', data);
