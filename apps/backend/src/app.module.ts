@@ -30,6 +30,7 @@ import { PaymentAuthorization } from './common/entities/payment-authorization.en
 import { WebhookEvent } from './common/entities/webhook-event.entity';
 import { CustomerAddress } from './customer/customer-address.entity';
 import { VendorApplication } from './vendor/vendor-application.entity';
+import { Promotion } from './common/entities/promotion.entity';
 import { AuthModule } from './auth/auth.module';
 import { PaymentsModule } from './payments/payments.module';
 
@@ -53,7 +54,7 @@ import { PaymentsModule } from './payments/payments.module';
           return {
             type: 'postgres',
             url: dbUrl,
-            entities: [Vendor, Category, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken, PaymentAuthorization, Review, WebhookEvent, CustomerAddress, VendorApplication],
+            entities: [Vendor, Category, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken, PaymentAuthorization, Review, WebhookEvent, CustomerAddress, VendorApplication, Promotion],
             // Phase 2.1: migrations own the schema — no more synchronize in any env.
             synchronize: false,
             logging: configService.get('NODE_ENV') === 'development',
@@ -70,7 +71,7 @@ import { PaymentsModule } from './payments/payments.module';
           database: configService.get('DB_DATABASE', 'marketplace'),
           // Fixed a latent drift: the fallback branch was missing Category from
           // entities, so `sync:true` would have silently dropped categories.
-          entities: [Vendor, Category, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken, PaymentAuthorization, Review, WebhookEvent, CustomerAddress, VendorApplication],
+          entities: [Vendor, Category, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken, PaymentAuthorization, Review, WebhookEvent, CustomerAddress, VendorApplication, Promotion],
           synchronize: false,
           logging: configService.get('NODE_ENV') === 'development',
           ssl: false,
