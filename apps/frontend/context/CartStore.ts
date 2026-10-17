@@ -1,4 +1,4 @@
-﻿/**
+/**
  * CartStore — client-side cart state using Zustand with `persist` middleware (§3.1).
  *
  * SSR safety (GAP-F7 / F10):
@@ -11,8 +11,16 @@
  *    be grouped by vendor at checkout time.
  */
 
+import { userCartKey, guestCartKey } from "@/lib/auth-storage-keys";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+
+let activeCartUserId: string | null = null;
+let suppressCartStorageWrites = false;
+
+function currentCartStorageKey(): string {
+  return activeCartUserId ? userCartKey(activeCartUserId) : guestCartKey();
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -117,11 +125,20 @@ export const useCartStore = create<CartState>()(
     }),
     {
       name: "marketplace_cart_store",
-      storage: createJSONStorage(() =>
-        // Guard against SSR environments where `window` is undefined.
-        typeof window !== "undefined" ? window.localStorage : (undefined as never)
-      ),
-      // Drawer UI state should never be persisted; only the cart contents.
+      storage: createJSONStorage(() => ({
+        getItem: (_name: string) =>
+          typeof window !== "undefined" ? window.localStorage.getItem(currentCartStorageKey()) : null,
+        setItem: (_name: string, value: string) => {
+          if (typeof window !== "undefined" && !suppressCartStorageWrites) {
+            window.localStorage.setItem(currentCartStorageKey(), value);
+          }
+        },
+        removeItem: (_name: string) => {
+          if (typeof window !== "undefined" && !suppressCartStorageWrites) {
+            window.localStorage.removeItem(currentCartStorageKey());
+          }
+        },
+      })),
       partialize: (state) => ({ cart: state.cart }),
       onRehydrateStorage: () => (state) => {
         state?.markHydrated();
@@ -129,6 +146,20 @@ export const useCartStore = create<CartState>()(
     }
   )
 );
+
+export function activateCartUser(userId: string | null): void {
+  const nextUserId = userId?.trim() || null;
+  if (nextUserId === activeCartUserId) return;
+
+  suppressCartStorageWrites = true;
+  try {
+    useCartStore.setState({ cart: [], hydrated: false, drawerOpen: false });
+    activeCartUserId = nextUserId;
+    useCartStore.persist.rehydrate();
+  } finally {
+    suppressCartStorageWrites = false;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Selectors
