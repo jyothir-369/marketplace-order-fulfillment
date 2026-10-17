@@ -13,7 +13,9 @@
     "load-test": "ts-node -r tsconfig-paths/register src/database/load-test.ts",
     "migration:run": "ts-node -r tsconfig-paths/register src/database/migrations/migration-runner.ts up",
     "migration:revert": "ts-node -r tsconfig-paths/register src/database/migrations/migration-runner.ts revert",
-    "migration:status": "ts-node -r tsconfig-paths/register src/database/migrations/migration-runner.ts status"
+    "migration:status": "ts-node -r tsconfig-paths/register src/database/migrations/migration-runner.ts status",
+    "migration:production:status": "ts-node -r tsconfig-paths/register src/database/migrations/production-migration-runner.ts status",
+    "migration:production:up": "ts-node -r tsconfig-paths/register src/database/migrations/production-migration-runner.ts up"
   },
   "dependencies": {
     "@nestjs/bullmq": "^10.2.3",
@@ -29,6 +31,7 @@
     "bullmq": "5.45.2",
     "class-transformer": "0.5.1",
     "class-validator": "0.14.1",
+    "google-auth-library": "^11.3.1",
     "ioredis": "5.6.1",
     "nestjs-pino": "^4.0.0",
     "pg": "8.16.0",
