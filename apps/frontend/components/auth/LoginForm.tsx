@@ -12,9 +12,11 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { LogIn, Loader2, Mail, Lock } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { GoogleSignInButton } from "./GoogleSignInButton";
+import { GoogleOAuthProvider } from "@react-oauth/google";
 import { cn } from "@/lib/utils";
 
-export function LoginForm({ redirectTo = "/products" }: { redirectTo?: string }) {
+export function LoginForm({ redirectTo = "/products", portal = "customer" }: { redirectTo?: string; portal?: "customer" | "vendor" }) {
   const { login } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -27,8 +29,9 @@ export function LoginForm({ redirectTo = "/products" }: { redirectTo?: string })
     setError(null);
     setSubmitting(true);
     try {
-      await login({ email, password });
-      router.push(redirectTo);
+      await login({ email, password, portal: portal === "vendor" ? "vendor" : "customer" });
+      const dest = portal === "vendor" ? "/vendor/products" : redirectTo;
+      router.push(dest);
       router.refresh();
     } catch (err) {
       const message =
@@ -127,6 +130,25 @@ export function LoginForm({ redirectTo = "/products" }: { redirectTo?: string })
           Create an account
         </Link>
       </p>
+
+      <div className="pt-2 text-center text-sm text-[var(--color-warm-muted)]">
+        <Link href={portal === "vendor" ? "/login" : "/login?portal=vendor"} className="font-medium text-[var(--color-brass)] hover:underline">
+          {portal === "vendor" ? "Customer Login" : "Vendor Login"}
+        </Link>
+      </div>
+
+      <div className="pt-1 text-center text-xs text-[var(--color-warm-muted)]">
+        <Link href="/forgot-password" className="underline hover:text-[var(--color-ink-navy)]">Forgot password?</Link>
+      </div>
+
+      <div className="relative my-4">
+        <div className="absolute inset-0 flex items-center" aria-hidden="true"><div className="w-full border-t border-[var(--color-warm-border)]"></div></div>
+        <div className="relative flex justify-center"><span className="bg-[var(--color-card)] px-3 text-xs text-[var(--color-warm-muted)]">OR</span></div>
+      </div>
+
+      <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}>
+        <GoogleSignInButton portal={portal} />
+      </GoogleOAuthProvider>
     </form>
   );
 }

@@ -4,7 +4,7 @@ import { GoogleLogin } from "@react-oauth/google";
 import { googleSignIn } from "@/lib/api";
 import { setTokens } from "@/lib/auth-token";
 
-export function GoogleSignInButton() {
+export function GoogleSignInButton({ portal = "customer" }: { portal?: "customer" | "vendor" }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cancelled, setCancelled] = useState(false);
@@ -22,9 +22,10 @@ export function GoogleSignInButton() {
     setLoading(true);
     setError(null);
     try {
-      const response = await googleSignIn({ idToken: credentialResponse.credential });
+      const destParam = portal === "vendor" ? "?portal=vendor" : "";
+      const response = await googleSignIn({ idToken: credentialResponse.credential, portal: portal === "vendor" ? "vendor" : "customer" });
       setTokens(response.accessToken, response.refreshToken);
-      window.location.href = "/";
+      window.location.href = portal === "vendor" ? "/vendor/products" + destParam : "/" + destParam;
     } catch (e) {
       const msg = (e as Error)?.message || "Google sign-in failed";
       setError(msg);
