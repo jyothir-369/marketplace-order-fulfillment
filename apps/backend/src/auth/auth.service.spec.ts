@@ -8,6 +8,7 @@ import * as crypto from 'crypto';
 import { AuthService } from './auth.service';
 import { User, UserRole } from '../common/entities/user.entity';
 import { RefreshToken } from '../common/entities/refresh-token.entity';
+import { PasswordResetToken } from '../common/entities/password-reset-token.entity';
 
 const mockUser: User = {
   id: 'u-1',
@@ -64,8 +65,11 @@ describe('AuthService', () => {
         AuthService,
         { provide: getRepositoryToken(User), useValue: userRepository },
         { provide: getRepositoryToken(RefreshToken), useValue: refreshTokenRepository },
+        { provide: getRepositoryToken(PasswordResetToken), useValue: { findOne: jest.fn(), save: jest.fn(), delete: jest.fn(), update: jest.fn(), createQueryBuilder: jest.fn() } },
         { provide: JwtService, useValue: jwtService },
         { provide: ConfigService, useValue: buildConfigService() },
+        { provide: 'DATA_SOURCE', useValue: { manager: { transaction: async (cb: any) => await cb({ getRepository: () => ({ findOne: jest.fn(), save: jest.fn() }) }) } } },
+        { provide: 'EmailService', useValue: { sendResetLink: jest.fn() } },
       ],
     }).compile();
 
