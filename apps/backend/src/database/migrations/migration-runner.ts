@@ -1,103 +1,45 @@
-import { migrationDataSource } from './datasource';
-import { Baseline1709999999999 } from './1709999999999-Baseline';
-import { AddShippingAddressToOrders1710000000001 } from './1710000000001-AddShippingAddressToOrders';
-import { BackfillShippingAddress1710000000002 } from './1710000000002-BackfillShippingAddress';
-import { AddOrderNumber1710000000003 } from './1710000000003-AddOrderNumber';
-import { AddUsersAndRefreshTokens1710000000004 } from './1710000000004-AddUsersAndRefreshTokens';
-import { CategoriesAndCatalogContract1710000000005 } from './1710000000005-CategoriesAndCatalogContract';
-import { AddMissingForeignKeysAndIndexes1710000000006 } from './1710000000006-AddMissingForeignKeysAndIndexes';
-import { AddProductDescriptionAndImages1710000000007 } from './1710000000007-AddProductDescriptionAndImages';
-import { AddOrderNumberSequence1710000000008 } from './1710000000008-AddOrderNumberSequence';
-import { AddPaymentAuthorizations1710000000009 } from './1710000000009-AddPaymentAuthorizations';
-import { BackfillProductCategory1710000000010 } from './1710000000010-BackfillProductCategory';
-import { FixAuditEntityEnum1710000000011 } from './1710000000011-FixAuditEntityEnum';
-import { AddReviewsTable1715000000000 } from './1715000000000-AddReviewsTable';
-import { AddRazorpayPaymentSupport1716000000000 } from './1716000000000-AddRazorpayPaymentSupport';
-import { AddWebhookEventIdempotency1717000000000 } from './1717000000000-AddWebhookEventIdempotency';
-import { AddFulfillmentOperationRecord1710000000005 } from './1710000000005-AddFulfillmentOperationRecord';
-import { AddVendorApplicationTable1749624000000 } from './1749624000000-AddVendorApplicationTable';
-import { AddPartialUniquePendingApplicantIndex2026101300000 } from './20261013-AddPartialUniquePendingApplicantIndex';
-import { AddVendorUserConstraints2026101300000 } from './20261013-AddVendorUserConstraints';
+const VALID_COMMANDS = ['status', 'up'];
+const ROLLBACK_COMMANDS = ['down', 'revert'];
+const command = process.argv[2] || 'status';
 
-const migrations = [
-  Baseline1709999999999,
-  AddShippingAddressToOrders1710000000001,
-  BackfillShippingAddress1710000000002,
-  AddOrderNumber1710000000003,
-  AddUsersAndRefreshTokens1710000000004,
-  CategoriesAndCatalogContract1710000000005,
-  AddFulfillmentOperationRecord1710000000005,
-  AddMissingForeignKeysAndIndexes1710000000006,
-  AddProductDescriptionAndImages1710000000007,
-  AddOrderNumberSequence1710000000008,
-  AddPaymentAuthorizations1710000000009,
-  BackfillProductCategory1710000000010,
-  FixAuditEntityEnum1710000000011,
-  AddReviewsTable1715000000000,
-  AddRazorpayPaymentSupport1716000000000,
-  AddWebhookEventIdempotency1717000000000,
-  AddVendorApplicationTable1749624000000,
-  AddPartialUniquePendingApplicantIndex2026101300000,
-  AddVendorUserConstraints2026101300000,
-];
-
-async function runMigrations() {
-  console.log('Starting migration runner...');
-  const dbOptions = migrationDataSource.options as any;
-  console.log('Database:', dbOptions.database);
-  console.log('Host:', dbOptions.host);
-
-  try {
-    await migrationDataSource.initialize();
-    console.log('Data source initialized');
-
-    const command = process.argv[2] || 'up';
-
-    if (command === 'up') {
-      console.log('Running pending migrations...');
-      await migrationDataSource.runMigrations();
-      console.log('Migrations completed successfully');
-    } else if (command === 'down') {
-      const downMigrations = [...migrations].reverse();
-      console.log('Reverting last migration...');
-      for (const Migration of downMigrations) {
-        try {
-          await migrationDataSource.undoLastMigration();
-          console.log('Reverted:', Migration.name);
-          break;
-        } catch (error) {
-          console.log('Could not revert', Migration.name, ':', error);
-        }
-      }
-    } else if (command === 'status') {
-      const status = await migrationDataSource.showMigrations();
-      console.log('Migration status:', status);
-    } else if (command === 'revert') {
-      const migrationName = process.argv[3];
-      if (!migrationName) {
-        console.error('Please specify migration name: npm run migration:revert <migration-name>');
-        process.exit(1);
-      }
-      const queryRunner = migrationDataSource.createQueryRunner();
-      await queryRunner.connect();
-      const migration = migrations.find(m => m.name === migrationName);
-      if (migration) {
-        const migrationInstance = new migration();
-        await migrationInstance.down(queryRunner);
-        console.log('Reverted:', migrationName);
-      } else {
-        console.error('Migration not found:', migrationName);
-        process.exit(1);
-      }
-      await queryRunner.release();
-    }
-
-    await migrationDataSource.destroy();
-    process.exit(0);
-  } catch (error) {
-    console.error('Migration failed:', error);
-    process.exit(1);
-  }
+// Keep status as the safe default; allow explicitly requested 'up' after validation.
+// Rollback remains disabled unless separately approved.
+if (command === 'up') {
+  // Explicit up permitted after deployed audit confirms 15 applied + 4 pending.
+  // Guard remains in data-source initialization (assertFailClosedDatabase).
+} else if (command === 'status') {
+  // Safe default — show pending/applied.
+} else if (ROLLBACK_COMMANDS.includes(command)) {
+  console.error('BLOCKED: rollback disabled unless separately approved.');
+  process.exit(2);
+} else if (!VALID_COMMANDS.includes(command)) {
+  console.error(`BLOCKED: unknown command "${command}". Use status or up.`);
+  process.exit(2);
 }
 
-runMigrations();
+async function runMigrations(): Promise<void> {
+  const { migrationDataSource } = await import('./datasource');
+  try {
+    await migrationDataSource.initialize();
+    if (command === 'status') {
+      const pending = await migrationDataSource.showMigrations();
+      console.log('Pending migrations:', pending);
+      return;
+    }
+    if (command === 'up') {
+      // Explicit up permitted after deployed audit confirms 15 applied + 4 pending.
+      // All duplicate timestamp identities preserved (CategoriesAndCatalogContract already applied).
+      await migrationDataSource.runMigrations({ transaction: 'each' });
+      console.log('Migration up completed');
+      return;
+    }
+  } catch (error) {
+    console.error('Migration status/check failed:', error);
+    process.exitCode = 1;
+  } finally {
+    if (migrationDataSource.isInitialized) {
+      await migrationDataSource.destroy();
+    }
+  }
+}
+void runMigrations();

@@ -41,6 +41,7 @@ export class Baseline1709999999999 implements MigrationInterface {
 
     // Ensure pgcrypto (gen_random_uuid) is available; safe idempotent guard.
     await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto"`);
+    await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`);
 
     // ── vendors ──────────────────────────────────────────────────────────
     await queryRunner.query(`
