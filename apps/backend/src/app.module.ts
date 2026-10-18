@@ -7,6 +7,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { CatalogModule } from './catalog/catalog.module';
 import { VendorApplicationModule } from './vendor/vendor-application.module';
+import { VendorSettingsModule } from './vendor/vendor-settings.module';
 import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware';
 import { LoggerModule } from 'nestjs-pino';
 import { InventoryModule } from './inventory/inventory.module';
@@ -117,6 +118,7 @@ import { PaymentsModule } from './payments/payments.module';
     VendorMockModule,
     CatalogModule,
     VendorApplicationModule,
+    VendorSettingsModule,
     InventoryModule,
     OrdersModule,
     FulfillmentModule,
