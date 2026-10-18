@@ -65,7 +65,7 @@ export function StorefrontHeader() {
   return (
     <header
       className={cn(
-        "relative w-full sticky top-0 z-50",
+        "relative w-full z-50",
         "backdrop-blur-md bg-[var(--color-ivory)]/90",
         "border-b border-[var(--color-warm-border)]",
         "shadow-v2 transition-all duration-200"
