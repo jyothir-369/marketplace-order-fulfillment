@@ -44,7 +44,7 @@ export function GoogleSignInButton({ portal = "customer" }: { portal?: "customer
   }
 
   return (
-    <div>
+    <div className="w-full">
       <div className={loading ? "opacity-60 pointer-events-none" : ""}>
         <GoogleLogin
           onSuccess={(credentialResponse: any) => {
@@ -60,10 +60,12 @@ export function GoogleSignInButton({ portal = "customer" }: { portal?: "customer
           size="large"
           text="signin_with"
           shape="rectangular"
+          width="100%"
+          locale="en"
         />
       </div>
-      {loading && <p className="mt-2 text-xs text-stone-500">Signing in...</p>}
-      {cancelled && !error && <p className="mt-2 text-xs text-stone-500">Cancelled — try again.</p>}
+      {loading && <p className="mt-2 text-xs text-[#6B7A90]">Signing in...</p>}
+      {cancelled && !error && <p className="mt-2 text-xs text-[#6B7A90]">Cancelled — try again.</p>}
       {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
     </div>
   );
