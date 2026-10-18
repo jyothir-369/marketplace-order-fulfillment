@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Settings } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { getAccessToken } from "@/lib/auth-token";
 
 export default function VendorSettingsPage() {
   const { user } = useAuth();
@@ -12,12 +13,24 @@ export default function VendorSettingsPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (user?.vendorId) {
-      fetch(`/api/vendor/settings`)
-        .then((r) => r.json())
-        .then((data) => setName(data.name || ""))
-        .catch(() => setError("Failed to load settings"));
+    if (!user?.vendorId) return;
+    const token = getAccessToken();
+    if (!token) {
+      setError("Not authenticated");
+      return;
     }
+    fetch("http://localhost:3001/api/vendor/settings", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((data) => setName(data.name || ""))
+      .catch((e: any) => {
+        console.error("Settings load error:", e);
+        setError("Failed to load settings");
+      });
   }, [user]);
 
   const handleSave = async () => {
@@ -25,15 +38,24 @@ export default function VendorSettingsPage() {
     setSaved(false);
     setError("");
     try {
-      const res = await fetch(`/api/vendor/settings`, {
+      const token = getAccessToken();
+      if (!token) throw new Error("No auth token");
+      const res = await fetch("http://localhost:3001/api/vendor/settings", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ name }),
       });
-      if (!res.ok) throw new Error("Save failed");
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody?.message || `HTTP ${res.status}`);
+      }
       setSaved(true);
-    } catch {
-      setError("Failed to save settings");
+    } catch (e: any) {
+      console.error("Settings save error:", e);
+      setError(e?.message || "Failed to save settings");
     } finally {
       setLoading(false);
     }
@@ -56,7 +78,7 @@ export default function VendorSettingsPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={handleSave}
-            disabled={loading}
+            disabled={loading || !name.trim()}
             className="rounded-lg bg-[var(--color-brass)] text-white px-4 py-2 text-sm font-medium hover:brightness-110 disabled:opacity-50"
           >
             {loading ? "Saving..." : "Save Changes"}
