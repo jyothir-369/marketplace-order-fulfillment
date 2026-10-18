@@ -4,6 +4,7 @@ import { VendorLinkSafeguards2026101200000 } from './20261012-vendor-link-safegu
 import { FixProductVendorIdColumn2026101400000 } from './20261014-FixProductVendorIdColumn';
 import { AddBuyerIdempotencyKeyConstraint2026101500000 } from './20261015-AddBuyerIdempotencyKeyConstraint';
 import { AddOAuthIdentityTable2026101500001 } from './20261015-AddOAuthIdentityTable';
+import { AddPromotionsTable2026101700000 } from './20261017-AddPromotionsTable';
 import { AddPasswordResetTokens2026101600000 } from './20261016-AddPasswordResetTokens';
 import { AddWebhookEventIdempotency1717000000000 } from './1717000000000-AddWebhookEventIdempotency';
 import { DataSource } from 'typeorm';
@@ -84,6 +85,7 @@ export const migrationDataSource = new DataSource({
     AddBuyerIdempotencyKeyConstraint2026101500000,
     AddOAuthIdentityTable2026101500001,
     AddPasswordResetTokens2026101600000,
+    AddPromotionsTable2026101700000,
   ],
   synchronize: false,
   logging: true,

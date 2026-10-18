@@ -1,4 +1,11 @@
-import { MigrationInterface, QueryRunner, Table } from 'typeorm';
+﻿import {
+  MigrationInterface,
+  QueryRunner,
+  Table,
+  TableForeignKey,
+  TableIndex,
+} from 'typeorm';
+
 export class AddPromotionsTable2026101700000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.createTable(
@@ -17,13 +24,26 @@ export class AddPromotionsTable2026101700000 implements MigrationInterface {
           { name: 'updated_at', type: 'timestamp', default: 'CURRENT_TIMESTAMP', isNullable: false },
         ],
         foreignKeys: [
-          { columnNames: ['vendor_id'], referencedTableName: 'vendors', referencedColumnNames: ['id'], onDelete: 'CASCADE' },
+          new TableForeignKey({
+            columnNames: ['vendor_id'],
+            referencedTableName: 'vendors',
+            referencedColumnNames: ['id'],
+            onDelete: 'CASCADE',
+          }),
         ],
       }),
       true,
     );
-    await queryRunner.createIndex('promotions', new (require('typeorm').Index)('idx_promo_vendor', ['vendor_id']));
+
+    await queryRunner.createIndex(
+      'promotions',
+      new TableIndex({
+        name: 'idx_promo_vendor',
+        columnNames: ['vendor_id'],
+      }),
+    );
   }
+
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.dropTable('promotions', true, true);
   }

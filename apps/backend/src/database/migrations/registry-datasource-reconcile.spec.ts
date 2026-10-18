@@ -45,6 +45,6 @@ describe('Migration registry/datasource reconciliation', () => {
   });
 
   it('retains all registered date-based migrations', () => {
-    expect(MIGRATION_REGISTRY.filter(name => /^202610/.test(name))).toHaveLength(8);
+    expect(MIGRATION_REGISTRY.filter(name => /^202610/.test(name))).toHaveLength(9);
   });
 });

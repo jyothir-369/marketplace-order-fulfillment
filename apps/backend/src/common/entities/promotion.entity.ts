@@ -19,7 +19,7 @@ export class Promotion {
 
   @Column({ type: 'uuid', name: 'vendor_id' }) vendorId: string;
 
-  @ManyToOne(() => Vendor, (vendor) => vendor.products)
+  @ManyToOne(() => Vendor, (vendor) => vendor.promotions)
   @JoinColumn({ name: 'vendor_id' })
   vendor: Vendor;
 
