@@ -1,0 +1,3 @@
+﻿Branch: vendor-portal
+Base commit: d917c7db81db21d6dc54fc2f13ed148c4bddd70c
+Checkpoint created: 2026-10-19T14:56:28.3913023+05:30

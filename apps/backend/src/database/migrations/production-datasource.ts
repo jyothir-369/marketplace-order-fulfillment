@@ -1,4 +1,4 @@
-// Production datasource for migration-runner — loads root .env, validates DATABASE_URL / Supabase, requires confirmation.
+﻿// Production datasource for migration-runner â€” loads root .env, validates DATABASE_URL / Supabase, requires confirmation.
 import { DataSource } from 'typeorm';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
@@ -21,15 +21,28 @@ if (process.env.MIGRATION_TEST_DB_HOST || process.env.MIGRATION_TEST_DB_USERNAME
   // Test-only env keys present; do not treat as production target
 }
 
+function parseUrlHostname(url: string): string | null {
+  try {
+    const parsed = new URL(url.trim());
+    return parsed.hostname || null;
+  } catch {
+    return null;
+  }
+}
+
 export function validateProductionTarget(requireWriteConfirmation = false): void {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl || typeof databaseUrl !== 'string' || databaseUrl.trim() === '') {
     throw new Error('BLOCKED: DATABASE_URL is required for production migrations; .env not loaded or missing');
   }
-  const urlLower = databaseUrl.toLowerCase();
-  const isSupabase = urlLower.includes('supabase') || urlLower.includes('pooler');
-  if (!isSupabase) {
-    throw new Error('BLOCKED: DATABASE_URL must target a Supabase database (supabase / pooler)');
+  const hostname = parseUrlHostname(databaseUrl);
+  if (!hostname) {
+    throw new Error('BLOCKED: DATABASE_URL hostname could not be parsed');
+  }
+  // Parsed hostname validation replaces substring checks (supabase / pooler)
+  const isSupabaseHost = hostname.endsWith('.supabase.co') || hostname === 'supabase.co' || /^[a-z0-9-]+\.pooler\.supabase\.com$/.test(hostname);
+  if (!isSupabaseHost) {
+    throw new Error('BLOCKED: DATABASE_URL must target a Supabase database (parsed hostname validation failed)');
   }
   if (requireWriteConfirmation) {
     const confirmEnv = process.env.MIGRATION_CONFIRM_WRITE;
@@ -49,8 +62,14 @@ export function getProductionMigrationDataSource(requireConfirm = true): DataSou
   if (fs.existsSync(rootEnvLocalPath)) {
     dotenv.config({ path: rootEnvLocalPath, override: true });
   }
-  // For production datasource initialization: confirm writes must be set; but status call relies on the runner's authorization split (status never requires confirmation). If called from status path without MIGRATION_CONFIRM_WRITE, validation passes with false by default unless override is forced.
-  // For safe read-only status: the runner passes no confirmation; the datasource function defaults to false to allow initialization. The runner's assertWriteConfirmed handles the up authorization.
+  // Require MIGRATION_CONFIRM_WRITE=yes for any datasource initialization that could write.
+  // Status reads are allowed only when requireConfirm=false (runner responsibility).
+  if (requireConfirm) {
+    const confirmEnv = process.env.MIGRATION_CONFIRM_WRITE;
+    if (!confirmEnv || confirmEnv.trim().toLowerCase() !== 'yes') {
+      throw new Error('BLOCKED: MIGRATION_CONFIRM_WRITE=yes required before datasource initialization');
+    }
+  }
   validateProductionTarget(requireConfirm);
   const url = process.env.DATABASE_URL!;
   return new DataSource({

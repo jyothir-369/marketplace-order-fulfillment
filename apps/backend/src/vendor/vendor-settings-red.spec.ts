@@ -8,9 +8,20 @@ describe('Vendor settings RED', () => {
   let vendorRepo: Repository<Vendor>;
 
   beforeEach(async () => {
+    const fixture = { id: 'v1', name: 'Vendor One', createdAt: new Date(), updatedAt: new Date() };
     const module = await Test.createTestingModule({
       providers: [
-        { provide: getRepositoryToken(Vendor), useValue: { findOne: jest.fn(), save: jest.fn(), update: jest.fn() } },
+        {
+          provide: getRepositoryToken(Vendor),
+          useValue: {
+            findOne: jest.fn(async ({ where }) => where?.id === 'v1' ? fixture : undefined),
+            save: jest.fn(async (entity) => entity),
+            update: jest.fn(async (_criteria, partial) => {
+              Object.assign(fixture, partial);
+              return fixture;
+            }),
+          },
+        },
       ],
     }).compile();
     vendorRepo = module.get(getRepositoryToken(Vendor));

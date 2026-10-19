@@ -1,4 +1,4 @@
-﻿// Fail-closed guard for the dedicated local reconciliation test database only.
+// Fail-closed guard for the dedicated local reconciliation test database only.
 const ALLOWED_HOSTS = new Set(['localhost', '127.0.0.1']);
 const ALLOWED_PORT = 55439;
 const ALLOWED_DATABASE = 'marketplace_migration_test';
@@ -9,6 +9,7 @@ export function assertFailClosedDatabase(config: {
   database?: string;
   url?: string;
 }): void {
+  // Reject DATABASE_URL entirely — only the dedicated local config is allowed
   if (config.url && config.url.trim() !== '') {
     throw new Error('BLOCKED: DATABASE_URL is not allowed by the local migration runner');
   }
@@ -22,7 +23,55 @@ export function assertFailClosedDatabase(config: {
     throw new Error(`BLOCKED: migration database port must be ${ALLOWED_PORT}`);
   }
 
-  if (config.database !== ALLOWED_DATABASE && !(config.database && typeof config.database === 'string' && (config.database === 'test_migrations_01' || config.database.startsWith('test_')))) {
-    throw new Error(`BLOCKED: migration database must be ${ALLOWED_DATABASE} or a designated disposable test database`);
+  if (config.database !== ALLOWED_DATABASE) {
+    throw new Error(`BLOCKED: migration database must be ${ALLOWED_DATABASE}`);
+  }
+
+  // Reject missing credentials
+  if (!config.host || !config.port || !config.database) {
+    throw new Error('BLOCKED: missing required connection parameters');
+  }
+
+  // Reject malformed URLs embedded in host field
+  const malformedUrlPattern = /^\w+:\/\//;
+  if (host && malformedUrlPattern.test(host)) {
+    throw new Error('BLOCKED: host contains malformed URL');
+  }
+
+  // Reject malformed URLs embedded in database field
+  if (config.database && malformedUrlPattern.test(config.database)) {
+    throw new Error('BLOCKED: database contains malformed URL');
+  }
+}
+
+export function assertFailClosedDatabaseFromUrl(url: string): void {
+  if (!url || url.trim() === '') {
+    throw new Error('BLOCKED: MIGRATION_TEST_DATABASE_URL is required explicitly');
+  }
+  try {
+    const parsed = new URL(url.trim());
+
+    if (parsed.search) {
+      throw new Error('BLOCKED: MIGRATION_TEST_DATABASE_URL query parameters are not allowed');
+    }
+    if (parsed.hash) {
+      throw new Error('BLOCKED: MIGRATION_TEST_DATABASE_URL fragments are not allowed');
+    }
+
+    if (parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') {
+      throw new Error('BLOCKED: MIGRATION_TEST_DATABASE_URL must target loopback (localhost/127.0.0.1)');
+    }
+    if (parsed.port !== String(ALLOWED_PORT)) {
+      throw new Error(`BLOCKED: MIGRATION_TEST_DATABASE_URL port must be ${ALLOWED_PORT}`);
+    }
+    const dbFromUrl = parsed.pathname && parsed.pathname.startsWith('/')
+      ? parsed.pathname.slice(1) || undefined
+      : undefined;
+    if (!dbFromUrl || dbFromUrl !== ALLOWED_DATABASE) {
+      throw new Error(`BLOCKED: MIGRATION_TEST_DATABASE_URL database must be ${ALLOWED_DATABASE}`);
+    }
+  } catch (e) {
+    if (e instanceof Error) throw e;
+    throw new Error('BLOCKED: invalid MIGRATION_TEST_DATABASE_URL format');
   }
 }
