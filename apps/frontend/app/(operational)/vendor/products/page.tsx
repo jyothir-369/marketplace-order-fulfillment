@@ -15,6 +15,7 @@ import {
   createProduct,
   updateProduct,
   deleteProduct,
+  updateStock,
 } from "@/lib/api";
 import type { CreateProductDto, ProductDto } from "@/lib/types";
 import { useVendorId } from "@/lib/hooks/use-vendor-id";
@@ -27,6 +28,8 @@ type ProductFormValues = {
   category: string;
   price: string;
   stockCount: string;
+  description: string;
+  images: string;
 };
 
 const EMPTY_FORM: ProductFormValues = {
@@ -34,6 +37,8 @@ const EMPTY_FORM: ProductFormValues = {
   category: "",
   price: "",
   stockCount: "0",
+  description: "",
+  images: "",
 };
 
 function errorMessage(error: unknown): string {
@@ -101,6 +106,8 @@ export default function VendorProductsPage() {
       category: product.category ?? "",
       price: String(product.price),
       stockCount: String(product.stockCount),
+      description: product.description ?? "",
+      images: Array.isArray(product.images) ? product.images.join(", ") : "",
     });
     setFormError(null);
     setEditor({ product });
@@ -120,6 +127,9 @@ export default function VendorProductsPage() {
     const price = Number(form.price);
     const stockCount = Number(form.stockCount);
     const category = form.category.trim();
+    const description = form.description.trim() || undefined;
+    const imagesRaw = form.images.trim();
+    const images = imagesRaw ? imagesRaw.split(",").map((s) => s.trim()).filter(Boolean) : undefined;
 
     if (!name) {
       setFormError("Product name is required.");
@@ -141,14 +151,32 @@ export default function VendorProductsPage() {
 
     try {
       if (editor.product) {
-        await updateProduct(editor.product.id, {
+        const originalStock = String(editor.product.stockCount ?? 0);
+        const stockChanged = String(stockCount) !== originalStock;
+        const payload: Record<string, unknown> = {
           name,
           category: category || undefined,
           price,
-          stockCount,
-        });
-
-        toast("Product updated successfully.", "success");
+          ...(description ? { description } : {}),
+          ...(images ? { images } : {}),
+        };
+        if (stockChanged) {
+          // Stock adjustments go through audited inventory endpoint.
+          // Sequential: metadata first, then audited stock. If metadata fails,
+          // stock never fires (fail-fast). If metadata succeeds but stock fails,
+          // error reported clearly — partial success never silent.
+          await updateProduct(editor.product.id, payload);
+          try {
+            await updateStock(editor.product.id, { stockCount: stockCount });
+          } catch (stockErr: unknown) {
+            toast("Product saved; stock adjustment failed: " + errorMessage(stockErr), "warning");
+            throw new Error("STOCK_ADJUST_FAILED: " + errorMessage(stockErr));
+          }
+          toast("Product updated; stock adjusted through audited endpoint.", "success");
+        } else {
+          await updateProduct(editor.product.id, payload);
+          toast("Product updated successfully.", "success");
+        }
       } else {
         const payload: CreateProductDto = {
           vendorId,
@@ -156,6 +184,8 @@ export default function VendorProductsPage() {
           price,
           stockCount,
           ...(category ? { category } : {}),
+          ...(description ? { description } : {}),
+          ...(images ? { images } : {}),
         };
 
         await createProduct(payload);
@@ -289,7 +319,7 @@ export default function VendorProductsPage() {
 
       {editor && (
         <section
-          className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-card)] p-5 shadow-v2"
+          className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-card)] p-5 shadow-v2 max-w-full overflow-visible"
           aria-labelledby="product-editor-title"
         >
           <div className="mb-5 flex items-start justify-between gap-3">
@@ -320,6 +350,23 @@ export default function VendorProductsPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2">
+                <label htmlFor="product-description" className="mb-1 block text-sm font-semibold">
+                  Description
+                </label>
+                <textarea
+                  id="product-description"
+                  rows={3}
+                  value={form.description}
+                  onChange={(event) =>
+                    setForm((previous) => ({ ...previous, description: event.target.value }))
+                  }
+                  disabled={saving}
+                  placeholder="What makes this product special?"
+                  className="w-full rounded-lg border border-[var(--color-border)] bg-transparent px-3 py-2.5 text-sm"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
                 <label htmlFor="product-name" className="mb-1 block text-sm font-semibold">
                   Product name
                 </label>
@@ -349,6 +396,22 @@ export default function VendorProductsPage() {
                   }
                   disabled={saving}
                   placeholder="e.g. Accessories"
+                  className="w-full rounded-lg border border-[var(--color-border)] bg-transparent px-3 py-2.5 text-sm"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label htmlFor="product-images" className="mb-1 block text-sm font-semibold">
+                  Image URLs (comma-separated)
+                </label>
+                <input
+                  id="product-images"
+                  value={form.images}
+                  onChange={(event) =>
+                    setForm((previous) => ({ ...previous, images: event.target.value }))
+                  }
+                  disabled={saving}
+                  placeholder="https://example.com/img1.jpg, https://example.com/img2.jpg"
                   className="w-full rounded-lg border border-[var(--color-border)] bg-transparent px-3 py-2.5 text-sm"
                 />
               </div>
@@ -398,17 +461,13 @@ export default function VendorProductsPage() {
               </p>
             )}
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 pt-2">
               <button
                 type="submit"
-                disabled={saving}
-                className="rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                disabled={saving || !form.name.trim() || !Number.isFinite(Number(form.price)) || Number(form.price) < 0 || !Number.isInteger(Number(form.stockCount)) || Number(form.stockCount) < 0}
+                className="rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {saving
-                  ? "Saving..."
-                  : editor.product
-                    ? "Save changes"
-                    : "Create product"}
+                {saving ? "Saving..." : editor.product ? "Save changes" : "Create product"}
               </button>
               <button
                 type="button"

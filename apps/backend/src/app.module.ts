@@ -6,6 +6,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bullmq';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { CatalogModule } from './catalog/catalog.module';
+import { VendorApplicationModule } from './vendor/vendor-application.module';
 import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware';
 import { LoggerModule } from 'nestjs-pino';
 import { InventoryModule } from './inventory/inventory.module';
@@ -28,6 +29,7 @@ import { RefreshToken } from './common/entities/refresh-token.entity';
 import { PaymentAuthorization } from './common/entities/payment-authorization.entity';
 import { WebhookEvent } from './common/entities/webhook-event.entity';
 import { CustomerAddress } from './customer/customer-address.entity';
+import { VendorApplication } from './vendor/vendor-application.entity';
 import { AuthModule } from './auth/auth.module';
 import { PaymentsModule } from './payments/payments.module';
 
@@ -44,14 +46,14 @@ import { PaymentsModule } from './payments/payments.module';
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => {
-        const dbUrl = configService.get<string>('DATABASE_URL');
-        const isCloudDb = dbUrl && dbUrl.trim() !== '' && (dbUrl.includes('supabase') || dbUrl.includes('pooler') || dbUrl.includes('sslmode=require') || dbUrl.includes('.co'));
+        const dbUrl = (configService.get<string>('DATABASE_URL') || '').trim();
+        const isCloudDb = dbUrl !== '' && (dbUrl.includes('supabase') || dbUrl.includes('pooler') || dbUrl.includes('sslmode=require') || dbUrl.includes('.co'));
 
         if (dbUrl && dbUrl.trim() !== '' && isCloudDb) {
           return {
             type: 'postgres',
             url: dbUrl,
-            entities: [Vendor, Category, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken, PaymentAuthorization, Review, WebhookEvent, CustomerAddress],
+            entities: [Vendor, Category, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken, PaymentAuthorization, Review, WebhookEvent, CustomerAddress, VendorApplication],
             // Phase 2.1: migrations own the schema — no more synchronize in any env.
             synchronize: false,
             logging: configService.get('NODE_ENV') === 'development',
@@ -68,7 +70,7 @@ import { PaymentsModule } from './payments/payments.module';
           database: configService.get('DB_DATABASE', 'marketplace'),
           // Fixed a latent drift: the fallback branch was missing Category from
           // entities, so `sync:true` would have silently dropped categories.
-          entities: [Vendor, Category, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken, PaymentAuthorization, Review, WebhookEvent, CustomerAddress],
+          entities: [Vendor, Category, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken, PaymentAuthorization, Review, WebhookEvent, CustomerAddress, VendorApplication],
           synchronize: false,
           logging: configService.get('NODE_ENV') === 'development',
           ssl: false,
@@ -113,6 +115,7 @@ import { PaymentsModule } from './payments/payments.module';
     AuditModule,
     VendorMockModule,
     CatalogModule,
+    VendorApplicationModule,
     InventoryModule,
     OrdersModule,
     FulfillmentModule,

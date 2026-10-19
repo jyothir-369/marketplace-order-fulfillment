@@ -1,6 +1,6 @@
-import { Controller, Get, Post, Param, Body, Query, ParseUUIDPipe, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Param, Body, Query, ParseUUIDPipe, UseGuards } from '@nestjs/common';
 import { AdminService } from './admin.service';
-import { AdminResolveDto, AdminDashboardDto, StuckOrdersResponseDto, AdminAuditLogResponseDto } from './dto/admin.dto';
+import { AdminResolveDto, AdminDashboardDto, StuckOrdersResponseDto, AdminAuditLogResponseDto, LinkUserDto, LinkedUserDto } from './dto/admin.dto';
 import { VendorSyncJob } from '../common/entities/vendor-sync-job.entity';
 import { CorrelationId } from '../common/decorators/correlation-id.decorator';
 import { AuditEntityType, AuditAction } from '../common/audit';
@@ -117,5 +117,33 @@ export class AdminController {
         createdAt: log.createdAt,
       })),
     };
+  }
+  @Get('vendors/:vendorId/users')
+  @Roles(UserRole.ADMIN, UserRole.OPERATIONS)
+  async listLinkedUsers(
+    @Param('vendorId', ParseUUIDPipe) vendorId: string,
+    @CorrelationId() correlationId: string,
+  ): Promise<LinkedUserDto[]> {
+    return this.adminService.listLinkedUsers(vendorId, correlationId);
+  }
+
+  @Post('vendors/:vendorId/users')
+  @Roles(UserRole.ADMIN)
+  async linkUser(
+    @Param('vendorId', ParseUUIDPipe) vendorId: string,
+    @Body() dto: LinkUserDto,
+    @CorrelationId() correlationId: string,
+  ): Promise<{ message: string }> {
+    return this.adminService.linkUser(vendorId, dto.email, correlationId);
+  }
+
+  @Delete('vendors/:vendorId/users/:userId')
+  @Roles(UserRole.ADMIN)
+  async unlinkUser(
+    @Param('vendorId', ParseUUIDPipe) vendorId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @CorrelationId() correlationId: string,
+  ): Promise<{ message: string }> {
+    return this.adminService.unlinkUser(vendorId, userId, correlationId);
   }
 }

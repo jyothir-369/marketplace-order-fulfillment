@@ -1,6 +1,7 @@
 import { Controller, Post, Get, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
+import { GoogleSignInDto } from './dto/auth.dto';
 import { AuthGuard } from './auth.guard';
 import { CurrentUser } from './current-user.decorator';
 import { AuthenticatedUser } from './auth.types';
@@ -39,6 +40,14 @@ export class AuthController {
   async logout(@Body() dto: LogoutDto): Promise<{ message: string }> {
     await this.authService.logout(dto.refreshToken);
     return { message: 'Logged out' };
+  }
+
+  /** POST /api/auth/google — Google OAuth sign-in via server-side ID-token validation. */
+  @Post('google')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  async google(@Body() dto: GoogleSignInDto): Promise<AuthTokensDto> {
+    return this.authService.googleSignIn(dto.idToken);
   }
 
   /** GET /api/auth/me — current authenticated user. */

@@ -1,0 +1,7 @@
+.agents
+.claude
+.next
+apps/backend/compiled/
+compiled/
+test/
+tests/

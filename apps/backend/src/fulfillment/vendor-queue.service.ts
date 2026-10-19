@@ -140,6 +140,7 @@ export class VendorQueueService implements OnModuleInit, OnModuleDestroy {
     const queue = await this.getOrCreateVendorQueue(vendorId, options?.concurrency);
 
     const jobOptions = {
+      jobId: 'vendor-sync-' + data.jobId,
       attempts: options?.attempts || 5,
       backoff: {
         type: 'exponential' as const,
@@ -166,6 +167,7 @@ export class VendorQueueService implements OnModuleInit, OnModuleDestroy {
     const queue = await this.getOrCreateVendorQueue(vendorId);
 
     await queue.add('vendor-sync-retry-' + retryCount, data, {
+      jobId: 'vendor-sync-retry-' + retryCount + '-' + data.jobId,
       attempts: Math.max(5 - retryCount, 1),
       backoff: {
         type: 'exponential',

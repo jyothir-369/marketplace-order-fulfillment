@@ -7,10 +7,10 @@ import { FulfillmentService } from './fulfillment.service';
 
 import { FulfillmentModule } from './fulfillment.module';
 jest.mock('bullmq', () => {
-  const MockWorker = jest.fn().mockImplementation((n: string, p: any, opts?: any) => ({
-    on: jest.fn().mockReturnThis(), close: jest.fn().mockResolvedValue(undefined), concurrency: (opts?.concurrency ?? 3),
+  const MockWorker = jest.fn().mockImplementation((n, p, opts) => ({
+    on: jest.fn().mockReturnThis(), close: jest.fn().mockResolvedValue(undefined), concurrency: (opts && opts.concurrency) || 3,
   }));
-  const MockQueue = jest.fn().mockImplementation((n: string, opts?: any) => ({
+  const MockQueue = jest.fn().mockImplementation((n, opts) => ({
     add: jest.fn().mockResolvedValue({ id: 'j1' }),
     on: jest.fn().mockReturnThis(),
     getWaitingCount: jest.fn().mockResolvedValue(2),
@@ -35,7 +35,7 @@ describe('BullMQ regression (unit, mocked Queue/Worker, no external Redis)', () 
       providers: [
         VendorWorkerRegistryService,
         { provide: FulfillmentService, useValue: { processSyncJob: jest.fn() } },
-        { provide: ConfigService, useValue: { get: (key: string, defaultValue?: unknown) => key === 'REDIS_URL' ? undefined : defaultValue ?? (key === 'REDIS_HOST' ? 'test' : key === 'REDIS_PORT' ? 6379 : undefined) } },
+        { provide: ConfigService, useValue: { get: (key, defaultValue) => key === 'REDIS_URL' ? undefined : (defaultValue != null ? defaultValue : (key === 'REDIS_HOST' ? 'test' : key === 'REDIS_PORT' ? 6379 : undefined)) } },
       ],
     }).compile();
     reg = mod.get(VendorWorkerRegistryService);

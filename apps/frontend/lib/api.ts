@@ -51,8 +51,6 @@ if (typeof window !== 'undefined' && !process.env.NEXT_PUBLIC_API_BASE_URL && !p
   console.info('[api] BASE_URL resolved to:', BASE_URL);
 }
 
-export const VENDOR_ID = "11111111-1111-1111-1111-111111111111";
-
 // ---------------------------------------------------------------------------
 // Fetch utility
 // ---------------------------------------------------------------------------
@@ -197,7 +195,7 @@ export async function getVendors(): Promise<VendorResponseDto[]> {
 
 /** GET /api/catalog/vendor/:vendorId */
 export async function getVendorProducts(
-  vendorId: string = VENDOR_ID,
+  vendorId: string,
   includeInactive = false
 ): Promise<ProductDto[]> {
   if (includeInactive) {
@@ -228,7 +226,7 @@ export async function updateStock(
 /** PATCH /api/catalog/:id — update product (name, category, price, stock, active). Uses bearer auth, returns ProductDto. */
 export async function updateProduct(
   id: string,
-  payload: Partial<{ name: string; category: string; price: number; stockCount: number; isActive: boolean }>
+  payload: Partial<{ name: string; category: string; price: number; stockCount: number; isActive: boolean; images?: string[] }>
 ): Promise<ProductDto> {
   return apiFetch<ProductDto>(`/catalog/${id}`, {
     method: "PATCH",
@@ -331,7 +329,7 @@ export async function getOrdersForBuyer(): Promise<OrderResponseDto[]> {
 
 /** GET /api/orders/vendor/:vendorId */
 export async function getVendorOrders(
-  vendorId: string = VENDOR_ID
+  vendorId: string
 ): Promise<OrderResponseDto[]> {
   return apiFetch<OrderResponseDto[]>(`/orders/vendor/${vendorId}`);
 }
@@ -363,7 +361,7 @@ export async function getVendorDeadLetterJobs(): Promise<DeadLetterJobDto[]> {
 
 /** GET /api/catalog/vendor/:vendorId/dashboard */
 export async function getVendorDashboard(
-  vendorId: string = VENDOR_ID
+  vendorId: string,
 ): Promise<VendorDashboardDto> {
   return apiFetch<VendorDashboardDto>(`/catalog/vendor/${vendorId}/dashboard`);
 }
@@ -409,6 +407,21 @@ export async function createVendor(payload: { name: string }): Promise<VendorDet
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+/** GET /api/admin/vendors/:vendorId/users */
+export async function getLinkedUsers(vendorId: string): Promise<Array<{ id: string; email: string; role: string; vendorId: string | null }>> {
+  return apiFetch<Array<{ id: string; email: string; role: string; vendorId: string | null }>>(`/admin/vendors/${vendorId}/users`);
+}
+
+/** POST /api/admin/vendors/:vendorId/users */
+export async function linkVendorUser(vendorId: string, payload: { email: string }): Promise<{ message: string; transitioned: boolean }> {
+  return apiFetch<{ message: string; transitioned: boolean }>(`/admin/vendors/${vendorId}/users`, { method: "POST", body: JSON.stringify(payload) });
+}
+
+/** DELETE /api/admin/vendors/:vendorId/users/:userId */
+export async function unlinkVendorUser(vendorId: string, userId: string): Promise<{ message: string; transitioned: boolean }> {
+  return apiFetch<{ message: string; transitioned: boolean }>(`/admin/vendors/${vendorId}/users/${userId}`, { method: "DELETE" });
 }
 
 /** GET /api/catalog/vendor/:vendorId/detail */
@@ -496,6 +509,40 @@ export async function getCorrelationTrace(
   correlationId: string
 ): Promise<AdminAuditLogResponseDto> {
   return apiFetch<AdminAuditLogResponseDto>(`/admin/trace/${correlationId}`);
+}
+
+/** POST /api/vendor-applications — submit a vendor application (public or with optional auth). */
+export async function submitVendorApplication(payload: { email: string; businessName: string; reason: string }): Promise<{ id: string; email: string; businessName: string; status: string }> {
+  return apiFetch<{ id: string; email: string; businessName: string; status: string }>("/vendor-applications", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+/** GET /api/vendor-applications/me — authenticated applicant's applications. */
+export async function getMyVendorApplications(): Promise<Array<{ id: string; email: string; businessName: string; status: string; createdAt: string }>> {
+  return apiFetch<Array<{ id: string; email: string; businessName: string; status: string; createdAt: string }>>("/vendor-applications/me");
+}
+
+/** GET /api/vendor-applications — admin list pending. */
+export async function getPendingVendorApplications(): Promise<Array<{ id: string; email: string; businessName: string; status: string; createdAt: string }>> {
+  return apiFetch<Array<{ id: string; email: string; businessName: string; status: string; createdAt: string }>>("/vendor-applications");
+}
+
+/** POST /api/vendor-applications/:id/approve */
+export async function approveVendorApplication(id: string, payload: { decision: 'approve' | 'reject' }): Promise<{ id: string; status: string }> {
+  return apiFetch<{ id: string; status: string }>(`/vendor-applications/${id}/approve`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+/** POST /api/vendor-applications/:id/reject */
+export async function rejectVendorApplication(id: string, payload: { decision: 'approve' | 'reject' }): Promise<{ id: string; status: string }> {
+  return apiFetch<{ id: string; status: string }>(`/vendor-applications/${id}/reject`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -590,6 +637,14 @@ export async function validateCoupon(code: string, orderTotal?: number): Promise
     method: "POST",
     body: JSON.stringify({ code, orderTotal }),
   }).catch(() => ({ valid: false, message: "Invalid coupon" }));
+}
+
+/** POST /api/auth/google — Google ID-token validation; returns AuthTokensDto. */
+export async function googleSignIn(payload: { idToken: string }): Promise<AuthTokensDto> {
+  return apiFetch<AuthTokensDto>("/auth/google", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 /** GET /api/auth/me — current authenticated user (requires a valid access token). */

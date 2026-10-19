@@ -1,4 +1,4 @@
-import { IsUUID, IsNumber, Min } from 'class-validator';
+import { IsUUID, IsNumber, Min, IsInt, IsString, MinLength } from 'class-validator';
 
 export class DecrementStockDto {
   @IsUUID()
@@ -16,6 +16,15 @@ export class StockOperationResult {
   newStock: number;
   requestedQuantity: number;
   message?: string;
+}
+
+export class AdjustStockDto {
+  @IsInt()
+  delta: number;
+
+  @IsString()
+  @MinLength(3)
+  reason: string;
 }
 
 export class StockInfoDto {

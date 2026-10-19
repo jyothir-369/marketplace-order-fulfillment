@@ -1,5 +1,5 @@
-/**
- * app/(auth)/login/page.tsx — Sign in (Phase 1).
+﻿/**
+ * app/(auth)/login/page.tsx â€” Sign in (Phase 1).
  *
  * Reads the `redirect` query param (set by useRoleGuard when a gated route
  * was hit unauthenticated) and passes it to the client LoginForm. The value
@@ -11,6 +11,7 @@ import Link from "next/link";
 import { LoginForm } from "@/components/auth/LoginForm";
 
 export const metadata: Metadata = { title: "Sign in" };
+export const dynamic = "force-dynamic";
 
 function safeRedirect(raw: string | undefined): string {
   if (!raw) return "/products";

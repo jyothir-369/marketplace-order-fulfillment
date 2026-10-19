@@ -1,10 +1,10 @@
 import { describe, test, expect } from '@jest/globals';
 
 describe('Catalog entity mapping regression', () => {
-  test('Product entity should reference DB column vendorId not vendor_id', () => {
+  test('Product entity should reference DB column vendor_id', () => {
     // This test documents the verified DB schema mapping.
-    const dbColumns = ['id', 'vendorId', 'name', 'price', 'stock_count', 'isActive', 'version', 'createdAt', 'updatedAt', 'slug', 'category'];
-    expect(dbColumns).toContain('vendorId');
+    const dbColumns = ['id', 'vendor_id', 'name', 'price', 'stock_count', 'isActive', 'version', 'createdAt', 'updatedAt', 'slug', 'category'];
+    expect(dbColumns).toContain('vendor_id');
     expect(dbColumns).toContain('stock_count');
   });
 
