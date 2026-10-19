@@ -1,0 +1,81 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
+import { Queue } from 'bullmq';
+import { VendorQueueService, VendorQueueJobData } from './vendor-queue.service';
+import { VendorWorkerRegistryService } from './vendor-worker-registry.service';
+
+jest.mock('bullmq', () => {
+  const mockAdd = jest.fn();
+  return {
+    ...jest.requireActual('bullmq'),
+    Queue: jest.fn().mockImplementation(() => ({
+      add: mockAdd,
+      on: jest.fn().mockReturnThis(),
+      close: jest.fn().mockResolvedValue(undefined),
+    })),
+  };
+});
+
+describe('Queue dedup (Fix A)', () => {
+  let service: VendorQueueService;
+  let mockQueueAdd: jest.Mock;
+
+  beforeEach(async () => {
+    const MockQueue = (require('bullmq') as any).Queue; // eslint-disable-line @typescript-eslint/no-var-requires
+    mockQueueAdd = MockQueue.mock.results?.[0]?.value?.add || jest.fn();
+    // Re-bind mock for fresh instance tracking isn't needed; we inspect args
+    testingModule = await Test.createTestingModule({
+      providers: [
+        VendorQueueService,
+        { provide: ConfigService, useValue: { get: (k?: string) => (k === 'REDIS_URL' ? undefined : (k === 'REDIS_HOST' ? 'localhost' : (k === 'REDIS_PORT' ? 6379 : (k === 'REDIS_TLS' ? 'false' : undefined)))) } },
+        { provide: VendorWorkerRegistryService, useValue: { getOrCreateWorker: jest.fn() } },
+        { provide: 'BullQueue_vendor-sync-base', useValue: { add: mockQueueAdd, on: jest.fn().mockReturnThis(), close: jest.fn().mockResolvedValue(undefined) } },
+      ],
+    }).compile();
+    service = testingModule.get(VendorQueueService);
+  });
+
+  afterEach(async () => {
+    if (testingModule) {
+      await testingModule.close();
+    }
+  });
+  it('duplicate enqueue with same business jobId binds same BullMQ jobId', async () => {
+    const data: VendorQueueJobData = { jobId: 'biz-1', vendorId: 'v1', orderLineItemId: 'i1', correlationId: 'c1' };
+    await service.addJobToVendorQueue('v1', data);
+    await service.addJobToVendorQueue('v1', data);
+
+    const MockQueue = (require('bullmq') as any).Queue; // eslint-disable-line @typescript-eslint/no-var-requires
+    const instances = MockQueue.mock.instances || MockQueue.mock.results || [];
+    // Direct inspection via last created mock queue's add call
+    const mockAddFn = MockQueue.mock.instances?.[MockQueue.mock.results.length - 1]?.add || MockQueue.mock.results?.slice(-1)[0]?.value?.add;
+    // Instead inspect via the actual queue instance used by service (re-instantiate logic not needed):
+    // Since service creates new Queue instances, the latest mock instance's add is the one called.
+    expect(mockAddFn).toHaveBeenCalledTimes(2);
+    const firstCallOpts = mockAddFn.mock.calls[0][2];
+    const secondCallOpts = mockAddFn.mock.calls[1][2];
+    expect(firstCallOpts.jobId).toBe('vendor-sync-biz-1');
+    expect(secondCallOpts.jobId).toBe('vendor-sync-biz-1');
+    // Same BullMQ jobId => second enqueue prevented by BullMQ; mock records both attempts.
+  });
+
+  it('distinct business operations keep distinct BullMQ jobIds', async () => {
+    const d1: VendorQueueJobData = { jobId: 'biz-a', vendorId: 'v1', orderLineItemId: 'i1', correlationId: 'c1' };
+    const d2: VendorQueueJobData = { jobId: 'biz-b', vendorId: 'v1', orderLineItemId: 'i2', correlationId: 'c2' };
+    await service.addJobToVendorQueue('v1', d1);
+    await service.addJobToVendorQueue('v1', d2);
+    const MockQueue = (require('bullmq') as any).Queue; // eslint-disable-line @typescript-eslint/no-var-requires
+    const mockAddFn = MockQueue.mock.results?.slice(-1)[0]?.value?.add || MockQueue.mock.instances[MockQueue.mock.instances.length - 1]?.add;
+    const lastOpts = mockAddFn.mock.calls[mockAddFn.mock.calls.length - 1][2];
+    expect(lastOpts.jobId).toBe('vendor-sync-biz-b');
+  });
+
+  it('retry uses distinct jobId including retry count', async () => {
+    const data: VendorQueueJobData = { jobId: 'biz-r', vendorId: 'v1', orderLineItemId: 'i1', correlationId: 'c1' };
+    await service.addJobToVendorQueueWithRetry('v1', data, 2);
+    const MockQueue = (require('bullmq') as any).Queue; // eslint-disable-line @typescript-eslint/no-var-requires
+    const mockAddFn = MockQueue.mock.results?.slice(-1)[0]?.value?.add || MockQueue.mock.instances[MockQueue.mock.instances.length - 1]?.add;
+    const opts = mockAddFn.mock.calls[mockAddFn.mock.calls.length - 1][2];
+    expect(opts.jobId).toBe('vendor-sync-retry-2-biz-r');
+  });
+});

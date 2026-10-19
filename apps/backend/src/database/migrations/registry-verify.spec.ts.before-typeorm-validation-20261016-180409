@@ -1,0 +1,34 @@
+﻿import { MIGRATION_REGISTRY } from './registry';
+import * as fs from 'fs';
+import * as path from 'path';
+
+describe('Migration registry integrity', () => {
+  it('contains unique registry entries', () => {
+    expect(new Set(MIGRATION_REGISTRY).size).toBe(MIGRATION_REGISTRY.length);
+  });
+
+  it('has a corresponding migration file for every registry entry', () => {
+    const missing = MIGRATION_REGISTRY.filter(name =>
+      !fs.existsSync(path.join(__dirname, `${name}.ts`)),
+    );
+    expect(missing).toEqual([]);
+  });
+
+  it('does not contain duplicate TypeORM timestamp suffixes', () => {
+    const timestampToNames = new Map<string, string[]>();
+    for (const name of MIGRATION_REGISTRY) {
+      const match = name.match(/(\d+)-[^/]+$/);
+      if (!match) {
+        throw new Error(`Migration has no numeric timestamp prefix: ${name}`);
+      }
+      const timestamp = match[1];
+      timestampToNames.set(timestamp, [...(timestampToNames.get(timestamp) || []), name]);
+    }
+
+    const collisions = [...timestampToNames.entries()]
+      .filter(([, names]) => names.length > 1)
+      .map(([timestamp, names]) => `${timestamp}: ${names.join(', ')}`);
+
+    expect(collisions).toEqual([]);
+  });
+});

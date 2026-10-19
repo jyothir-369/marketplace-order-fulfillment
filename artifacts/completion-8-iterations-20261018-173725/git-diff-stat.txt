@@ -1,0 +1,11 @@
+﻿ apps/backend/src/app.module.ts                     |  2 ++
+ .../src/common/entities/promotion.entity.ts        |  2 +-
+ apps/backend/src/common/entities/vendor.entity.ts  |  4 +++
+ .../migrations/20261017-AddPromotionsTable.ts      | 26 +++++++++++++--
+ apps/backend/src/database/migrations/datasource.ts |  2 ++
+ .../registry-datasource-reconcile.spec.ts          |  2 +-
+ apps/backend/src/database/migrations/registry.ts   |  1 +
+ .../src/vendor/vendor-promotions.controller.ts     | 33 +++++++++++++++----
+ .../src/vendor/vendor-promotions.service.spec.ts   | 37 ++++++++++++++++++++++
+ .../src/vendor/vendor-promotions.service.ts        | 34 +++++++++++++++++---
+ 10 files changed, 126 insertions(+), 17 deletions(-)
