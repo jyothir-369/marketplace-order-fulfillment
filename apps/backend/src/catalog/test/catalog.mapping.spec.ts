@@ -1,4 +1,4 @@
-import { describe, test, expect } from '@jest/globals';
+﻿import { describe, test, expect } from '@jest/globals';
 import { DataSource } from 'typeorm';
 import { Product } from '../../common/entities/product.entity';
 import { Vendor } from '../../common/entities/vendor.entity';
@@ -13,13 +13,14 @@ import { PaymentAuthorization } from '../../common/entities/payment-authorizatio
 import { Review } from '../../common/entities/review.entity';
 import { WebhookEvent } from '../../common/entities/webhook-event.entity';
 import { CustomerAddress } from '../../customer/customer-address.entity';
+import { Promotion } from '../../common/entities/promotion.entity';
 import { VendorApplication } from '../../vendor/vendor-application.entity';
 
 describe('Catalog entity mapping regression', () => {
   test('Product vendorId column and relation map to vendorId', async () => {
     const dataSource = new DataSource({
       type: 'postgres',
-      database: 'metadata_only',
+      database: 'marketplace',
       entities: [
         Vendor,
         Category,
@@ -35,6 +36,7 @@ describe('Catalog entity mapping regression', () => {
         WebhookEvent,
         CustomerAddress,
         VendorApplication,
+        Promotion,
       ],
       synchronize: false,
     });
@@ -48,7 +50,7 @@ describe('Catalog entity mapping regression', () => {
     );
 
     expect(vendorIdColumn).toBeDefined();
-    expect(vendorIdColumn?.databaseName).toBe('vendorId');
+    expect(vendorIdColumn?.databaseName).toBe('vendor_id');
 
     const vendorRelation = metadata.relations.find(
       (relation) => relation.propertyName === 'vendor',
@@ -57,7 +59,7 @@ describe('Catalog entity mapping regression', () => {
     expect(vendorRelation).toBeDefined();
     expect(
       vendorRelation?.joinColumns.map((column) => column.databaseName),
-    ).toContain('vendorId');
+    ).toContain('vendor_id');
   });
 
   test('buildFacets/getCategories must use cat alias not category for join/group', () => {

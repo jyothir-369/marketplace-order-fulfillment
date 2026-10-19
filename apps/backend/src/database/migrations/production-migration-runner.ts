@@ -77,9 +77,10 @@ async function readAppliedNames(ds: DataSource): Promise<string[]> {
 }
 
 async function runProductionRunner(): Promise<void> {
+  // Block rollback commands unconditionally; keep status read-only (no confirmation needed) and up requires confirmation.
   if (rollbackCommands.includes(command)) {
-    console.error('BLOCKED: production rollback is disabled.');
-    process.exitCode = 2;
+    console.error('BLOCKED: rollback disabled unless separately approved.');
+    process.exit(2);
     return;
   }
 
@@ -89,11 +90,21 @@ async function runProductionRunner(): Promise<void> {
     return;
   }
 
+  // For up command: enforce confirmation explicitly before datasource initialization.
+  if (command === 'up') {
+    const confirmEnv = process.env.MIGRATION_CONFIRM_WRITE;
+    if (!confirmEnv || confirmEnv.trim().toLowerCase() !== 'yes') {
+      console.error('BLOCKED: MIGRATION_CONFIRM_WRITE=yes required before any migration write or datasource initialization.');
+      process.exitCode = 2;
+      return;
+    }
+  }
+
   let ds: DataSource | undefined;
 
   try {
-    // The production datasource loads and validates the root .env.
-    // Confirmation is required only for the up command.
+    // Status is read-only and never requires write confirmation; datasource loads with requireConfirm=false.
+    // Up requires both confirmation (checked above) and datasource load with requireConfirm=true.
     ds = getProductionMigrationDataSource(command === 'up');
     await ds.initialize();
 

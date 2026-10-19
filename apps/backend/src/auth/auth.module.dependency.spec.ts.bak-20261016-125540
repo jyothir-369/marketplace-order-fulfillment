@@ -1,0 +1,56 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken, getDataSourceToken } from '@nestjs/typeorm';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { AuthService } from './auth.service';
+import { EmailService } from '../common/email/email.service';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigModule } from '@nestjs/config';
+import { DataSource } from 'typeorm';
+import { AuthModule } from './auth.module';
+import { User } from '../common/entities/user.entity';
+import { RefreshToken } from '../common/entities/refresh-token.entity';
+import { PasswordResetToken } from '../common/entities/password-reset-token.entity';
+
+describe('AuthModule dependency injection regression', () => {
+  it('resolves AuthService, EmailService, and DATA_SOURCE as TypeORM DataSource instance', async () => {
+    const mockRepo = { findOne: jest.fn(), save: jest.fn(), delete: jest.fn(), update: jest.fn(), createQueryBuilder: jest.fn() };
+    const mockDataSource = {
+      manager: { transaction: jest.fn(async (cb: any) => await cb({ getRepository: () => mockRepo })) },
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      imports: [AuthModule, ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true }), TypeOrmModule.forFeature([User, RefreshToken, PasswordResetToken])],
+      providers: [
+        { provide: JwtService, useValue: { signAsync: jest.fn() } },
+        { provide: ConfigService, useValue: { get: () => 'test' } },
+        { provide: 'EmailService', useValue: { sendResetLink: jest.fn() } },
+        { provide: EmailService, useValue: { sendResetLink: jest.fn() } },
+        { provide: DataSource, useValue: mockDataSource },
+      ],
+    })
+      .overrideProvider(ConfigService)
+      .useValue({ get: () => 'test' })
+      .overrideProvider(getRepositoryToken(User))
+      .useValue(mockRepo)
+      .overrideProvider(getRepositoryToken(RefreshToken))
+      .useValue(mockRepo)
+      .overrideProvider(getRepositoryToken(PasswordResetToken))
+      .useValue(mockRepo)
+      .compile();
+
+    const authService = module.get<AuthService>(AuthService);
+    const emailService = module.get<EmailService>('EmailService');
+    const dataSource = module.get<any>('DATA_SOURCE');
+
+    expect(authService).toBeDefined();
+    expect(emailService).toBeDefined();
+    expect(typeof (emailService as any).sendResetLink).toBe('function');
+
+    expect(dataSource).toBeDefined();
+    expect(typeof dataSource.manager?.transaction).toBe('function');
+    expect(typeof dataSource).not.toBe('function');
+    expect(dataSource.constructor?.name).not.toBe('DataSource');
+    expect(dataSource).toBe(mockDataSource);
+  });
+});

@@ -1,14 +1,18 @@
-describe('CartStore isolation RED', () => {
-  it('CartStore real module loaded; name fixed but must become user-scoped', () => {
-    const { useCartStore } = require('../../context/CartStore');
-    expect(useCartStore).toBeTruthy();
+import { describe, it, expect, beforeEach } from '@jest/globals';
+import { activateCartUser, useCartStore } from "@/context/CartStore";
+
+describe('Cart isolation regression — two users + logout + persistence', () => {
+  beforeEach(() => { activateCartUser(null); useCartStore.setState({ cart: [], hydrated: false, drawerOpen: false }); });
+  it('two-account: A sees A; B sees B; never cross-leak', () => {
+    activateCartUser('A'); useCartStore.setState({ cart: [{ productId: 'a', name: 'A', price: 1, quantity: 1, maxStock: 1, vendorId: 'v', vendorName: 'V' }], hydrated: true });
+    activateCartUser('B'); expect(useCartStore.getState().cart.find(i => i.productId === 'a')).toBeUndefined();
   });
-  it('auth-storage-keys exports userCartKey and guestCartKey', () => {
-    const { userCartKey, guestCartKey } = require('../auth-storage-keys');
-    expect(typeof userCartKey).toBe('function');
-    expect(typeof guestCartKey).toBe('function');
+  it('guest isolated; no auto-merge', () => {
+    activateCartUser(null); expect(useCartStore.getState().cart).toEqual([]);
   });
-  it('logout must not show previous user state (structural check)', () => {
-    expect('account_switch_clears_displayed_state').toBeTruthy();
+  it('refresh preserves identity on same user', () => {
+    activateCartUser('U'); useCartStore.getState().addToCart({ productId: 'p', name: 'P', price: 2, quantity: 1, maxStock: 1, vendorId: 'v', vendorName: 'V' });
+    const len = useCartStore.getState().cart.length;
+    activateCartUser('U'); expect(useCartStore.getState().cart.length).toBe(len);
   });
 });

@@ -61,7 +61,7 @@ export const useWishlistStore = create<WishlistState>()(
       clearWishlist: () => set({ items: [] }),
     }),
     {
-      name: "marketplace.wishlist.v1",
+      name: currentWishlistStorageKey(),
       storage: createJSONStorage(() => ({
         getItem: (_name: string) =>
           typeof window !== "undefined" ? window.localStorage.getItem(currentWishlistStorageKey()) : null,

@@ -1,0 +1,10 @@
+﻿326ff1d9 (HEAD -> vendor-portal, origin/vendor-portal) feat(vendor): implement promotions management
+96ff0e65 test(catalog): cover product ownership validation
+0973cd85 test(vendor): cover vendor settings regressions
+2d97fc67 test(frontend): cover login background rendering
+45a7f760 fix(frontend): add marketplace login background assets
+5918bfd8 test(auth): expand Google OAuth regression coverage
+8b45366f fix(storefront): improve marketplace header
+3da5ec10 feat(vendor): implement vendor settings page
+f0b6702a feat(vendor): implement vendor settings endpoints
+d9441423 fix(frontend): improve registration page

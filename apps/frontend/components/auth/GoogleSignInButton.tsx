@@ -61,7 +61,6 @@ export function GoogleSignInButton({ portal = "customer" }: { portal?: "customer
           text="signin_with"
           shape="rectangular"
           width="100%"
-          locale="en"
         />
       </div>
       {loading && <p className="mt-2 text-xs text-[#6B7A90]">Signing in...</p>}

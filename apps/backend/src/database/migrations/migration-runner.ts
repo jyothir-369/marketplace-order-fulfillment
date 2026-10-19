@@ -5,6 +5,10 @@ const command = process.argv[2] || 'status';
 // Keep status as the safe default; allow explicitly requested 'up' after validation.
 // Rollback remains disabled unless separately approved.
 if (command === 'up') {
+  if (process.env.MIGRATION_CONFIRM_WRITE !== 'yes') {
+    console.error('BLOCKED: MIGRATION_CONFIRM_WRITE=yes required before migration write');
+    process.exit(2);
+  }
   // Explicit up permitted after deployed audit confirms 15 applied + 4 pending.
   // Guard remains in data-source initialization (assertFailClosedDatabase).
 } else if (command === 'status') {

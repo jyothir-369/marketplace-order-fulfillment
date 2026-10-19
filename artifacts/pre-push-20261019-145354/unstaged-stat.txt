@@ -1,0 +1,22 @@
+﻿ .../src/auth/account-isolation-live-red.spec.ts    | 31 ++++-----
+ .../backend/src/auth/account-isolation.red.spec.ts | 47 +++----------
+ .../src/catalog/test/catalog.mapping.spec.ts       | 10 +--
+ apps/backend/src/database/migrations/datasource.ts | 61 ++++++++++++-----
+ .../src/database/migrations/migration-runner.ts    |  4 ++
+ .../database/migrations/production-datasource.ts   | 33 ++++++++--
+ .../migrations/production-migration-runner.ts      | 19 ++++--
+ .../migrations/test-integration/harness.ts         | 77 +++++++++++++++++-----
+ .../migration-e2e-verified.spec.ts                 | 26 ++++----
+ .../test-integration/migration-integration.spec.ts |  8 +--
+ .../migrations/test/registry-completeness.spec.ts  |  4 +-
+ .../migrations/test/uuid-driver-config.spec.ts     | 63 ++++++++++++++++--
+ .../src/test/fail-closed-database-guard.spec.ts    | 64 +++++++++++++++++-
+ .../backend/src/test/fail-closed-database-guard.ts | 54 ++++++++++++++-
+ .../src/vendor/vendor-promotions.service.spec.ts   | 36 ++++++++++
+ .../backend/src/vendor/vendor-settings-red.spec.ts | 13 +++-
+ .../components/auth/GoogleSignInButton.tsx         |  1 -
+ apps/frontend/context/CartStore.ts                 |  2 +-
+ apps/frontend/lib/hooks/use-wishlist.ts            |  2 +-
+ .../lib/store/account-isolation-live-red.spec.ts   | 62 ++++++++---------
+ apps/frontend/lib/store/cart-isolation.red.spec.ts | 24 ++++---
+ 21 files changed, 462 insertions(+), 179 deletions(-)
