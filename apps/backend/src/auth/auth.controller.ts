@@ -47,7 +47,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   async google(@Body() dto: GoogleSignInDto): Promise<AuthTokensDto> {
-    return this.authService.googleSignIn(dto.idToken);
+    return this.authService.googleSignIn(dto.idToken, dto.portal);
   }
 
   /** GET /api/auth/me — current authenticated user. */

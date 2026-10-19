@@ -640,7 +640,7 @@ export async function validateCoupon(code: string, orderTotal?: number): Promise
 }
 
 /** POST /api/auth/google — Google ID-token validation; returns AuthTokensDto. */
-export async function googleSignIn(payload: { idToken: string }): Promise<AuthTokensDto> {
+export async function googleSignIn(payload: { idToken: string; portal?: "customer" | "vendor" }): Promise<AuthTokensDto> {
   return apiFetch<AuthTokensDto>("/auth/google", {
     method: "POST",
     body: JSON.stringify(payload),

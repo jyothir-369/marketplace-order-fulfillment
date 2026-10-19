@@ -38,6 +38,8 @@ import {
   logoutAccount,
   refreshAccessToken,
 } from "@/lib/api";
+import { activateCartUser } from "@/context/CartStore";
+import { activateWishlistUser } from "@/lib/hooks/use-wishlist";
 
 export type AuthStatus =
   | "idle" // provider mounted, not yet attempted restore
@@ -73,9 +75,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>("idle");
 
   const refreshSession = useCallback(async (): Promise<boolean> => {
+    // Prevent stale hydration race: clear any previous in-memory user state
+    // before resolving new identity; saved persist data stays intact (keyed by userId).
     const refreshToken = getRefreshToken();
     const accessToken = getAccessToken();
     if (!refreshToken && !accessToken) {
+      activateCartUser(null);
+      activateWishlistUser(null);
       setUser(null);
       setStatus("unauthenticated");
       return false;
@@ -85,6 +91,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (accessToken) {
       try {
         const me = await getMe();
+        activateCartUser(me.id);
+        activateWishlistUser(me.id);
         setUser(me);
         setStatus("authenticated");
         return true;
@@ -98,18 +106,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const tokens = await refreshAccessToken(refreshToken);
         const freshUser = applyTokens(tokens);
+        activateCartUser(freshUser.id);
+        activateWishlistUser(freshUser.id);
         setUser(freshUser);
         setStatus("authenticated");
         return true;
       } catch {
         // Refresh token invalid/revoked — full sign-out.
         clearTokens();
+        activateCartUser(null);
+        activateWishlistUser(null);
         setUser(null);
         setStatus("unauthenticated");
         return false;
       }
     }
 
+    activateCartUser(null);
+    activateWishlistUser(null);
     setUser(null);
     setStatus("unauthenticated");
     return false;
@@ -127,6 +141,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setStatus("loading");
       const tokens = await loginAccount(dto);
       const freshUser = applyTokens(tokens);
+      activateCartUser(freshUser.id);
+      activateWishlistUser(freshUser.id);
       setUser(freshUser);
       setStatus("authenticated");
       return freshUser;
@@ -141,6 +157,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Register provisions the account only; complete a login to get tokens.
       const tokens = await loginAccount({ email: dto.email, password: dto.password });
       const freshUser = applyTokens(tokens);
+      activateCartUser(freshUser.id);
+      activateWishlistUser(freshUser.id);
       setUser(freshUser);
       setStatus("authenticated");
       return freshUser;
@@ -158,8 +176,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
     clearTokens();
+    activateCartUser(null);
+    activateWishlistUser(null);
     setUser(null);
     setStatus("unauthenticated");
+    // Preserve saved user data: cart/wishlist persist via user-scoped keys (auth-storage-keys);
+    // do NOT call useCartStore.getState().clearCart() — that deletes saved data.
   }, []);
 
   const value = useMemo<AuthContextValue>(

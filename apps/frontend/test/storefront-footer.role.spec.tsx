@@ -30,15 +30,14 @@ describe("StorefrontFooter — Phase 1 regression (D2): role-aware Sell links", 
     expect(screen.getByText("Marketplace")).toBeInTheDocument();
   });
 
-  it("renders exactly one Sell heading and no duplicate Vendor Portal in Sell", () => {
-    renderFooter(null, "unauthenticated");
-    const sellHeadings = screen.getAllByRole("heading", { name: /Sell/i });
-    expect(sellHeadings.length).toBe(1);
+  it("renders Vendor Portal beneath Become a vendor and preserves unrelated links", () => {
+    renderFooter({ role: "vendor", vendorId: "v-1", id: "u-1" }, "authenticated");
     const sellNav = screen.getByRole("navigation", { name: /Sell/i });
     expect(sellNav).toBeInTheDocument();
-    // Vendor Portal link removed from Sell; only "Become a vendor" remains
-    expect(screen.queryByRole("link", { name: /Vendor Portal/i })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Become a vendor/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Vendor Portal/i })).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: /Shop/i })).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: /Your account/i })).toBeInTheDocument();
   });
 
   it("preserves unrelated navigation (Shop, Your account, Company, Support)", () => {

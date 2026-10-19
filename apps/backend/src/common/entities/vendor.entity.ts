@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
 import { Product } from './product.entity';
 import { OrderLineItem } from './order-line-item.entity';
+import { Promotion } from './promotion.entity';
 
 @Entity('vendors')
 export class Vendor {
@@ -21,4 +22,7 @@ export class Vendor {
 
   @OneToMany(() => OrderLineItem, (lineItem) => lineItem.vendor)
   orderLineItems: OrderLineItem[];
+
+  @OneToMany(() => Promotion, (promo) => promo.vendor)
+  promotions: Promotion[];
 }

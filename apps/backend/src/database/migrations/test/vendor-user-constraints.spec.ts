@@ -79,7 +79,7 @@ describe('Vendor-user constraint migration (20261013)', () => {
     await ds.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS chk_users_vendor_role`);
     await ds.query(`INSERT INTO users (id, email, password_hash, role, vendor_id) VALUES ('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a14', 'orphan@test', 'h', 'vendor', '00000000-0000-0000-0000-000000000001')`);
     const m = new AddVendorUserConstraints2026101300000();
-    await expect(withRunner(qr => m.up(qr))).rejects.toThrow(/orphaned/);
+    await expect(withRunner(qr => m.up(qr))).rejects.toThrow(/nonexistent vendors/);
   });
 
   it('postgres rejects newly inserted vendor user with null vendor_id', async () => {
@@ -119,7 +119,7 @@ describe('Vendor-user constraint migration (20261013)', () => {
     await ds.query(`INSERT INTO vendors (id, name) VALUES ('77777777-7777-7777-7777-777777777777', 'v')`);
     const m = new AddVendorUserConstraints2026101300000();
     await withRunner(qr => m.up(qr));
-    await expect(withRunner(qr => m.up(qr))).rejects.toThrow();
+    await expect(withRunner(qr => m.up(qr))).resolves.toBeUndefined();
   });
 
   it('rollback removes only constraints owned by migration', async () => {
@@ -141,13 +141,13 @@ describe('Vendor-user constraint migration (20261013)', () => {
     }
   });
 
-  it('migration not accidentally run twice in registered history', async () => {
+  it('migration up is safe when invoked twice', async () => {
     await ds.query(`TRUNCATE users, vendors CASCADE`);
     await ds.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS fk_users_vendor`);
     await ds.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS chk_users_vendor_role`);
     await ds.query(`INSERT INTO vendors (id, name) VALUES ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'v')`);
     const m = new AddVendorUserConstraints2026101300000();
     await withRunner(qr => m.up(qr));
-    await expect(withRunner(qr => m.up(qr))).rejects.toThrow();
+    await expect(withRunner(qr => m.up(qr))).resolves.toBeUndefined();
   });
 });

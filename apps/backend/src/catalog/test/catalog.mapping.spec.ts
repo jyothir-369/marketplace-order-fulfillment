@@ -1,20 +1,78 @@
 import { describe, test, expect } from '@jest/globals';
+import { DataSource } from 'typeorm';
+import { Product } from '../../common/entities/product.entity';
+import { Vendor } from '../../common/entities/vendor.entity';
+import { Category } from '../../common/entities/category.entity';
+import { Order } from '../../common/entities/order.entity';
+import { OrderLineItem } from '../../common/entities/order-line-item.entity';
+import { VendorSyncJob } from '../../common/entities/vendor-sync-job.entity';
+import { AuditLog } from '../../common/audit/audit-log.entity';
+import { User } from '../../common/entities/user.entity';
+import { RefreshToken } from '../../common/entities/refresh-token.entity';
+import { PaymentAuthorization } from '../../common/entities/payment-authorization.entity';
+import { Review } from '../../common/entities/review.entity';
+import { WebhookEvent } from '../../common/entities/webhook-event.entity';
+import { CustomerAddress } from '../../customer/customer-address.entity';
+import { VendorApplication } from '../../vendor/vendor-application.entity';
 
 describe('Catalog entity mapping regression', () => {
-  test('Product entity should reference DB column vendor_id', () => {
-    // This test documents the verified DB schema mapping.
-    const dbColumns = ['id', 'vendor_id', 'name', 'price', 'stock_count', 'isActive', 'version', 'createdAt', 'updatedAt', 'slug', 'category'];
-    expect(dbColumns).toContain('vendor_id');
-    expect(dbColumns).toContain('stock_count');
+  test('Product vendorId column and relation map to vendorId', async () => {
+    const dataSource = new DataSource({
+      type: 'postgres',
+      database: 'metadata_only',
+      entities: [
+        Vendor,
+        Category,
+        Order,
+        Product,
+        OrderLineItem,
+        VendorSyncJob,
+        AuditLog,
+        User,
+        RefreshToken,
+        PaymentAuthorization,
+        Review,
+        WebhookEvent,
+        CustomerAddress,
+        VendorApplication,
+      ],
+      synchronize: false,
+    });
+
+    await (dataSource as any).buildMetadatas();
+
+    const metadata = dataSource.getMetadata(Product);
+
+    const vendorIdColumn = metadata.columns.find(
+      (column) => column.propertyName === 'vendorId',
+    );
+
+    expect(vendorIdColumn).toBeDefined();
+    expect(vendorIdColumn?.databaseName).toBe('vendorId');
+
+    const vendorRelation = metadata.relations.find(
+      (relation) => relation.propertyName === 'vendor',
+    );
+
+    expect(vendorRelation).toBeDefined();
+    expect(
+      vendorRelation?.joinColumns.map((column) => column.databaseName),
+    ).toContain('vendorId');
   });
 
   test('buildFacets/getCategories must use cat alias not category for join/group', () => {
-    // Protect against reverting category slug group reference to undeclared alias.
     expect('cat.slug').not.toBe('category.slug');
   });
 
-  test('DB column mapping matches verified schema', () => {
-    const dbColumns = ['id', 'name', 'slug', 'description', 'created_at', 'updated_at'];
+  test('documents expected product timestamp column names', () => {
+    const dbColumns = [
+      'id',
+      'name',
+      'slug',
+      'description',
+      'created_at',
+      'updated_at',
+    ];
     expect(dbColumns).toContain('created_at');
   });
 });
