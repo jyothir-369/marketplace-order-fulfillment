@@ -11,6 +11,14 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import { userWishlistKey, guestWishlistKey } from "@/lib/auth-storage-keys";
+
+let activeWishlistUserId: string | null = null;
+let suppressWishlistStorageWrites = false;
+
+function currentWishlistStorageKey(): string {
+  return activeWishlistUserId ? userWishlistKey(activeWishlistUserId) : guestWishlistKey();
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -54,12 +62,20 @@ export const useWishlistStore = create<WishlistState>()(
     }),
     {
       name: "marketplace.wishlist.v1",
-      storage: createJSONStorage(() =>
-        // Guard against SSR environments where `window` is undefined.
-        typeof window !== "undefined"
-          ? window.localStorage
-          : (undefined as never)
-      ),
+      storage: createJSONStorage(() => ({
+        getItem: (_name: string) =>
+          typeof window !== "undefined" ? window.localStorage.getItem(currentWishlistStorageKey()) : null,
+        setItem: (_name: string, value: string) => {
+          if (typeof window !== "undefined" && !suppressWishlistStorageWrites) {
+            window.localStorage.setItem(currentWishlistStorageKey(), value);
+          }
+        },
+        removeItem: (_name: string) => {
+          if (typeof window !== "undefined" && !suppressWishlistStorageWrites) {
+            window.localStorage.removeItem(currentWishlistStorageKey());
+          }
+        },
+      })),
       partialize: (state) => ({ items: state.items }),
       onRehydrateStorage: () => (state) => {
         state?.markHydrated();
@@ -67,6 +83,20 @@ export const useWishlistStore = create<WishlistState>()(
     }
   )
 );
+
+export function activateWishlistUser(userId: string | null): void {
+  const nextUserId = userId?.trim() || null;
+  if (nextUserId === activeWishlistUserId) return;
+
+  suppressWishlistStorageWrites = true;
+  try {
+    useWishlistStore.setState({ items: [], hydrated: false });
+    activeWishlistUserId = nextUserId;
+    useWishlistStore.persist.rehydrate();
+  } finally {
+    suppressWishlistStorageWrites = false;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Public API

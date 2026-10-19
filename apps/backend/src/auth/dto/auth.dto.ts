@@ -1,4 +1,4 @@
-import { IsEmail, IsString, MinLength, MaxLength, IsOptional, IsNotEmpty, IsEnum } from 'class-validator';
+import { IsEmail, IsString, MinLength, MaxLength, IsOptional, IsNotEmpty, IsIn } from 'class-validator';
 import { UserRole } from '../../common/entities/user.entity';
 
 export class RegisterDto {
@@ -23,6 +23,10 @@ export class LoginDto {
   @IsString()
   @IsNotEmpty()
   password: string;
+
+  @IsOptional()
+  @IsIn(["customer", "vendor"])
+  portal?: "customer" | "vendor";
 }
 
 export class RefreshTokenDto {
@@ -50,6 +54,10 @@ export class GoogleSignInDto {
   @IsString()
   @IsNotEmpty()
   idToken: string;
+
+  @IsOptional()
+  @IsIn(["customer", "vendor"])
+  portal?: "customer" | "vendor";
 }
 
 export class AuthTokensDto extends AuthUserDto {

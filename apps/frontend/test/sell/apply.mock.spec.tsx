@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import SellPage from '../../app/(storefront)/sell/page';
 import ApplyPage from '../../app/(storefront)/sell/apply/page';
@@ -52,7 +52,9 @@ describe('ApplyPage behavioral', () => {
 
   it('guest enters valid values, submits, API called with normalized values, success shown, no redirect', async () => {
     const user = userEvent.setup();
-    const submitSpy = jest.spyOn(api, 'submitVendorApplication').mockResolvedValue({ id: 'v-1', email: 'a@b.com', businessName: 'B', status: 'pending' } as any);
+    let resolveSubmission: (value: any) => void = () => {};
+const submission = new Promise<any>((resolve) => { resolveSubmission = resolve; });
+const submitSpy = jest.spyOn(api, 'submitVendorApplication').mockReturnValue(submission);
     const pushMock = jest.fn();
     require("next/navigation").useRouter = jest.fn().mockReturnValue({ push: pushMock });
     useAuth.mockReturnValue({ user: null, status: 'unauthenticated', login: () => {}, register: () => {}, logout: () => {}, refreshSession: () => Promise.resolve(false) });
@@ -63,7 +65,11 @@ describe('ApplyPage behavioral', () => {
     await user.click(screen.getByRole('button', { name: /submit/i }));
     await waitFor(() => expect(submitSpy).toHaveBeenCalledTimes(1));
     expect(submitSpy).toHaveBeenCalledWith({ email: 'a@b.com', businessName: 'B', reason: 'To grow' });
-    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+    await act(async () => {
+  resolveSubmission({ id: 'v-1', email: 'a@b.com', businessName: 'B', status: 'pending' } as any);
+  await submission;
+});
+expect(screen.getByRole('alert')).toBeInTheDocument();
     expect(pushMock).not.toHaveBeenCalled();
     submitSpy.mockRestore();
   });
@@ -80,6 +86,7 @@ describe('ApplyPage behavioral', () => {
     await user.type(screen.getByLabelText(/why do you want to sell/i), 'To grow');
     await user.click(screen.getByRole('button', { name: /submit/i }));
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith('/vendor/applications'));
+    await waitFor(() => expect(screen.queryByRole('button', { name: /submitting/i })).not.toBeInTheDocument());
     submitSpy.mockRestore();
   });
 
@@ -92,29 +99,69 @@ describe('ApplyPage behavioral', () => {
     await user.type(screen.getByLabelText(/business name/i), 'B');
     await user.type(screen.getByLabelText(/why do you want to sell/i), 'Reason');
     await user.click(screen.getByRole('button', { name: /submit/i }));
-    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
-    // button should be enabled again after catch
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument(), { timeout: 500 });
     await waitFor(() => expect(screen.getByRole('button', { name: /submit/i })).not.toBeDisabled());
     submitSpy.mockRestore();
   });
 
   it('during unresolved promise submit is disabled and repeated clicks do not call again', async () => {
     const user = userEvent.setup();
-    let resolveSubmit: (v: any) => void = () => {};
-    const submitSpy = jest.spyOn(api, 'submitVendorApplication').mockImplementation(() => new Promise((res) => { resolveSubmit = res; }));
-    useAuth.mockReturnValue({ user: null, status: 'unauthenticated', login: () => {}, register: () => {}, logout: () => {}, refreshSession: () => Promise.resolve(false) });
+
+    let resolveSubmit: (value: any) => void = () => {};
+    let submission: Promise<any> = Promise.resolve(null);
+
+    const submitSpy = jest.spyOn(api, 'submitVendorApplication').mockImplementation(() => {
+      submission = new Promise<any>((resolve) => {
+        resolveSubmit = resolve;
+      });
+      return submission;
+    });
+
+    useAuth.mockReturnValue({
+      user: null,
+      status: 'unauthenticated',
+      login: () => {},
+      register: () => {},
+      logout: () => {},
+      refreshSession: () => Promise.resolve(false),
+    });
+
     render(<ApplyPage />);
+
     await user.type(screen.getByLabelText(/email/i), 'a@b.com');
     await user.type(screen.getByLabelText(/business name/i), 'B');
     await user.type(screen.getByLabelText(/why do you want to sell/i), 'Reason');
+
     await user.click(screen.getByRole('button', { name: /submit/i }));
-    await waitFor(() => expect(screen.getByRole('button', { name: /submitting/i })).toBeInTheDocument());
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /submitting/i })).toBeInTheDocument()
+    );
+
     await user.click(screen.getByRole('button', { name: /submitting/i }));
     expect(submitSpy).toHaveBeenCalledTimes(1);
-    resolveSubmit({ id: 'v-2', email: 'a@b.com', businessName: 'B', status: 'pending' });
+
+    await act(async () => {
+      resolveSubmit({
+        id: 'v-2',
+        email: 'a@b.com',
+        businessName: 'B',
+        status: 'pending',
+      });
+      await submission;
+    });
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toBeInTheDocument()
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /submit/i })).not.toBeDisabled()
+    );
+
+    expect(submitSpy).toHaveBeenCalledTimes(1);
     submitSpy.mockRestore();
   });
-
   it('invalid fields show validation errors and API is not called', async () => {
     const user = userEvent.setup();
     const submitSpy = jest.spyOn(api, 'submitVendorApplication').mockResolvedValue({ id: 'v-1' } as any);

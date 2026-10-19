@@ -441,6 +441,7 @@ export interface RegisterDto {
 export interface LoginDto {
   email: string;
   password: string;
+  portal?: "customer" | "vendor";
 }
 
 export interface DashboardOverviewData {

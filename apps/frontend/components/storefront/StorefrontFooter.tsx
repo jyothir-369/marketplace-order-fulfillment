@@ -37,6 +37,7 @@ const FOOTER_NAV: ReadonlyArray<{
     heading: "Sell",
     links: [
       { href: "/sell", label: "Become a vendor" },
+      { href: "/vendor/dashboard", label: "Vendor Portal" },
     ],
   },
   {

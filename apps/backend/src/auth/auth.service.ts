@@ -1,18 +1,20 @@
-import {
-  Injectable,
+﻿import { InternalServerErrorException, Injectable,
   UnauthorizedException,
   ConflictException,
   NotFoundException,
-  Logger,
-} from '@nestjs/common';
+  ForbiddenException,
+  Logger, } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { JwtService } from '@nestjs/jwt';
-import { Repository, LessThan } from 'typeorm';
+import { Repository, LessThan, DataSource } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { User, UserRole } from '../common/entities/user.entity';
 import { RefreshToken } from '../common/entities/refresh-token.entity';
+import { PasswordResetToken } from '../common/entities/password-reset-token.entity';
+import { EmailService } from '../common/email/email.service';
+import { Inject } from '@nestjs/common';
 import { OAuth2Client } from 'google-auth-library';
 import { AuthJwtPayload, AuthenticatedUser } from './auth.types';
 import { RegisterDto, LoginDto, AuthUserDto, AuthTokensDto, RefreshTokenDto } from './dto/auth.dto';
@@ -28,8 +30,14 @@ export class AuthService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(RefreshToken)
     private readonly refreshTokenRepository: Repository<RefreshToken>,
+    @InjectRepository(PasswordResetToken)
+    private readonly passwordResetTokenRepository: Repository<PasswordResetToken>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    @Inject('DATA_SOURCE')
+    private readonly dataSource: DataSource,
+    @Inject('EmailService')
+    private readonly emailService: EmailService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -39,7 +47,7 @@ export class AuthService {
   /**
    * Public registration always creates a BUYER. Higher roles (VENDOR/ADMIN/
    * OPERATIONS) are provisioned by the seed script or (later) an admin
-   * endpoint — a public endpoint that accepted a `role` would be a privilege
+   * endpoint â€” a public endpoint that accepted a `role` would be a privilege
    * escalation.
    */
   async register(dto: RegisterDto): Promise<AuthUserDto> {
@@ -69,6 +77,11 @@ export class AuthService {
     const passwordMatches = await bcrypt.compare(dto.password, user.passwordHash);
     if (!passwordMatches) {
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Backend authorization: never trust client roles or redirects.
+    if (dto.portal === 'vendor' && user.role !== UserRole.VENDOR && user.vendorId == null) {
+      throw new ForbiddenException('Vendor access required');
     }
 
     const accessToken = await this.signAccessToken(user);
@@ -131,7 +144,7 @@ export class AuthService {
     };
   }
 
-  /** Idempotent — safe to call with an already-revoked or unknown token. */
+  /** Idempotent â€” safe to call with an already-revoked or unknown token. */
   async logout(refreshToken: string): Promise<void> {
     const tokenHash = this.hashToken(refreshToken);
     await this.refreshTokenRepository
@@ -214,35 +227,67 @@ export class AuthService {
     return value * seconds;
   }
 
-  private async verifyGoogleIdToken(idToken: string): Promise<{ sub: string; email: string; emailVerified: boolean; name?: string; picture?: string }> {
-    const client = new OAuth2Client({
-      clientId: this.configService.get<string>('GOOGLE_CLIENT_ID') || '',
-    });
-    const ticket = await client.verifyIdToken({
-      idToken,
-      audience: [
-        this.configService.get<string>('GOOGLE_CLIENT_ID') || '',
-      ],
-    });
+  private async verifyGoogleIdToken(
+    idToken: string,
+  ): Promise<{
+    sub: string;
+    email: string;
+    emailVerified: boolean;
+    name?: string;
+    picture?: string;
+  }> {
+    const clientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
+
+    if (!clientId?.trim()) {
+      throw new InternalServerErrorException(
+        'Google sign-in is not configured',
+      );
+    }
+
+    if (!idToken?.trim()) {
+      throw new UnauthorizedException('Invalid Google ID token');
+    }
+
+    const client = new OAuth2Client({ clientId });
+
+    let ticket;
+
+    try {
+      ticket = await client.verifyIdToken({
+        idToken,
+        audience: clientId,
+      });
+    } catch {
+      // Never expose raw provider errors to the client.
+      throw new UnauthorizedException('Invalid Google ID token');
+    }
+
     const payload = ticket.getPayload();
-    if (!payload) throw new UnauthorizedException('Invalid Google ID token');
-    if (!payload.email_verified) throw new UnauthorizedException('Google account email not verified');
+
+    if (!payload?.sub || !payload.email) {
+      throw new UnauthorizedException('Invalid Google ID token');
+    }
+
+    if (payload.email_verified !== true) {
+      throw new UnauthorizedException('Google account email not verified');
+    }
+
     return {
-      sub: payload.sub || '',
-      email: payload.email || '',
-      emailVerified: payload.email_verified || false,
+      sub: payload.sub,
+      email: payload.email,
+      emailVerified: true,
       name: payload.name,
       picture: payload.picture,
     };
   }
 
-  async googleSignIn(idToken: string): Promise<AuthTokensDto> {
+  async googleSignIn(idToken: string, portal?: "customer" | "vendor"): Promise<AuthTokensDto> {
     const verified = await this.verifyGoogleIdToken(idToken);
     if (!verified.emailVerified) throw new UnauthorizedException('Email not verified');
     const email = verified.email.toLowerCase();
     let user = await this.userRepository.findOne({ where: { email } });
     if (user) {
-      // Existing user: prevent privilege escalation — role must stay BUYER.
+      // Existing user: prevent privilege escalation â€” role must stay BUYER.
       if (user.role !== UserRole.BUYER) {
         // Keep existing role but log; no escalation allowed from OAuth.
       }
@@ -250,7 +295,7 @@ export class AuthService {
       user = this.userRepository.create({
         email,
         passwordHash: '', // OAuth user: no local password
-        role: UserRole.BUYER,
+        role: portal === 'vendor' ? UserRole.VENDOR : UserRole.BUYER,
         displayName: verified.name || null,
         vendorId: null,
       });
@@ -277,16 +322,45 @@ export class AuthService {
   }
 
   // ------------------------------------------------------------------
-  // Forgot / Reset Password (Phase — secure, single-use, expiring)
+  // Forgot / Reset Password (Phase â€” secure, single-use, expiring)
   // ------------------------------------------------------------------
   async requestReset(email: string): Promise<void> {
     const user = await this.userRepository.findOne({ where: { email: email.toLowerCase() } });
     if (!user) return;
+    const tokenRaw = crypto.randomBytes(48).toString('base64url');
+    const tokenHash = crypto.createHash('sha256').update(tokenRaw).digest('hex');
+    const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    await this.passwordResetTokenRepository.save(
+      this.passwordResetTokenRepository.create({
+        userId: user.id,
+        tokenHash,
+        expiresAt: expires,
+      }),
+    );
+    await this.emailService.sendResetLink(user.email, tokenHash);
     this.logger.log('Reset requested (generic): ' + email.toLowerCase(), AuthService.name);
   }
 
   async resetPassword(token: string, newPassword: string): Promise<{ success: boolean }> {
-    return { success: true };
+    return this.dataSource.manager.transaction(async (manager) => {
+      const repo = manager.getRepository(PasswordResetToken);
+      const userRepo = manager.getRepository(User);
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+      const resetToken = await repo.findOne({ where: { tokenHash, usedAt: null } });
+      if (!resetToken) throw new UnauthorizedException('Invalid or used reset token');
+      if (new Date(resetToken.expiresAt) < new Date()) {
+        await repo.delete({ tokenHash });
+        throw new UnauthorizedException('Reset token has expired');
+      }
+      const user = await userRepo.findOne({ where: { id: resetToken.userId } });
+      if (!user) throw new UnauthorizedException('User not found');
+      user.passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+      await userRepo.save(user);
+      resetToken.usedAt = new Date();
+      await repo.save(resetToken);
+      await this.revokeSessionsAfterReset(user.id);
+      return { success: true };
+    });
   }
 
   async revokeSessionsAfterReset(userId: string): Promise<number> {

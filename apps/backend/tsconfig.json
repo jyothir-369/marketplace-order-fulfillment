@@ -1,34 +1,59 @@
-{
-  "compilerOptions": {
-    "module": "commonjs",
-    "declaration": true,
-    "removeComments": true,
-    "emitDecoratorMetadata": true,
-    "experimentalDecorators": true,
-    "allowSyntheticDefaultImports": true,
-    "target": "ES2021",
-    "sourceMap": true,
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "incremental": true,
-    "skipLibCheck": true,
-    "strict": false,
-    "noImplicitAny": false,
-    "strictNullChecks": false,
-    "strictBindCallApply": false,
-    "forceConsistentCasingInFileNames": true,
-    "noFallthroughCasesInSwitch": true,
-    "esModuleInterop": true,
-    "resolveJsonModule": true,
-    "baseUrl": "./",
-    "paths": {
-      "@/*": ["./src/*"],
-      "typeorm": ["../../node_modules/typeorm"],
-      "typeorm/*": ["../../node_modules/typeorm/*"],
-      "uuid": ["../../node_modules/uuid"],
-      "uuid/*": ["../../node_modules/uuid/*"]
-    }
-  },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "test", "**/*.spec.ts"]
+﻿{
+    "compilerOptions":  {
+                            "module":  "commonjs",
+                            "declaration":  true,
+                            "removeComments":  true,
+                            "emitDecoratorMetadata":  true,
+                            "experimentalDecorators":  true,
+                            "allowSyntheticDefaultImports":  true,
+                            "target":  "ES2021",
+                            "sourceMap":  true,
+                            "outDir":  "./dist",
+                            "rootDir":  "./src",
+                            "incremental":  true,
+                            "skipLibCheck":  true,
+                            "strict":  false,
+                            "noImplicitAny":  false,
+                            "strictNullChecks":  false,
+                            "strictBindCallApply":  false,
+                            "forceConsistentCasingInFileNames":  true,
+                            "noFallthroughCasesInSwitch":  true,
+                            "esModuleInterop":  true,
+                            "resolveJsonModule":  true,
+                            "baseUrl":  "./",
+                            "paths":  {
+                                          "@/*":  [
+                                                      "./src/*"
+                                                  ],
+                                          "typeorm":  [
+                                                          "../../node_modules/typeorm"
+                                                      ],
+                                          "typeorm/*":  [
+                                                            "../../node_modules/typeorm/*"
+                                                        ],
+                                          "uuid":  [
+                                                       "../../node_modules/uuid"
+                                                   ],
+                                          "uuid/*":  [
+                                                         "../../node_modules/uuid/*"
+                                                     ]
+                                      }
+                        },
+    "include":  [
+                    "src/**/*"
+                ],
+    "exclude":  [
+                    "node_modules",
+                    "dist",
+                    "test",
+                    "**/*.spec.ts",
+                    "**/*.bak*",
+                    "migration-*-backup-*",
+                    "migration-blocker1-backup-*",
+                    "migration-fix-backup-*",
+                    "migration-audit-backup-*",
+                    "src/**/collision-fix-backup-*/**/*",
+                    "src/**/migration-*-backup-*/**/*",
+                    "src/**/migration-blocker*-backup-*/**/*"
+                ]
 }

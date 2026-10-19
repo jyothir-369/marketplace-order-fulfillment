@@ -1,6 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class VendorLinkSafeguards20261012 implements MigrationInterface {
+export class VendorLinkSafeguards2026101200000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Pre-check: must return 0 rows; if not, abort manually
     const bad = await queryRunner.query(
