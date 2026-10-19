@@ -124,7 +124,7 @@ export const useCartStore = create<CartState>()(
       toggleDrawer: () => set((state) => ({ drawerOpen: !state.drawerOpen })),
     }),
     {
-      name: "marketplace_cart_store",
+      name: currentCartStorageKey(),
       storage: createJSONStorage(() => ({
         getItem: (_name: string) =>
           typeof window !== "undefined" ? window.localStorage.getItem(currentCartStorageKey()) : null,

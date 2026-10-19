@@ -1,0 +1,57 @@
+﻿ M apps/backend/src/auth/account-isolation-live-red.spec.ts
+ M apps/backend/src/auth/account-isolation.red.spec.ts
+ M apps/backend/src/catalog/test/catalog.mapping.spec.ts
+ M apps/backend/src/database/migrations/datasource.ts
+ M apps/backend/src/database/migrations/migration-runner.ts
+ M apps/backend/src/database/migrations/production-datasource.ts
+ M apps/backend/src/database/migrations/production-migration-runner.ts
+ M apps/backend/src/database/migrations/test-integration/harness.ts
+ M apps/backend/src/database/migrations/test-integration/migration-e2e-verified.spec.ts
+ M apps/backend/src/database/migrations/test-integration/migration-integration.spec.ts
+ M apps/backend/src/database/migrations/test/registry-completeness.spec.ts
+ M apps/backend/src/database/migrations/test/uuid-driver-config.spec.ts
+ M apps/backend/src/test/fail-closed-database-guard.spec.ts
+ M apps/backend/src/test/fail-closed-database-guard.ts
+ M apps/backend/src/vendor/vendor-promotions.service.spec.ts
+ M apps/backend/src/vendor/vendor-settings-red.spec.ts
+ M apps/frontend/components/auth/GoogleSignInButton.tsx
+ M apps/frontend/context/CartStore.ts
+ M apps/frontend/lib/hooks/use-wishlist.ts
+ M apps/frontend/lib/store/account-isolation-live-red.spec.ts
+ M apps/frontend/lib/store/cart-isolation.red.spec.ts
+?? apps/backend/artifacts/
+?? apps/backend/src/auth/storage-isolation-e2e.spec.ts
+?? apps/backend/src/catalog/test/catalog.mapping.spec.ts.bak-20261019-104249
+?? apps/backend/src/catalog/test/catalog.mapping.spec.ts.bak-metadata-fix-20261019-124747
+?? apps/backend/src/database/migrations/datasource.ts.backup-20261019-141605-735
+?? apps/backend/src/database/migrations/datasource.ts.backup-before-pathname-fix-20261019-143211
+?? apps/backend/src/database/migrations/datasource.ts.backup-before-regex-fix-20261019-143122
+?? apps/backend/src/database/migrations/datasource.ts.before-credential-consistency-20261019-143819
+?? apps/backend/src/database/migrations/datasource.ts.before-credential-consistency-20261019-145000
+?? apps/backend/src/database/migrations/datasource.ts.before-credential-fix-20261019-143610
+?? apps/backend/src/database/migrations/offline-discovery.spec.ts
+?? apps/backend/src/database/migrations/production-datasource.ts.guardrail-backup-20261019-125935
+?? apps/backend/src/database/migrations/test-integration/harness.spec.ts
+?? apps/backend/src/database/migrations/test/datasource-url-guard.spec.ts
+?? apps/backend/src/database/migrations/test/migration-authorization-regression.spec.ts
+?? apps/backend/src/database/migrations/test/uuid-driver-config.spec.ts.backup-before-isolation-20261019-143726
+?? apps/backend/src/database/sqlite-test-datasource.ts
+?? apps/backend/src/test/fail-closed-database-guard.ts.backup-before-query-fragment-fix-20261019-143451
+?? apps/backend/src/test/fail-closed-datasource-regression.spec.ts
+?? apps/backend/src/test/fail-closed-datasource-regression.spec.ts.backup-before-isolation-20261019-143322
+?? apps/backend/src/test/fail-closed-datasource-regression.spec.ts.before-credential-consistency-20261019-143819
+?? apps/backend/src/test/fail-closed-datasource-regression.spec.ts.before-credential-consistency-20261019-145000
+?? apps/backend/src/test/fail-closed-datasource-regression.spec.ts.before-credential-fix-20261019-143610
+?? apps/frontend/components/auth/GoogleSignInButton.tsx.bak-20261019-104249
+?? artifacts/backup-20261019-130521/
+?? artifacts/guardrail-hardening-20261019-125134/
+?? artifacts/migration-integrity-audit-20261019-103039/
+?? artifacts/migration-integrity-audit-20261019-103113/
+?? artifacts/migration-url-guard-20261019-092025/
+?? artifacts/pre-push-20261019-145354/
+?? artifacts/pre-push-20261019-145627/
+?? backups-preserve-20261019131323/
+?? backups/datasource-20261019-130517.ts
+?? backups/local-db-20261018-181537/
+?? backups/registry-20261019-130517.ts
+?? fix_node.js

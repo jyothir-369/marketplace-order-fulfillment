@@ -1,30 +1,73 @@
 /**
- * Migration integration-test harness.
- * Canonical source: MIGRATION_REGISTRY (25 classes).
- * Requires MIGRATION_TEST_DATABASE_URL explicitly; validates loopback 55439.
- * Never falls back to .env / DATABASE_URL. Never invokes production runner.
+ * Fail-closed migration integration-test URL validation.
+ * Never falls back to DATABASE_URL or .env.
  */
-
-import { DataSource } from 'typeorm';
 import { MIGRATION_REGISTRY } from '../registry';
 
-function requireTestUrl(): string {
-  const url = process.env.MIGRATION_TEST_DATABASE_URL;
-  if (!url || url.trim() === '') {
+const ALLOWED_HOSTS = new Set(['localhost', '127.0.0.1']);
+const ALLOWED_PORT = '55439';
+const ALLOWED_DATABASE = '/marketplace_migration_test';
+
+export function requireTestUrl(): string {
+  const raw = process.env.MIGRATION_TEST_DATABASE_URL;
+
+  if (!raw || raw.trim() === '') {
     throw new Error('BLOCKED: MIGRATION_TEST_DATABASE_URL is required explicitly');
   }
-  const parsed = new URL(url);
-  if (parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') {
-    throw new Error('BLOCKED: MIGRATION_TEST_DATABASE_URL must target loopback (localhost/127.0.0.1)');
+
+  if (raw !== raw.trim()) {
+    throw new Error('BLOCKED: URL must not contain surrounding whitespace');
   }
-  if (parsed.port !== '55439') {
-    throw new Error(`BLOCKED: MIGRATION_TEST_DATABASE_URL port must be 55439 (got ${parsed.port || 'default'})`);
+
+  let parsed: URL;
+
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error('BLOCKED: MIGRATION_TEST_DATABASE_URL is not a valid URL');
   }
-  return url.trim();
+
+  if (parsed.protocol !== 'postgres:' && parsed.protocol !== 'postgresql:') {
+    throw new Error('BLOCKED: URL must use postgres: or postgresql:');
+  }
+
+  if (!ALLOWED_HOSTS.has(parsed.hostname.toLowerCase())) {
+    throw new Error('BLOCKED: URL must target localhost or 127.0.0.1');
+  }
+
+  if (parsed.port !== ALLOWED_PORT) {
+    throw new Error('BLOCKED: URL must use host-mapped port 55439');
+  }
+
+  if (parsed.pathname !== ALLOWED_DATABASE) {
+    throw new Error('BLOCKED: URL must target marketplace_migration_test');
+  }
+
+  if (parsed.search !== '' || parsed.hash !== '') {
+    throw new Error('BLOCKED: URL query parameters and fragments are prohibited');
+  }
+
+  if (!parsed.username || !parsed.password) {
+    throw new Error('BLOCKED: URL must include explicit database credentials');
+  }
+
+  return raw;
 }
 
-function getCanonicalClasses(): string[] {
+export function getCanonicalClasses(): string[] {
   return [...MIGRATION_REGISTRY];
 }
 
-export { requireTestUrl, getCanonicalClasses };
+/**
+ * Validate the designated test URL before constructing or initializing
+ * a database connection. The factory is injectable so tests can prove
+ * invalid configuration never reaches the connection boundary.
+ */
+export async function initializeTestDataSource<
+  T extends { initialize: () => Promise<unknown> }
+>(createDataSource: (url: string) => T): Promise<T> {
+  const url = requireTestUrl();
+  const dataSource = createDataSource(url);
+  await dataSource.initialize();
+  return dataSource;
+}

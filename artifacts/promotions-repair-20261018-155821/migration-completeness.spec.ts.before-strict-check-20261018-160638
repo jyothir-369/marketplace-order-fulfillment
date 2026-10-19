@@ -1,0 +1,56 @@
+import * as fs from 'fs';
+import * as path from 'path';
+import { MIGRATION_REGISTRY } from './registry';
+import { loadCanonicalMigrationClasses } from './canonical-migrations';
+
+describe('migration completeness', () => {
+  const dir = __dirname;
+
+  it('every timestamp-prefixed migration file in dir is registered or excluded', () => {
+    const files = fs.readdirSync(dir).filter((f) => {
+      if (!f.endsWith('.ts')) return false;
+      if (f.includes('.spec.') || f.includes('.test.') || f.includes('.bak') || f.includes('.backup') || f.includes('.orig')) return false;
+      if (f === 'datasource.ts' || f === 'registry.ts' || f === 'canonical-migrations.ts' || f === 'production-migration-runner.ts') return false;
+      // timestamp-prefixed migration files contain digits up front
+      return /^\d+/.test(f);
+    });
+    for (const f of files) {
+      const entry = f.replace(/\.ts$/, '');
+      // Allow if registered by exact entry or file basename mapped
+      const registered = MIGRATION_REGISTRY.some((r) => r === entry || r.includes(entry.replace(/\d+/, '').replace(/^-/,'').replace(/-/g,'')));
+      // For promotions specifically
+      if (f.includes('AddPromotionsTable')) {
+        // File exists; must be registered with its identity
+        expect(registered || MIGRATION_REGISTRY.some(r => r.includes('20261017'))).toBeTruthy();
+      }
+    }
+  });
+
+  it('every registered migration has a corresponding file', () => {
+    for (const entry of MIGRATION_REGISTRY) {
+      const candidates = [`${entry}.ts`, `${entry}.js`];
+      const found = candidates.some((c) => fs.existsSync(path.join(dir, c)));
+      expect(found).toBeTruthy();
+    }
+  });
+
+  it('every datasource migration class exists in registry and file', () => {
+    const { migrationDataSource } = require('./datasource');
+    const migrations = (migrationDataSource.migrations || []) as any[];
+    for (const m of migrations) {
+      const name = m.name || m.constructor?.name || String(m);
+      const identity = typeof m === 'function' ? m.name : name;
+      expect(identity).toBeTruthy();
+    }
+  });
+
+  it('duplicate timestamp allowlist preserved', () => {
+    const { DUPLICATE_TIMESTAMPS } = require('./registry');
+    expect(Array.isArray(DUPLICATE_TIMESTAMPS)).toBe(true);
+    expect(DUPLICATE_TIMESTAMPS.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('promotions migration file exists', () => {
+    expect(fs.existsSync(path.join(dir, '20261017-AddPromotionsTable.ts'))).toBe(true);
+  });
+});

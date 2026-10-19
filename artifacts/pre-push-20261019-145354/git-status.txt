@@ -1,0 +1,197 @@
+﻿A  Marketplace.png
+A  apps/backend/.claude/agents/config.json
+A  apps/backend/apps/frontend/components/auth/GoogleSignInButton.tsx
+A  apps/backend/backups/end-to-end-20261016-190544/datasource.ts
+A  apps/backend/backups/end-to-end-20261016-190544/migration-runner.ts
+A  apps/backend/backups/end-to-end-20261016-190544/registry.ts
+A  apps/backend/backups/migration-regression-20261016-195318/src/database/migrations/20261013-AddVendorUserConstraints.ts
+A  apps/backend/backups/migration-regression-20261016-195318/src/database/migrations/datasource.ts
+A  apps/backend/backups/migration-regression-20261016-195318/src/database/migrations/registry-verify.spec.ts
+A  apps/backend/backups/migration-regression-20261016-195318/src/database/migrations/registry.ts
+A  apps/backend/backups/migration-regression-20261016-195318/src/database/migrations/test/uuid-driver-config.spec.ts
+A  apps/backend/backups/migration-regression-20261016-195318/src/database/migrations/test/vendor-user-constraints.spec.ts
+A  apps/backend/backups/migration-regression-fix-20261017-120836/1709999999999-Baseline.ts.original
+A  apps/backend/backups/migration-regression-fix-20261017-120836/fail-closed-database-guard.spec.ts.original
+A  apps/backend/backups/migration-regression-fix-20261017-120836/relocated-source-backups/1709999999999-Baseline-backup-20261017-115103.ts
+A  apps/backend/backups/migration-regression-repair-20261017-122645/Baseline.ts.original
+A  apps/backend/backups/migration-regression-repair-20261017-122645/fail-closed-database-guard.spec.ts.original
+A  apps/backend/backups/migration-regression-repair-20261017-123016/Baseline.ts.original
+A  apps/backend/backups/migration-regression-repair-20261017-123016/fail-closed-database-guard.spec.ts.original
+A  apps/backend/backups/migration-regression-repair-20261017-123124/Baseline.ts.original
+A  apps/backend/backups/migration-regression-repair-20261017-123124/fail-closed-database-guard.spec.ts.original
+A  apps/backend/backups/queue-dedup-mock-20261017-124414/queue-dedup.spec.ts.original
+A  apps/backend/migration-audit-backup-20261016-161523/20261015-AddBuyerIdempotencyKeyConstraint.ts
+A  apps/backend/migration-audit-backup-20261016-161523/datasource.ts
+A  apps/backend/migration-audit-backup-20261016-161523/migration-runner.ts
+A  apps/backend/migration-blocker1-backup-20261016-161655/datasource.ts
+A  apps/backend/migration-blocker1-backup-20261016-161655/migration-runner.ts
+A  apps/backend/migration-fix-backup-20261016-161823/20261010-customer-addresses.ts
+A  apps/backend/migration-fix-backup-20261016-161823/20261013-AddVendorUserConstraints.ts
+A  apps/backend/migration-integrity-backup-20261016-181305/src/database/migrations/datasource.ts
+A  apps/backend/migration-integrity-backup-20261016-181305/src/database/migrations/migration-runner.ts
+A  apps/backend/migration-integrity-backup-20261016-181305/src/database/migrations/registry-verify.spec.ts
+A  apps/backend/migration-integrity-backup-20261016-181305/src/database/migrations/registry.ts
+A  apps/backend/migration-integrity-backup-20261016-181305/src/test/fail-closed-database-guard.ts
+A  apps/backend/migration-safety-backup-20261016-175037/apps/backend/src/database/migrations/datasource.ts
+A  apps/backend/migration-safety-backup-20261016-175037/apps/backend/src/database/migrations/migration-runner.ts
+A  apps/backend/migration-safety-backup-20261016-175037/apps/backend/src/database/migrations/registry-verify.spec.ts
+A  apps/backend/migration-safety-backup-20261016-175037/apps/backend/src/database/migrations/registry.ts
+A  apps/backend/migration-safety-backup-20261016-175037/apps/backend/src/test/fail-closed-database-guard.spec.ts
+A  apps/backend/migration-safety-backup-20261016-175037/apps/backend/src/test/fail-closed-database-guard.ts
+A  apps/backend/seed-catalog.js.bak.202610151615
+AM apps/backend/src/auth/account-isolation-live-red.spec.ts
+AM apps/backend/src/auth/account-isolation.red.spec.ts
+A  apps/backend/src/auth/atomic-reset-red.spec.ts
+A  apps/backend/src/auth/auth.module.dependency.spec.ts.bak-20261016-125540
+A  apps/backend/src/auth/auth.module.ts.bak.prodread
+A  apps/backend/src/auth/auth.service.spec.ts.new
+A  apps/backend/src/auth/auth.service.ts.bak.prodread
+ M apps/backend/src/catalog/test/catalog.mapping.spec.ts
+A  apps/backend/src/catalog/test/catalog.mapping.spec.ts.bak-20261016-150407
+A  apps/backend/src/catalog/test/catalog.mapping.spec.ts.bak-metadata-fix-20261016-150504
+A  apps/backend/src/catalog/update-product-vendor-ids.ts
+A  apps/backend/src/common/entities/product.entity.ts.bak-20261016-150407
+A  apps/backend/src/common/entities/product.entity.ts.bak.prodread
+A  apps/backend/src/database/migrations/collision-fix-backup-20261016-172237/1710000000005-AddFulfillmentOperationRecord.ts
+A  apps/backend/src/database/migrations/collision-fix-backup-20261016-172237/1710000000005-CategoriesAndCatalogContract.ts
+A  apps/backend/src/database/migrations/collision-fix-backup-20261016-172237/20261013-AddPartialUniquePendingApplicantIndex.ts
+A  apps/backend/src/database/migrations/collision-fix-backup-20261016-172237/20261013-AddVendorUserConstraints.ts
+A  apps/backend/src/database/migrations/collision-fix-backup-20261016-172237/20261015-AddBuyerIdempotencyKeyConstraint.ts
+A  apps/backend/src/database/migrations/collision-fix-backup-20261016-172237/20261015-AddOAuthIdentityTable.ts
+A  apps/backend/src/database/migrations/collision-fix-backup-20261016-172237/datasource.ts
+A  apps/backend/src/database/migrations/collision-fix-backup-20261016-172237/migration-runner.ts
+A  apps/backend/src/database/migrations/collision-fix-backup-20261016-172237/registry.ts
+ M apps/backend/src/database/migrations/datasource.ts
+A  apps/backend/src/database/migrations/datasource.ts.bak-20261016
+A  apps/backend/src/database/migrations/migration-completeness.spec.ts
+ M apps/backend/src/database/migrations/migration-runner.ts
+A  apps/backend/src/database/migrations/migration-runner.ts.bak-before-syntax-fix-20261016-164740
+A  apps/backend/src/database/migrations/migration-runner.ts.before-preconnect-block-20261016-180532
+A  apps/backend/src/database/migrations/migration-runner.ts.broken-backup
+ M apps/backend/src/database/migrations/production-datasource.ts
+ M apps/backend/src/database/migrations/production-migration-runner.ts
+A  apps/backend/src/database/migrations/registry-verify.spec.ts.bak-phase2
+A  apps/backend/src/database/migrations/registry-verify.spec.ts.before-timestamp-fix-20261016-180156
+A  apps/backend/src/database/migrations/registry-verify.spec.ts.before-typeorm-validation-20261016-180409
+A  apps/backend/src/database/migrations/registry.ts.backup-20261016170350
+A  apps/backend/src/database/migrations/registry.ts.bak-20261016
+A  apps/backend/src/database/migrations/registry.ts.pre-fix-backup
+ M apps/backend/src/database/migrations/test-integration/harness.ts
+ M apps/backend/src/database/migrations/test-integration/migration-e2e-verified.spec.ts
+ M apps/backend/src/database/migrations/test-integration/migration-integration.spec.ts
+A  apps/backend/src/database/migrations/test/final-verification-red.spec.ts
+ M apps/backend/src/database/migrations/test/registry-completeness.spec.ts
+ M apps/backend/src/database/migrations/test/uuid-driver-config.spec.ts
+A  apps/backend/src/fulfillment/queue-dedup.spec.ts.bak-20261016
+A  apps/backend/src/fulfillment/queue-dedup.spec.ts.bak-final
+A  apps/backend/src/orders/orders.idempotency.spec.ts.bak-20261016-161002
+A  apps/backend/src/orders/orders.idempotency.spec.ts.bak-placeholder
+A  apps/backend/src/orders/orders.idempotency.spec.ts.bak.pre-fix
+ M apps/backend/src/test/fail-closed-database-guard.spec.ts
+ M apps/backend/src/test/fail-closed-database-guard.ts
+ M apps/backend/src/vendor/vendor-promotions.service.spec.ts
+AM apps/backend/src/vendor/vendor-settings-red.spec.ts
+A  apps/backend/tsconfig.json.before-migration-excludes-20261016-175932
+A  apps/frontend/app/(auth)/layout.tsx.bak.20261018
+A  apps/frontend/app/(auth)/login/page.tsx.bak.20261018
+ M apps/frontend/components/auth/GoogleSignInButton.tsx
+A  apps/frontend/components/auth/LoginForm.tsx.bak.20261018
+A  apps/frontend/components/storefront/StorefrontFooter.tsx.before-vendor-portal-fix
+ M apps/frontend/context/CartStore.ts
+ M apps/frontend/lib/hooks/use-wishlist.ts
+ M apps/frontend/lib/store/account-isolation-live-red.spec.ts
+ M apps/frontend/lib/store/cart-isolation.red.spec.ts
+A  apps/frontend/public/images/@Marketplace.png
+A  artifacts/blocker-fix-20261016-214409/apps__backend__src__database__migrations__datasource.ts
+A  artifacts/blocker-fix-20261016-214409/apps__backend__src__database__migrations__migration-runner.ts
+A  artifacts/blocker-fix-20261016-214409/apps__backend__src__database__migrations__registry-datasource-reconcile.spec.ts
+A  artifacts/blocker-fix-20261016-214409/apps__backend__src__database__migrations__registry-verify.spec.ts
+A  artifacts/blocker-fix-20261016-214409/apps__backend__src__database__migrations__registry.ts
+A  artifacts/blocker-fix-20261016-214409/apps__backend__src__orders__orders.idempotency.spec.ts
+A  artifacts/completion-8-iterations-20261018-173725/backup-inventory.csv
+A  artifacts/completion-8-iterations-20261018-173725/backup-sha256.txt
+A  artifacts/completion-8-iterations-20261018-173725/git-diff-stat.txt
+A  artifacts/completion-8-iterations-20261018-173725/git-staged-stat.txt
+A  artifacts/completion-8-iterations-20261018-173725/git-status.txt
+A  artifacts/completion-8-iterations-20261018-173725/pg14-backup-list.txt
+A  artifacts/completion-8-iterations-20261018-173725/pg18-executable-hashes.txt
+A  artifacts/completion-8-iterations-20261018-173725/pg18-install-summary.txt
+A  artifacts/fix-backups/20261016-212043/apps/backend/src/database/migrations/datasource.ts
+A  artifacts/fix-backups/20261016-212043/apps/backend/src/database/migrations/registry-verify.spec.ts
+A  artifacts/fix-backups/20261016-212043/apps/backend/src/database/migrations/registry.ts
+A  artifacts/fix-backups/20261016-212043/apps/backend/src/fulfillment/queue-dedup.spec.ts
+A  artifacts/fix-backups/20261016-212043/apps/backend/src/fulfillment/vendor-queue.service.ts
+A  artifacts/migration-fix-20261016-215207/apps__backend__src__database__migrations__datasource.ts
+A  artifacts/migration-fix-20261016-215207/apps__backend__src__database__migrations__migration-runner.ts
+A  artifacts/migration-fix-20261016-215207/apps__backend__src__database__migrations__registry-datasource-reconcile.spec.ts
+A  artifacts/migration-fix-20261016-215207/apps__backend__src__database__migrations__registry-verify.spec.ts
+A  artifacts/migration-fix-20261016-215207/apps__backend__src__database__migrations__registry.ts
+A  artifacts/migration-integrity-fix-20261016-215306/apps__backend__src__database__migrations__1710000000005-AddFulfillmentOperationRecord.ts
+A  artifacts/migration-integrity-fix-20261016-215306/apps__backend__src__database__migrations__20261012-vendor-link-safeguards.ts
+A  artifacts/migration-integrity-fix-20261016-215306/apps__backend__src__database__migrations__20261013-AddVendorUserConstraints.ts
+A  artifacts/migration-integrity-fix-20261016-215306/apps__backend__src__database__migrations__20261014-FixProductVendorIdColumn.ts
+A  artifacts/migration-integrity-fix-20261016-215306/apps__backend__src__database__migrations__20261015-AddBuyerIdempotencyKeyConstraint.ts
+A  artifacts/migration-integrity-fix-20261016-215306/apps__backend__src__database__migrations__20261015-AddOAuthIdentityTable.ts
+A  artifacts/migration-integrity-fix-20261016-215306/apps__backend__src__database__migrations__20261016-AddPasswordResetTokens.ts
+A  artifacts/migration-integrity-fix-20261016-215306/apps__backend__src__database__migrations__datasource.ts
+A  artifacts/migration-integrity-fix-20261016-215306/apps__backend__src__database__migrations__registry-datasource-reconcile.spec.ts
+A  artifacts/migration-integrity-fix-20261016-215306/apps__backend__src__database__migrations__registry.ts
+A  artifacts/migration-root-cause-20261016-214727/apps__backend__src__database__migrations__datasource.ts
+A  artifacts/migration-root-cause-20261016-214727/apps__backend__src__database__migrations__migration-runner.ts
+A  artifacts/migration-root-cause-20261016-214727/apps__backend__src__database__migrations__registry-datasource-reconcile.spec.ts
+A  artifacts/migration-root-cause-20261016-214727/apps__backend__src__database__migrations__registry-verify.spec.ts
+A  artifacts/migration-root-cause-20261016-214727/apps__backend__src__database__migrations__registry.ts
+A  artifacts/migration-root-cause-20261016-214727/migration-classes.txt
+A  artifacts/promotions-repair-20261018-155821/apps/backend/src/app.module.ts
+A  artifacts/promotions-repair-20261018-155821/apps/backend/src/common/entities/promotion.entity.ts
+A  artifacts/promotions-repair-20261018-155821/apps/backend/src/common/entities/vendor.entity.ts
+A  artifacts/promotions-repair-20261018-155821/apps/backend/src/database/migrations/datasource.ts
+A  artifacts/promotions-repair-20261018-155821/apps/backend/src/database/migrations/registry-datasource-reconcile.spec.ts
+A  artifacts/promotions-repair-20261018-155821/apps/backend/src/database/migrations/registry-verify.spec.ts
+A  artifacts/promotions-repair-20261018-155821/apps/backend/src/database/migrations/registry.ts
+A  artifacts/promotions-repair-20261018-155821/apps/backend/src/vendor/vendor-promotions.controller.ts
+A  artifacts/promotions-repair-20261018-155821/apps/backend/src/vendor/vendor-promotions.service.ts
+A  artifacts/promotions-repair-20261018-155821/migration-completeness.spec.ts.before-membership-fix-20261018-160825
+A  artifacts/promotions-repair-20261018-155821/migration-completeness.spec.ts.before-strict-check-20261018-160638
+A  artifacts/promotions-repair-20261018-155821/registry-datasource-reconcile.spec.ts.before-count-fix-20261018-160409
+A  audit-catalog-2026-10-15.json
+A  "bject {"
+A  login-1672x941-fixed.png
+A  login-1672x941.png
+A  login-card-fixed.png
+A  login-card-large.png
+?? apps/backend/artifacts/
+?? apps/backend/src/auth/storage-isolation-e2e.spec.ts
+?? apps/backend/src/catalog/test/catalog.mapping.spec.ts.bak-20261019-104249
+?? apps/backend/src/catalog/test/catalog.mapping.spec.ts.bak-metadata-fix-20261019-124747
+?? apps/backend/src/database/migrations/datasource.ts.backup-20261019-141605-735
+?? apps/backend/src/database/migrations/datasource.ts.backup-before-pathname-fix-20261019-143211
+?? apps/backend/src/database/migrations/datasource.ts.backup-before-regex-fix-20261019-143122
+?? apps/backend/src/database/migrations/datasource.ts.before-credential-consistency-20261019-143819
+?? apps/backend/src/database/migrations/datasource.ts.before-credential-consistency-20261019-145000
+?? apps/backend/src/database/migrations/datasource.ts.before-credential-fix-20261019-143610
+?? apps/backend/src/database/migrations/offline-discovery.spec.ts
+?? apps/backend/src/database/migrations/production-datasource.ts.guardrail-backup-20261019-125935
+?? apps/backend/src/database/migrations/test-integration/harness.spec.ts
+?? apps/backend/src/database/migrations/test/datasource-url-guard.spec.ts
+?? apps/backend/src/database/migrations/test/migration-authorization-regression.spec.ts
+?? apps/backend/src/database/migrations/test/uuid-driver-config.spec.ts.backup-before-isolation-20261019-143726
+?? apps/backend/src/database/sqlite-test-datasource.ts
+?? apps/backend/src/test/fail-closed-database-guard.ts.backup-before-query-fragment-fix-20261019-143451
+?? apps/backend/src/test/fail-closed-datasource-regression.spec.ts
+?? apps/backend/src/test/fail-closed-datasource-regression.spec.ts.backup-before-isolation-20261019-143322
+?? apps/backend/src/test/fail-closed-datasource-regression.spec.ts.before-credential-consistency-20261019-143819
+?? apps/backend/src/test/fail-closed-datasource-regression.spec.ts.before-credential-consistency-20261019-145000
+?? apps/backend/src/test/fail-closed-datasource-regression.spec.ts.before-credential-fix-20261019-143610
+?? apps/frontend/components/auth/GoogleSignInButton.tsx.bak-20261019-104249
+?? artifacts/backup-20261019-130521/
+?? artifacts/guardrail-hardening-20261019-125134/
+?? artifacts/migration-integrity-audit-20261019-103039/
+?? artifacts/migration-integrity-audit-20261019-103113/
+?? artifacts/migration-url-guard-20261019-092025/
+?? artifacts/pre-push-20261019-145354/
+?? backups-preserve-20261019131323/
+?? backups/datasource-20261019-130517.ts
+?? backups/local-db-20261018-181537/
+?? backups/registry-20261019-130517.ts
+?? fix_node.js

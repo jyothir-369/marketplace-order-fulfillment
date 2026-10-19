@@ -1,0 +1,31 @@
+{
+  "auditDate": "2026-10-15",
+  "catalogEndpoint": "http://localhost:3001/api/catalog",
+  "totalProducts": 27,
+  "imageStatus": {
+    "ok": 1,
+    "missing": 25,
+    "malformed": 0,
+    "broken": 1
+  },
+  "issuesFound": 26,
+  "confirmedRepairsApplied": [],
+  "products": [
+    {
+      "id": "a291ac08-e419-4720-98d9-91b8f2e21176",
+      "name": "Gaming Mouse",
+      "issues": ["broken_image_url_404", "test_description_text"],
+      "imageUrl": "https://example.com/test-product-image.jpg",
+      "imageStatus": "status_404",
+      "descriptionStatus": "TEST: Vendor-to-consumer product metadata verification."
+    },
+    {
+      "id": "0c74a26d-f8e6-4b28-a62c-5d97247a7dda",
+      "name": "Chess board",
+      "issues": ["category_null", "missing_description", "missing_image"],
+      "category": null,
+      "imageStatus": "missing"
+    }
+  ],
+  "summary": "27 products audited. 1 verified image OK. 1 broken (Gaming Mouse example URL 404). 25 missing images. 25 missing descriptions (NONE or empty). 1 null category (Chess board). Repair should be limited to confirmed broken/test data; missing data requires source content that does not exist in audit scope. No destructive changes applied to existing cards/PDP."
+}

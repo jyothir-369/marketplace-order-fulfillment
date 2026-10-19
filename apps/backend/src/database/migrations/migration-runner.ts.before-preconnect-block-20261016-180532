@@ -1,0 +1,34 @@
+﻿const command = process.argv[2] || 'status';
+
+if (!['status', 'up'].includes(command)) {
+  console.error('BLOCKED: only status and up are recognized; rollback/revert is disabled.');
+  process.exit(2);
+}
+
+async function runMigrations(): Promise<void> {
+  // The datasource module is imported only after command validation.
+  const { migrationDataSource } = await import('./datasource');
+
+  try {
+    await migrationDataSource.initialize();
+    if (command === 'status') {
+      const pending = await migrationDataSource.showMigrations();
+      console.log('Pending migrations:', pending);
+      return;
+    }
+
+    console.error(
+      'BLOCKED: migration execution is disabled until migration identity collisions and deployed-history compatibility are resolved.',
+    );
+    process.exitCode = 3;
+  } catch (error) {
+    console.error('Migration safety check failed:', error);
+    process.exitCode = 1;
+  } finally {
+    if (migrationDataSource.isInitialized) {
+      await migrationDataSource.destroy();
+    }
+  }
+}
+
+void runMigrations();

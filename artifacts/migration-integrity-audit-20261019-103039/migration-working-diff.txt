@@ -1,0 +1,286 @@
+﻿diff --git a/apps/backend/src/database/migrations/datasource.ts b/apps/backend/src/database/migrations/datasource.ts
+index eb11da2a..39c7a111 100644
+--- a/apps/backend/src/database/migrations/datasource.ts
++++ b/apps/backend/src/database/migrations/datasource.ts
+@@ -7,6 +7,7 @@ import { AddOAuthIdentityTable2026101500001 } from './20261015-AddOAuthIdentityT
+ import { AddPromotionsTable2026101700000 } from './20261017-AddPromotionsTable';
+ import { AddPasswordResetTokens2026101600000 } from './20261016-AddPasswordResetTokens';
+ import { AddWebhookEventIdempotency1717000000000 } from './1717000000000-AddWebhookEventIdempotency';
++import { assertFailClosedDatabase, assertFailClosedDatabaseFromUrl } from '../../test/fail-closed-database-guard';
+ import { DataSource } from 'typeorm';
+ import { Baseline1709999999999 } from './1709999999999-Baseline';
+ import { AddShippingAddressToOrders1710000000001 } from './1710000000001-AddShippingAddressToOrders';
+@@ -26,14 +27,55 @@ import { AddVendorApplicationTable1749624000000 } from './1749624000000-AddVendo
+ import { AddPartialUniquePendingApplicantIndex2026101300000 } from './20261013-AddPartialUniquePendingApplicantIndex';
+ import { AddVendorUserConstraints2026101300000 } from './20261013-AddVendorUserConstraints';
+ 
+-import { assertFailClosedDatabase } from '../../test/fail-closed-database-guard';
++function parseMigrationTestDbUrl(): { host: string; port: number; username: string; database: string } | null {
++  const url = process.env.MIGRATION_TEST_DATABASE_URL;
++  if (!url || url.trim() === '') return null;
++  try {
++    const parsed = new URL(url.trim());
++    if (parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') return null;
++    if (parsed.port !== '55439') return null;
++    const dbName = parsed.pathname && parsed.pathname.startsWith('/')
++      ? parsed.pathname.slice(1) : undefined;
++    if (!dbName || dbName !== 'marketplace_migration_test') return null;
++    const host = parsed.hostname;
++    const port = Number(parsed.port);
++    const username = parsed.username || 'reconcile_test';
++    return { host, port, username, database: dbName };
++  } catch {
++    return null;
++  }
++}
++
++function getMigrationConfigFromDbFields(): { host: string; port: number; username: string; database: string } {
++  const host = process.env.MIGRATION_TEST_DB_HOST || '127.0.0.1';
++  const port = Number(process.env.MIGRATION_TEST_DB_PORT || 55439);
++  const username = process.env.MIGRATION_TEST_DB_USERNAME || 'reconcile_test';
++  const database = process.env.MIGRATION_TEST_DB_NAME || 'marketplace_migration_test';
++
++  // Validate against allowed values
++  if (!['localhost', '127.0.0.1'].includes(host)) {
++    throw new Error('BLOCKED: MIGRATION_TEST_DB_HOST must be a loopback host');
++  }
++  if (port !== 55439) {
++    throw new Error('BLOCKED: MIGRATION_TEST_DB_PORT must be 55439');
++  }
++  if (database !== 'marketplace_migration_test') {
++    throw new Error('BLOCKED: MIGRATION_TEST_DB_NAME must be marketplace_migration_test');
++  }
++
++  return { host, port, username, database };
++}
++
++function resolveMigrationConfig(): { host: string; port: number; username: string; database: string } {
++  // First, try MIGRATION_TEST_DATABASE_URL (takes precedence if set and valid)
++  const urlConfig = parseMigrationTestDbUrl();
++  if (urlConfig) return urlConfig;
++
++  // Fall back to MIGRATION_TEST_DB_* fields
++  return getMigrationConfigFromDbFields();
++}
+ 
+-const migrationDb = {
+-  host: process.env.MIGRATION_TEST_DB_HOST || '127.0.0.1',
+-  port: Number(process.env.MIGRATION_TEST_DB_PORT || 55439),
+-  username: process.env.MIGRATION_TEST_DB_USERNAME || 'reconcile_test',
+-  database: process.env.MIGRATION_TEST_DB_NAME || 'marketplace_migration_test',
+-};
++const migrationConfig = resolveMigrationConfig();
+ 
+ if (process.env.DATABASE_URL || process.env.DB_HOST || process.env.DB_PORT ||
+     process.env.DB_DATABASE || process.env.DB_USERNAME || process.env.DB_PASSWORD) {
+@@ -43,18 +85,18 @@ if (process.env.DATABASE_URL || process.env.DB_HOST || process.env.DB_PORT ||
+ }
+ 
+ assertFailClosedDatabase({
+-  host: migrationDb.host,
+-  port: migrationDb.port,
+-  database: migrationDb.database,
++  host: migrationConfig.host,
++  port: migrationConfig.port,
++  database: migrationConfig.database,
+   url: '',
+ });
+ 
+ export const migrationDataSource = new DataSource({
+   type: 'postgres',
+-  host: migrationDb.host,
+-  port: migrationDb.port,
+-  username: migrationDb.username,
+-  database: migrationDb.database,
++  host: migrationConfig.host,
++  port: migrationConfig.port,
++  username: migrationConfig.username,
++  database: migrationConfig.database,
+   password: process.env.MIGRATION_TEST_DB_PASSWORD || '',
+   ssl: false,
+   uuidExtension: 'pgcrypto',
+diff --git a/apps/backend/src/database/migrations/test-integration/harness.ts b/apps/backend/src/database/migrations/test-integration/harness.ts
+index 978df834..75774e88 100644
+--- a/apps/backend/src/database/migrations/test-integration/harness.ts
++++ b/apps/backend/src/database/migrations/test-integration/harness.ts
+@@ -1,30 +1,73 @@
+ /**
+- * Migration integration-test harness.
+- * Canonical source: MIGRATION_REGISTRY (25 classes).
+- * Requires MIGRATION_TEST_DATABASE_URL explicitly; validates loopback 55439.
+- * Never falls back to .env / DATABASE_URL. Never invokes production runner.
++ * Fail-closed migration integration-test URL validation.
++ * Never falls back to DATABASE_URL or .env.
+  */
+-
+-import { DataSource } from 'typeorm';
+ import { MIGRATION_REGISTRY } from '../registry';
+ 
+-function requireTestUrl(): string {
+-  const url = process.env.MIGRATION_TEST_DATABASE_URL;
+-  if (!url || url.trim() === '') {
++const ALLOWED_HOSTS = new Set(['localhost', '127.0.0.1']);
++const ALLOWED_PORT = '55439';
++const ALLOWED_DATABASE = '/marketplace_migration_test';
++
++export function requireTestUrl(): string {
++  const raw = process.env.MIGRATION_TEST_DATABASE_URL;
++
++  if (!raw || raw.trim() === '') {
+     throw new Error('BLOCKED: MIGRATION_TEST_DATABASE_URL is required explicitly');
+   }
+-  const parsed = new URL(url);
+-  if (parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') {
+-    throw new Error('BLOCKED: MIGRATION_TEST_DATABASE_URL must target loopback (localhost/127.0.0.1)');
++
++  if (raw !== raw.trim()) {
++    throw new Error('BLOCKED: URL must not contain surrounding whitespace');
++  }
++
++  let parsed: URL;
++
++  try {
++    parsed = new URL(raw);
++  } catch {
++    throw new Error('BLOCKED: MIGRATION_TEST_DATABASE_URL is not a valid URL');
++  }
++
++  if (parsed.protocol !== 'postgres:' && parsed.protocol !== 'postgresql:') {
++    throw new Error('BLOCKED: URL must use postgres: or postgresql:');
++  }
++
++  if (!ALLOWED_HOSTS.has(parsed.hostname.toLowerCase())) {
++    throw new Error('BLOCKED: URL must target localhost or 127.0.0.1');
++  }
++
++  if (parsed.port !== ALLOWED_PORT) {
++    throw new Error('BLOCKED: URL must use host-mapped port 55439');
++  }
++
++  if (parsed.pathname !== ALLOWED_DATABASE) {
++    throw new Error('BLOCKED: URL must target marketplace_migration_test');
+   }
+-  if (parsed.port !== '55439') {
+-    throw new Error(`BLOCKED: MIGRATION_TEST_DATABASE_URL port must be 55439 (got ${parsed.port || 'default'})`);
++
++  if (parsed.search !== '' || parsed.hash !== '') {
++    throw new Error('BLOCKED: URL query parameters and fragments are prohibited');
+   }
+-  return url.trim();
++
++  if (!parsed.username || !parsed.password) {
++    throw new Error('BLOCKED: URL must include explicit database credentials');
++  }
++
++  return raw;
+ }
+ 
+-function getCanonicalClasses(): string[] {
++export function getCanonicalClasses(): string[] {
+   return [...MIGRATION_REGISTRY];
+ }
+ 
+-export { requireTestUrl, getCanonicalClasses };
++/**
++ * Validate the designated test URL before constructing or initializing
++ * a database connection. The factory is injectable so tests can prove
++ * invalid configuration never reaches the connection boundary.
++ */
++export async function initializeTestDataSource<
++  T extends { initialize: () => Promise<unknown> }
++>(createDataSource: (url: string) => T): Promise<T> {
++  const url = requireTestUrl();
++  const dataSource = createDataSource(url);
++  await dataSource.initialize();
++  return dataSource;
++}
+diff --git a/apps/backend/src/database/migrations/test-integration/migration-e2e-verified.spec.ts b/apps/backend/src/database/migrations/test-integration/migration-e2e-verified.spec.ts
+index 9565a757..fdbab9dd 100644
+--- a/apps/backend/src/database/migrations/test-integration/migration-e2e-verified.spec.ts
++++ b/apps/backend/src/database/migrations/test-integration/migration-e2e-verified.spec.ts
+@@ -1,25 +1,25 @@
+ /*
+- * Migration integration tests ΓÇö real execution against loopback 55439 / marketplace_migration_test.
++ * Migration integration tests ├óΓé¼ΓÇ¥ real execution against loopback 55439 / marketplace_migration_test.
+  * Distinct from unit/component tests; uses isolated PostgreSQL via MIGRATION_TEST_DATABASE_URL.
+  */
+ import { describe, it, beforeAll, afterAll, expect } from '@jest/globals';
+ import { DataSource } from 'typeorm';
+-import { requireTestUrl } from './harness';
++import { initializeTestDataSource } from './harness';
+ 
+ describe('Real database migration E2E (distinct from unit tests)', () => {
+   let ds: DataSource;
+-  const url = requireTestUrl(); // validates 127.0.0.1:55439 / marketplace_migration_test
+-
+   beforeAll(async () => {
+-    ds = new DataSource({
+-      type: 'postgres',
+-      url,
+-      entities: [],
+-      migrations: [],
+-      synchronize: false,
+-      logging: false,
+-    });
+-    await ds.initialize();
++    ds = await initializeTestDataSource(
++      (url) =>
++        new DataSource({
++          type: 'postgres',
++          url,
++          entities: [],
++          migrations: [],
++          synchronize: false,
++          logging: false,
++        }),
++    );
+   });
+ 
+   it('connects to loopback 55439 and database marketplace_migration_test', async () => {
+diff --git a/apps/backend/src/database/migrations/test-integration/migration-integration.spec.ts b/apps/backend/src/database/migrations/test-integration/migration-integration.spec.ts
+index 4b630b0d..24928bea 100644
+--- a/apps/backend/src/database/migrations/test-integration/migration-integration.spec.ts
++++ b/apps/backend/src/database/migrations/test-integration/migration-integration.spec.ts
+@@ -1,5 +1,5 @@
+ /*
+- * Migration integration tests ΓÇö canonical 25 migration classes.
++ * Migration integration tests ├óΓé¼ΓÇ¥ canonical 26 migration classes.
+  * Uses actual PostgreSQL at MIGRATION_TEST_DATABASE_URL (loopback:55439).
+  */
+ 
+@@ -7,7 +7,7 @@ import { describe, it, beforeAll, afterAll, expect } from '@jest/globals';
+ import { DataSource } from 'typeorm';
+ import { requireTestUrl, getCanonicalClasses } from './harness';
+ 
+-describe('Migration integration harness (canonical 25)', () => {
++describe('Migration integration harness (canonical 26)', () => {
+   const DATABASE_URL = requireTestUrl();
+   describe('env validation', () => {
+     it('MIGRATION_TEST_DATABASE_URL set explicitly', () => {
+@@ -16,8 +16,8 @@ describe('Migration integration harness (canonical 25)', () => {
+     it('points to loopback port 55439', () => {
+       expect(DATABASE_URL).toContain(':55439');
+     });
+-    it('canonical registry has 25 migrations', () => {
+-      expect(getCanonicalClasses()).toHaveLength(25);
++    it('canonical registry has 26 migrations', () => {
++      expect(getCanonicalClasses()).toHaveLength(26);
+     });
+   });
+ });
+diff --git a/apps/backend/src/database/migrations/test/registry-completeness.spec.ts b/apps/backend/src/database/migrations/test/registry-completeness.spec.ts
+index 59292ec4..6529ebc5 100644
+--- a/apps/backend/src/database/migrations/test/registry-completeness.spec.ts
++++ b/apps/backend/src/database/migrations/test/registry-completeness.spec.ts
+@@ -1,9 +1,9 @@
+ import { MIGRATION_REGISTRY, DUPLICATE_TIMESTAMPS } from '../registry';
+ 
+ describe('Registry completeness (RED)', () => {
+-  it('registers all 25 migrations including additional six', () => {
++  it('registers all canonical migrations including date-based migrations', () => {
+     expect(MIGRATION_REGISTRY.length).toBeGreaterThanOrEqual(25);
+-    expect(MIGRATION_REGISTRY.filter(n => /^2026/.test(n))).toHaveLength(8);
++    expect(MIGRATION_REGISTRY.filter(n => /^2026/.test(n))).toHaveLength(9);
+   });
+ 
+   it('preserves duplicate timestamps with distinct class names', () => {

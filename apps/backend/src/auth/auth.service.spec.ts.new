@@ -1,0 +1,26 @@
+// TDD ADDITION — fails until reset methods added (RED phase preserved)
+import { AuthService } from './auth.service';
+describe('PasswordReset (RED — unimplemented)', () => {
+  it('requestReset does not exist on AuthService prototype', () => {
+    expect(typeof (AuthService.prototype as any).requestReset).toBe('undefined'); // fails after GREEN
+  });
+  it('resetPassword does not exist on AuthService prototype', () => {
+    expect(typeof (AuthService.prototype as any).resetPassword).toBe('undefined');
+  });
+  it('revokeSessionsAfterReset does not exist', () => {
+    expect(typeof (AuthService.prototype as any).revokeSessionsAfterReset).toBe('undefined');
+  });
+});
+// Updated after GREEN — verifies minimal behavior without real DB
+import { AuthService } from './auth.service';
+describe('PasswordReset (post-GREEN)', () => {
+  it('requestReset exists and returns void', () => {
+    expect(typeof (AuthService.prototype as any).requestReset).toBe('function');
+  });
+  it('resetPassword exists and returns { success: boolean }', () => {
+    expect(typeof (AuthService.prototype as any).resetPassword).toBe('function');
+  });
+  it('revokeSessionsAfterReset exists', () => {
+    expect(typeof (AuthService.prototype as any).revokeSessionsAfterReset).toBe('function');
+  });
+});

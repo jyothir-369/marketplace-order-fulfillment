@@ -7,6 +7,7 @@ import { AddOAuthIdentityTable2026101500001 } from './20261015-AddOAuthIdentityT
 import { AddPromotionsTable2026101700000 } from './20261017-AddPromotionsTable';
 import { AddPasswordResetTokens2026101600000 } from './20261016-AddPasswordResetTokens';
 import { AddWebhookEventIdempotency1717000000000 } from './1717000000000-AddWebhookEventIdempotency';
+import { assertFailClosedDatabase } from '../../test/fail-closed-database-guard';
 import { DataSource } from 'typeorm';
 import { Baseline1709999999999 } from './1709999999999-Baseline';
 import { AddShippingAddressToOrders1710000000001 } from './1710000000001-AddShippingAddressToOrders';
@@ -26,14 +27,44 @@ import { AddVendorApplicationTable1749624000000 } from './1749624000000-AddVendo
 import { AddPartialUniquePendingApplicantIndex2026101300000 } from './20261013-AddPartialUniquePendingApplicantIndex';
 import { AddVendorUserConstraints2026101300000 } from './20261013-AddVendorUserConstraints';
 
-import { assertFailClosedDatabase } from '../../test/fail-closed-database-guard';
+export function parseMigrationTestDbUrl(): { host: string; port: number; username: string; password: string; database: string; protocol: string; query: string; fragment: string } | never {
+  const urlStr = process.env.MIGRATION_TEST_DATABASE_URL;
+  if (!urlStr || urlStr.trim() === '') { throw new Error('FAIL-CLOSED: MIGRATION_TEST_DATABASE_URL missing or empty'); }
+  try {
+    const url = urlStr.trim();
+    let parsed;
+    try { parsed = new URL(url); } catch (e: any) { throw new Error('FAIL-CLOSED: malformed URL: ' + (e && e.message ? e.message : String(e))); }
+    if (parsed.protocol !== 'postgresql:' && parsed.protocol !== 'postgres:') { throw new Error('FAIL-CLOSED: protocol invalid'); }
+    if (!['localhost','127.0.0.1'].includes(parsed.hostname)) { throw new Error('FAIL-CLOSED: host invalid'); }
+    if (parsed.port !== '55439') { throw new Error('FAIL-CLOSED: port must be 55439'); }
+    if (parsed.pathname === '/' || !parsed.pathname || parsed.pathname === '') { throw new Error('FAIL-CLOSED: database missing'); }
+    const segments = parsed.pathname.slice(1).split('/');
+    if (segments.length !== 1 || segments[0] !== 'marketplace_migration_test') { throw new Error('FAIL-CLOSED: database must be marketplace_migration_test'); }
+    if (parsed.search && parsed.search !== '') { throw new Error('FAIL-CLOSED: query not allowed'); }
+    if (parsed.hash && parsed.hash !== '') { throw new Error('FAIL-CLOSED: fragment not allowed'); }
+    const username = parsed.username || '';
+    const password = parsed.password || '';
+    if (username === '') { throw new Error('FAIL-CLOSED: username missing'); }
+    return {
+      host: parsed.hostname,
+      port: parseInt(parsed.port, 10) || 55439,
+      username: decodeURIComponent(username),
+      password: decodeURIComponent(password),
+      database: 'marketplace_migration_test',
+      protocol: parsed.protocol,
+      query: parsed.search || '',
+      fragment: parsed.hash || '',
+    };
+  } catch (e) { throw e instanceof Error ? e : new Error('FAIL-CLOSED: invalid URL'); }
+}
 
-const migrationDb = {
-  host: process.env.MIGRATION_TEST_DB_HOST || '127.0.0.1',
-  port: Number(process.env.MIGRATION_TEST_DB_PORT || 55439),
-  username: process.env.MIGRATION_TEST_DB_USERNAME || 'reconcile_test',
-  database: process.env.MIGRATION_TEST_DB_NAME || 'marketplace_migration_test',
-};
+function getMigrationConfigFromDbFields(): never { throw new Error('FAIL-CLOSED: Fallback MIGRATION_TEST_DB_* fields disabled'); }
+
+function resolveMigrationConfig(): { host: string; port: number; username: string; password: string; database: string; protocol: string; query: string; fragment: string } {
+  return parseMigrationTestDbUrl();
+}
+
+const migrationConfig = resolveMigrationConfig();
 
 if (process.env.DATABASE_URL || process.env.DB_HOST || process.env.DB_PORT ||
     process.env.DB_DATABASE || process.env.DB_USERNAME || process.env.DB_PASSWORD) {
@@ -43,19 +74,19 @@ if (process.env.DATABASE_URL || process.env.DB_HOST || process.env.DB_PORT ||
 }
 
 assertFailClosedDatabase({
-  host: migrationDb.host,
-  port: migrationDb.port,
-  database: migrationDb.database,
+  host: migrationConfig.host,
+  port: migrationConfig.port,
+  database: migrationConfig.database,
   url: '',
 });
 
 export const migrationDataSource = new DataSource({
   type: 'postgres',
-  host: migrationDb.host,
-  port: migrationDb.port,
-  username: migrationDb.username,
-  database: migrationDb.database,
-  password: process.env.MIGRATION_TEST_DB_PASSWORD || '',
+  host: migrationConfig.host,
+  port: migrationConfig.port,
+  username: migrationConfig.username,
+  database: migrationConfig.database,
+  password: migrationConfig.password,
   ssl: false,
   uuidExtension: 'pgcrypto',
   entities: [],

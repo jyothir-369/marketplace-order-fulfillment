@@ -1,0 +1,68 @@
+﻿ M apps/backend/src/app.module.ts
+ M apps/backend/src/common/entities/promotion.entity.ts
+ M apps/backend/src/common/entities/vendor.entity.ts
+ M apps/backend/src/database/migrations/20261017-AddPromotionsTable.ts
+ M apps/backend/src/database/migrations/datasource.ts
+ M apps/backend/src/database/migrations/registry-datasource-reconcile.spec.ts
+ M apps/backend/src/database/migrations/registry.ts
+ M apps/backend/src/vendor/vendor-promotions.controller.ts
+ M apps/backend/src/vendor/vendor-promotions.service.spec.ts
+ M apps/backend/src/vendor/vendor-promotions.service.ts
+?? Marketplace.png
+?? apps/backend/.claude/
+?? apps/backend/apps/frontend/components/
+?? apps/backend/backups/
+?? apps/backend/migration-audit-backup-20261016-161523/
+?? apps/backend/migration-blocker1-backup-20261016-161655/
+?? apps/backend/migration-fix-backup-20261016-161823/
+?? apps/backend/migration-integrity-backup-20261016-181305/
+?? apps/backend/migration-safety-backup-20261016-175037/
+?? apps/backend/seed-catalog.js.bak.202610151615
+?? apps/backend/src/auth/account-isolation-live-red.spec.ts
+?? apps/backend/src/auth/account-isolation.red.spec.ts
+?? apps/backend/src/auth/atomic-reset-red.spec.ts
+?? apps/backend/src/auth/auth.module.dependency.spec.ts.bak-20261016-125540
+?? apps/backend/src/auth/auth.module.ts.bak.prodread
+?? apps/backend/src/auth/auth.service.spec.ts.new
+?? apps/backend/src/auth/auth.service.ts.bak.prodread
+?? apps/backend/src/catalog/test/catalog.mapping.spec.ts.bak-20261016-150407
+?? apps/backend/src/catalog/test/catalog.mapping.spec.ts.bak-metadata-fix-20261016-150504
+?? apps/backend/src/catalog/update-product-vendor-ids.ts
+?? apps/backend/src/common/entities/product.entity.ts.bak-20261016-150407
+?? apps/backend/src/common/entities/product.entity.ts.bak.prodread
+?? apps/backend/src/database/migrations/collision-fix-backup-20261016-172237/
+?? apps/backend/src/database/migrations/datasource.ts.bak-20261016
+?? apps/backend/src/database/migrations/migration-completeness.spec.ts
+?? apps/backend/src/database/migrations/migration-runner.ts.bak-before-syntax-fix-20261016-164740
+?? apps/backend/src/database/migrations/migration-runner.ts.before-preconnect-block-20261016-180532
+?? apps/backend/src/database/migrations/migration-runner.ts.broken-backup
+?? apps/backend/src/database/migrations/registry-verify.spec.ts.bak-phase2
+?? apps/backend/src/database/migrations/registry-verify.spec.ts.before-timestamp-fix-20261016-180156
+?? apps/backend/src/database/migrations/registry-verify.spec.ts.before-typeorm-validation-20261016-180409
+?? apps/backend/src/database/migrations/registry.ts.backup-20261016170350
+?? apps/backend/src/database/migrations/registry.ts.bak-20261016
+?? apps/backend/src/database/migrations/registry.ts.pre-fix-backup
+?? apps/backend/src/database/migrations/test/final-verification-red.spec.ts
+?? apps/backend/src/fulfillment/queue-dedup.spec.ts.bak-20261016
+?? apps/backend/src/fulfillment/queue-dedup.spec.ts.bak-final
+?? apps/backend/src/orders/orders.idempotency.spec.ts.bak-20261016-161002
+?? apps/backend/src/orders/orders.idempotency.spec.ts.bak-placeholder
+?? apps/backend/src/orders/orders.idempotency.spec.ts.bak.pre-fix
+?? apps/backend/src/vendor/dto/vendor-promotion.dto.spec.ts
+?? apps/backend/src/vendor/dto/vendor-promotion.dto.ts
+?? apps/backend/src/vendor/vendor-promotions.controller.spec.ts
+?? apps/backend/src/vendor/vendor-promotions.module.ts
+?? apps/backend/src/vendor/vendor-settings-red.spec.ts
+?? apps/backend/tsconfig.json.before-migration-excludes-20261016-175932
+?? apps/frontend/app/(auth)/layout.tsx.bak.20261018
+?? apps/frontend/app/(auth)/login/page.tsx.bak.20261018
+?? apps/frontend/components/auth/LoginForm.tsx.bak.20261018
+?? apps/frontend/components/storefront/StorefrontFooter.tsx.before-vendor-portal-fix
+?? apps/frontend/public/images/@Marketplace.png
+?? artifacts/
+?? audit-catalog-2026-10-15.json
+?? "bject {"
+?? login-1672x941-fixed.png
+?? login-1672x941.png
+?? login-card-fixed.png
+?? login-card-large.png
