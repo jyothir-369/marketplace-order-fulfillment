@@ -158,7 +158,7 @@
   --color-secondary-foreground: 0 0% 98%;
 
   --color-muted: 240 3.7% 15.9%;
-  --color-muted-foreground: 240 5% 64.9%;
+  --color-muted-foreground: hsl(240 5% 64.9%);
 
   --color-accent: 239 84% 67%;
   --color-accent-foreground: 239 84% 97%;
@@ -210,7 +210,7 @@
 
   /* ----- V2 Premium operational chrome (Phase 5) ----- */
   --color-brass-rail:           38 40% 55%;
-  --color-brass-rail-soft:      38 40% 55% / 0.18;
+  --color-brass-rail-soft: hsl(38 40% 55% / 0.18);
   --color-sidebar-section:      40 45% 75%;
   --color-sidebar-cream:        38 47% 94%;
   --color-sidebar-elevated:     220 33% 22%;
