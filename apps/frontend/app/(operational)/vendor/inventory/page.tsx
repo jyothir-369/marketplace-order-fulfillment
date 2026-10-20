@@ -225,6 +225,7 @@ function InventoryInner() {
               <th className="p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--color-muted-foreground)]">Price</th>
               <th className="p-3 text-center text-xs font-semibold uppercase tracking-wider text-[var(--color-muted-foreground)]">Stock</th>
               <th className="p-3 text-center text-xs font-semibold uppercase tracking-wider text-[var(--color-muted-foreground)]">Status</th>
+              <th className="p-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--color-muted-foreground)]">Image</th>
               <th className="p-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--color-muted-foreground)]">Actions</th>
             </tr>
           </thead>
@@ -237,13 +238,14 @@ function InventoryInner() {
                   <td className="p-3"><Skeleton className="h-4 w-12 ml-auto" /></td>
                   <td className="p-3"><Skeleton className="h-4 w-12 mx-auto" /></td>
                   <td className="p-3"><Skeleton className="h-4 w-20 mx-auto" /></td>
+                  <td className="p-3"><Skeleton className="h-4 w-10 mx-auto" /></td>
                   <td className="p-3"><Skeleton className="h-4 w-16 ml-auto" /></td>
                 </tr>
               ))}
 
             {!loading && products.length === 0 && (
               <tr>
-                <td colSpan={6}>
+                <td colSpan={7}>
                   <EmptyState
                     icon={
                       <div className="rounded-full bg-[var(--color-muted)] p-3">
@@ -303,6 +305,18 @@ function InventoryInner() {
                     </td>
                     <td className="p-3 text-center">
                       <StatusBadge status={status.label.toUpperCase().replace(" ", "_")} size="sm" />
+                    </td>
+                    <td className="p-3 text-center">
+                      {(() => {
+                        const imgs = Array.isArray(p.images) ? p.images.filter((i) => !!i) : [];
+                        if (imgs.length === 0) return <span className="text-xs text-[var(--color-muted-foreground)]">No image</span>;
+                        return (
+                          <span className="inline-flex gap-1 items-center text-xs text-[var(--color-success)] font-medium">
+                            <span className="inline-block h-2 w-2 rounded-full bg-green-500" aria-hidden />
+                            <span title={imgs[0]}>{imgs.length} verified</span>
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="p-3 text-right whitespace-nowrap">
                       {editing[p.id] !== undefined ? (
