@@ -7,7 +7,9 @@ import { Repository, LessThan, In } from 'typeorm';
 import { Order, OrderStatus } from '../common/entities/order.entity';
 import { OrderLineItem, FulfillmentStatus } from '../common/entities/order-line-item.entity';
 import { VendorSyncJob, SyncJobStatus } from '../common/entities/vendor-sync-job.entity';
-import { AdminResolveDto, AdminDashboardDto, StuckOrdersResponseDto, StuckOrderDto, StuckOrderLineItemDto } from './dto/admin.dto';
+import { VendorApplication, VendorApplicationStatus } from '../vendor/vendor-application.entity';
+import { Product } from '../common/entities/product.entity';
+import { AdminResolveDto, AdminDashboardDto, StuckOrdersResponseDto, StuckOrderDto, StuckOrderLineItemDto, AdminAnalyticsDto } from './dto/admin.dto';
 import { OrdersService } from '../orders/orders.service';
 import { FulfillmentService } from '../fulfillment/fulfillment.service';
 import { AuditService, AuditLogQuery } from '../common/audit';
@@ -28,11 +30,53 @@ export class AdminService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(Vendor)
     private readonly vendorRepository: Repository<Vendor>,
+    @InjectRepository(VendorApplication)
+    private readonly vendorApplicationRepository: Repository<VendorApplication>,
+    @InjectRepository(Product)
+    private readonly productRepository: Repository<Product>,
     private readonly ordersService: OrdersService,
     private readonly fulfillmentService: FulfillmentService,
     private readonly auditService: AuditService,
     private readonly authService: AuthService,
   ) {}
+
+  async getKPI(correlationId: string): Promise<{ aov: number; activeVendors: number; pendingApplications: number; fulfillmentRate: number; categoryTrends: Array<{ category: string; count: number }>; vendorTrends: Array<{ vendorName: string; productCount: number }>; operationalAlerts: Array<{ type: string; message: string; severity: string }>; recentActivity: Array<{ label: string; timestamp: string }> }> {
+    // AOV = average totalAmount of fulfilled orders (real data). Use enum value to avoid string-mismatch errors with DB enum.
+    const aovRow = await this.orderRepository.createQueryBuilder('o').select('AVG(o.totalAmount)', 'aov').where("o.status = :status", { status: OrderStatus.FULFILLED }).getRawOne();
+    const aov = aovRow?.aov == null ? 0 : parseFloat(aovRow.aov);
+
+    const activeVendors = await this.vendorRepository.count();
+    const pendingApplications = await this.vendorApplicationRepository.count({ where: { status: VendorApplicationStatus.PENDING } });
+
+    // Fulfillment rate = fulfilled / (fulfilled + cancelled + failed) — 'failed' is not a valid OrderStatus; guard against phantom counts.
+    const statusCounts = await this.orderRepository.createQueryBuilder('o').select("o.status", "status").addSelect("COUNT(*)", "c").groupBy("o.status").getRawMany();
+    let fulfilled = 0, cancelled = 0;
+    for (const r of statusCounts) { if (r.status === 'fulfilled') fulfilled = parseInt(r.c,10); if (r.status === 'cancelled') cancelled = parseInt(r.c,10); }
+    const totalProcessed = fulfilled + cancelled;
+    const fulfillmentRate = totalProcessed > 0 ? Math.round((fulfilled / totalProcessed) * 100) : 0;
+
+    // Category trends (top 5 by product count)
+    const catRows = await this.productRepository.createQueryBuilder('p').select("p.category", "cat").addSelect("COUNT(*)", "cnt").where("p.category IS NOT NULL").groupBy("p.category").orderBy("cnt", "DESC").limit(5).getRawMany();
+    const categoryTrends = catRows.map((r: any) => ({ category: String(r.cat), count: parseInt(r.cnt,10) }));
+
+    // Vendor trends (top 5 vendors by product count)
+    const vendorRows = await this.vendorRepository.createQueryBuilder('v').leftJoin('v.products', 'p').select("v.name", "name").addSelect("COUNT(p.id)", "cnt").groupBy("v.id").addGroupBy("v.name").orderBy("cnt", "DESC").limit(5).getRawMany();
+    const vendorTrends = vendorRows.map((r: any) => ({ vendorName: String(r.name), productCount: parseInt(r.cnt,10) }));
+
+    // Operational alerts (dead-letter / ambiguous / low stock batches)
+    const dead = await this.syncJobRepository.count({ where: { status: SyncJobStatus.DEAD_LETTER } });
+    const ambiguous = await this.syncJobRepository.count({ where: { status: SyncJobStatus.AMBIGUOUS } });
+    const alerts = [];
+    if (dead > 0) alerts.push({ type: 'dead-letter', message: `${dead} dead-letter sync job(s)`, severity: 'critical' });
+    if (ambiguous > 0) alerts.push({ type: 'ambiguous', message: `${ambiguous} ambiguous sync job(s)`, severity: 'warning' });
+    if (pendingApplications > 0) alerts.push({ type: 'pending-applications', message: `${pendingApplications} pending vendor application(s)`, severity: 'info' });
+
+    // Recent activity: last 5 orders created
+    const recentOrders = await this.orderRepository.find({ order: { createdAt: 'DESC' }, take: 5, select: { id: true, status: true, createdAt: true, buyerId: true } });
+    const recentActivity = recentOrders.map((o: any) => ({ label: `Order ${o.id.slice(0,8)} ${o.status}`, timestamp: o.createdAt.toISOString() }));
+
+    return { aov, activeVendors, pendingApplications, fulfillmentRate, categoryTrends, vendorTrends, operationalAlerts: alerts, recentActivity };
+  }
 
   async getDashboard(correlationId: string): Promise<AdminDashboardDto> {
     const totalOrders = await this.orderRepository.count();
@@ -78,6 +122,159 @@ export class AdminService {
     };
   }
 
+  /**
+   * Operational telemetry for the admin dashboard.
+   *
+   * TRUTHFULNESS CONTRACT — every number below is derived only from columns
+   * that are semantically valid for the metric, and anything that cannot be
+   * computed safely is reported as explicitly unavailable (null + note)
+   * rather than approximated or zero-filled.
+   *
+   *   - THROUGHPUT: orders bucketed by `orders.created_at` (the order's
+   *     placement time) per calendar day, counted by the CURRENT status of
+   *     each order. This is an order-arrival-per-day series, not a
+   *     state-transition series: there is no trustworthy "time of transition"
+   *     column in this schema, so status is read as-of-now. The units are
+   *     orders per day. Buckets are rendered in UTC.
+   *   - LATENCY: vendor sync duration, computed as
+   *     `vendor_sync_jobs.completed_at - vendor_sync_jobs.created_at`.
+   *     This population is restricted to jobs that actually reached
+   *     COMPLETED, because `completed_at` is only written on the success
+   *     path (fulfillment.service.ts) and is NULL for pending / in-progress /
+   *     failed / dead-letter jobs. Mixing those in would either drop rows
+   *     silently or treat an open job's age as a latency sample, so they are
+   *     excluded and the sample size is reported alongside the average.
+   *
+   * NO customer data is exposed: the queries aggregate over time buckets and
+   * never select buyer ids, order ids, emails, or names.
+   */
+  async getAnalytics(correlationId: string, days = 14): Promise<AdminAnalyticsDto> {
+    this.logger.log('Computing admin analytics telemetry', AdminService.name, correlationId);
+
+    // Bounded window: never more than 90 days, never fewer than 1.
+    // undefined -> NaN -> Math.floor NaN=NaN -> || 14 fallback to default.
+    const windowDays = Math.min(90, Math.max(1, Math.floor(Number.isFinite(days) ? days : 14)) || 14);
+
+    // Anchor the window to whole UTC days so buckets are stable and the
+    // label matches the bucket exactly.
+    const endExclusive = new Date();
+    endExclusive.setUTCHours(23, 59, 59, 999);
+    const startInclusive = new Date(endExclusive.getTime() - (windowDays - 1) * 24 * 60 * 60 * 1000);
+    startInclusive.setUTCHours(0, 0, 0, 0);
+
+    const throughput = await this.getThroughputSeries(startInclusive, endExclusive, windowDays);
+    const latency = await this.getVendorSyncLatency(startInclusive, endExclusive);
+
+    return {
+      window: {
+        start: startInclusive.toISOString(),
+        end: endExclusive.toISOString(),
+        timezone: 'UTC',
+      },
+      throughput,
+      latency,
+      sources: [
+        'orders.createdAt (order placement time)',
+        'orders.status (current status, as-of-now snapshot)',
+        'vendor_sync_jobs.createdAt',
+        'vendor_sync_jobs.completedAt',
+      ],
+    };
+  }
+
+  /**
+   * Orders placed per UTC day, split by the order's current status.
+   *
+   * Uses a parameterized, bounded `date_trunc` bucketing query over a
+   * half-open interval [start, end]. Days with no orders are emitted as
+   * explicit zero buckets so the chart renders a continuous axis.
+   */
+  private async getThroughputSeries(
+    startInclusive: Date,
+    endExclusive: Date,
+    windowDays: number,
+  ): Promise<AdminAnalyticsDto['throughput']> {
+    const rows = await this.orderRepository
+      .createQueryBuilder('order')
+      .select("date_trunc('day', order.createdAt)", 'bucket')
+      .addSelect('order.status', 'status')
+      .addSelect('COUNT(*)', 'count')
+      .where('order.createdAt >= :start', { start: startInclusive })
+      .andWhere('order.createdAt <= :end', { end: endExclusive })
+      .groupBy("date_trunc('day', order.createdAt)")
+      .addGroupBy('order.status')
+      .getRawMany();
+
+    const buckets = new Map<string, { placed: number; fulfilling: number; fulfilled: number; cancelled: number }>();
+    for (let i = 0; i < windowDays; i++) {
+      const d = new Date(startInclusive.getTime() + i * 24 * 60 * 60 * 1000);
+      buckets.set(d.toISOString().slice(0, 10), { placed: 0, fulfilling: 0, fulfilled: 0, cancelled: 0 });
+    }
+
+    for (const row of rows) {
+      if (!row || !row.bucket) continue;
+      const key = new Date(row.bucket).toISOString().slice(0, 10);
+      const bucket = buckets.get(key);
+      if (!bucket) continue;
+      const count = Number(row.count ?? 0);
+      switch (row.status) {
+        case OrderStatus.FULFILLING:
+          bucket.fulfilling += count;
+          break;
+        case OrderStatus.FULFILLED:
+          bucket.fulfilled += count;
+          break;
+        case OrderStatus.CANCELLED:
+          bucket.cancelled += count;
+          break;
+        default:
+          // PLACED and CONFIRMED both count as still-open arrivals; the
+          // frontend's "placed" series is the total arrivals for the day.
+          bucket.placed += count;
+          break;
+      }
+    }
+
+    return Array.from(buckets.entries()).map(([date, counts]) => ({ date, ...counts }));
+  }
+
+  /**
+   * Average vendor sync duration (ms) over the window.
+   *
+   * Population: vendor sync jobs whose status is COMPLETED and whose
+   * `completed_at` is non-null. Jobs still queued, in flight, failed, or
+   * dead-lettered are excluded — their `completed_at` is NULL and their age
+   * is not a latency sample.
+   */
+  private async getVendorSyncLatency(
+    startInclusive: Date,
+    endExclusive: Date,
+  ): Promise<AdminAnalyticsDto['latency']> {
+    const row = await this.syncJobRepository
+      .createQueryBuilder('job')
+      .select('AVG(EXTRACT(EPOCH FROM (job.completedAt - job.createdAt)) * 1000)', 'averageMs')
+      .addSelect('COUNT(*)', 'sampleCount')
+      .where('job.status = :status', { status: SyncJobStatus.COMPLETED })
+      .andWhere('job.completedAt IS NOT NULL')
+      .andWhere('job.createdAt >= :start', { start: startInclusive })
+      .andWhere('job.createdAt <= :end', { end: endExclusive })
+      .getRawOne();
+
+    const count = Number(row?.sampleCount ?? 0);
+    const rawAverage = row?.averageMs === null || row?.averageMs === undefined ? null : Number(row.averageMs);
+
+    return {
+      computedFrom: 'vendor_sync_jobs.completedAt - vendor_sync_jobs.createdAt',
+      unit: 'milliseconds',
+      averageMs: count > 0 && rawAverage !== null && Number.isFinite(rawAverage) ? Math.round(rawAverage) : null,
+      count,
+      note:
+        count > 0
+          ? 'Average vendor sync duration over completed sync jobs only. Jobs that are pending, in progress, failed, or dead-lettered are excluded because they have no completedAt timestamp.'
+          : 'Unavailable: no completed vendor sync jobs in this window, so no latency sample can be computed. Non-completed jobs are excluded because their completedAt timestamp is NULL.',
+    };
+  }
+
   async getStuckOrders(correlationId: string): Promise<StuckOrdersResponseDto> {
     this.logger.log('Querying stuck orders', AdminService.name, correlationId);
 
@@ -106,13 +303,14 @@ export class AdminService {
       .andWhere(
         '(li.fulfillmentStatus = :pending AND li.createdAt < :tenMinutesAgo) OR ' +
         '(li.fulfillmentStatus = :syncing AND li.updatedAt < :fiveMinutesAgo) OR ' +
-        'li.fulfillmentStatus IN (:terminalStatuses)',
+        'li.fulfillmentStatus = :ambiguousStatus OR li.fulfillmentStatus = :deadLetterStatus',
         {
           pending: FulfillmentStatus.PENDING,
           syncing: FulfillmentStatus.SYNCING,
           tenMinutesAgo: tenMinutesAgo,
           fiveMinutesAgo: fiveMinutesAgo,
-          terminalStatuses: [FulfillmentStatus.AMBIGUOUS, FulfillmentStatus.DEAD_LETTER],
+          ambiguousStatus: FulfillmentStatus.AMBIGUOUS,
+          deadLetterStatus: FulfillmentStatus.DEAD_LETTER,
         },
       )
       .getMany();
@@ -211,6 +409,41 @@ export class AdminService {
       'admin',
       currentOrder.status,
     );
+  }
+
+  async getOrders(
+    query: { status?: string; limit?: number; offset?: number },
+    correlationId: string,
+  ): Promise<{ total: number; orders: { orderId: string; buyerId: string; status: string; createdAt: Date; lineItems: any[]; stuckReason?: string }[] }> {
+    this.logger.log('Querying paginated orders', AdminService.name, correlationId);
+
+    const limitVal = query.limit && query.limit > 0 ? Math.min(query.limit, 100) : 20;
+    const offsetVal = query.offset && query.offset > 0 ? query.offset : 0;
+
+    const qb = this.orderRepository.createQueryBuilder('order');
+
+    if (query.status && query.status !== 'all') {
+      const statusNormalized = String(query.status).toLowerCase();
+      const statusUpper = statusNormalized.toUpperCase();
+      qb.andWhere('order.status = :status', { status: statusUpper });
+    }
+
+    qb.orderBy('order.created_at', 'DESC');
+
+    const [ordersRaw, total] = await qb
+      .skip(offsetVal)
+      .take(limitVal)
+      .getManyAndCount();
+
+    const orders = ordersRaw.map((o) => ({
+      orderId: o.id,
+      buyerId: o.buyerId,
+      status: o.status,
+      createdAt: o.createdAt,
+      lineItems: [],
+    }));
+
+    return { total, orders };
   }
 
   async getDeadLetterDetails(correlationId: string): Promise<VendorSyncJob[]> {
