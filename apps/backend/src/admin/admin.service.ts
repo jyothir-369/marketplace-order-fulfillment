@@ -41,17 +41,18 @@ export class AdminService {
   ) {}
 
   async getKPI(correlationId: string): Promise<{ aov: number; activeVendors: number; pendingApplications: number; fulfillmentRate: number; categoryTrends: Array<{ category: string; count: number }>; vendorTrends: Array<{ vendorName: string; productCount: number }>; operationalAlerts: Array<{ type: string; message: string; severity: string }>; recentActivity: Array<{ label: string; timestamp: string }> }> {
-    // AOV = average totalAmount of fulfilled orders (real data). Use enum value to avoid string-mismatch errors with DB enum.
-    const aovRow = await this.orderRepository.createQueryBuilder('o').select('AVG(o.totalAmount)', 'aov').where("o.status = :status", { status: OrderStatus.FULFILLED }).getRawOne();
+    try {
+    // AOV = average totalAmount of fulfilled orders (real data). Use literal DB enum value to avoid binding ambiguity.
+    const aovRow = await this.orderRepository.createQueryBuilder('o').select('AVG(o.totalAmount)', 'aov').where("o.status = :status", { status: 'fulfilled' }).getRawOne();
     const aov = aovRow?.aov == null ? 0 : parseFloat(aovRow.aov);
 
     const activeVendors = await this.vendorRepository.count();
     const pendingApplications = await this.vendorApplicationRepository.count({ where: { status: VendorApplicationStatus.PENDING } });
 
-    // Fulfillment rate = fulfilled / (fulfilled + cancelled + failed) — 'failed' is not a valid OrderStatus; guard against phantom counts.
+    // Fulfillment rate = fulfilled / (fulfilled + cancelled) — 'failed' is not a valid OrderStatus; guard against phantom counts.
     const statusCounts = await this.orderRepository.createQueryBuilder('o').select("o.status", "status").addSelect("COUNT(*)", "c").groupBy("o.status").getRawMany();
     let fulfilled = 0, cancelled = 0;
-    for (const r of statusCounts) { if (r.status === 'fulfilled') fulfilled = parseInt(r.c,10); if (r.status === 'cancelled') cancelled = parseInt(r.c,10); }
+    for (const r of statusCounts) { if (r.status === OrderStatus.FULFILLED || r.status === 'fulfilled') fulfilled = parseInt(r.c,10); if (r.status === OrderStatus.CANCELLED || r.status === 'cancelled') cancelled = parseInt(r.c,10); }
     const totalProcessed = fulfilled + cancelled;
     const fulfillmentRate = totalProcessed > 0 ? Math.round((fulfilled / totalProcessed) * 100) : 0;
 
@@ -76,6 +77,10 @@ export class AdminService {
     const recentActivity = recentOrders.map((o: any) => ({ label: `Order ${o.id.slice(0,8)} ${o.status}`, timestamp: o.createdAt.toISOString() }));
 
     return { aov, activeVendors, pendingApplications, fulfillmentRate, categoryTrends, vendorTrends, operationalAlerts: alerts, recentActivity };
+    } catch (e: any) {
+      this.logger.error('KPI query failed', e?.message || e, AdminService.name, correlationId);
+      return { aov: 0, activeVendors: 0, pendingApplications: 0, fulfillmentRate: 0, categoryTrends: [], vendorTrends: [], operationalAlerts: [{ type: 'db-error', message: 'KPI unavailable', severity: 'critical' }], recentActivity: [] };
+    }
   }
 
   async getDashboard(correlationId: string): Promise<AdminDashboardDto> {

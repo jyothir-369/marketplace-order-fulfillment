@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Delete, Param, Body, Query, ParseUUIDPipe, UseGuards } from '@nestjs/common';
 import { AdminService } from './admin.service';
-import { AdminResolveDto, AdminDashboardDto, StuckOrdersResponseDto, AdminAuditLogResponseDto, LinkUserDto, LinkedUserDto } from './dto/admin.dto';
+import { AdminResolveDto, AdminDashboardDto, StuckOrdersResponseDto, AdminAuditLogResponseDto, LinkUserDto, LinkedUserDto, AdminOrderListDto, AdminAnalyticsDto } from './dto/admin.dto';
 import { VendorSyncJob } from '../common/entities/vendor-sync-job.entity';
 import { CorrelationId } from '../common/decorators/correlation-id.decorator';
 import { AuditEntityType, AuditAction } from '../common/audit';
@@ -23,15 +23,24 @@ export class AdminController {
   @Get('orders')
   async getOrders(
     @Query('status') status: string,
+    @Query('type') type: string,
+    @Query('limit') limit: string,
+    @Query('offset') offset: string,
     @CorrelationId() correlationId: string,
-  ): Promise<StuckOrdersResponseDto> {
-    // GET /admin/orders?status=stuck
-    // Returns orders with stuck fulfillment line items
-    if (status === 'stuck') {
+  ): Promise<StuckOrdersResponseDto | AdminOrderListDto> {
+    const limitNum = limit ? parseInt(limit, 10) : 20;
+    const offsetNum = offset ? parseInt(offset, 10) : 0;
+    if (limitNum < 0 || offsetNum < 0 || (limitNum > 100 && limit !== '')) {
+      // Invalid pagination — return empty paginated result rather than crash.
+      return { total: 0, orders: [] };
+    }
+    if (status === 'stuck' || type === 'stuck') {
       return this.adminService.getStuckOrders(correlationId);
     }
-    // Default: return empty result for non-stuck queries
-    return { total: 0, orders: [] };
+    return this.adminService.getOrders(
+      { status: status || undefined, limit: limitNum, offset: offsetNum },
+      correlationId,
+    );
   }
 
   @Post('orders/:orderId/cancel')
@@ -48,6 +57,16 @@ export class AdminController {
   ): Promise<{ message: string }> {
     await this.adminService.resolveOrderLineItem(lineItemId, dto, correlationId);
     return { message: 'Line item resolved' };
+  }
+
+  @Get('analytics')
+  async getAnalytics(@CorrelationId() correlationId: string, @Query('days') days?: string): Promise<AdminAnalyticsDto> {
+    return this.adminService.getAnalytics(correlationId, days ? parseInt(days, 10) : 14);
+  }
+
+  @Get('kpi')
+  async getKPI(@CorrelationId() correlationId: string): Promise<any> {
+    return this.adminService.getKPI(correlationId);
   }
 
   @Get('dead-letter')
