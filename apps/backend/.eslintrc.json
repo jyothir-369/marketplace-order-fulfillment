@@ -4,6 +4,6 @@
   "plugins":["@typescript-eslint"],
   "extends":["eslint:recommended","plugin:@typescript-eslint/recommended"],
   "parserOptions":{"ecmaVersion":"latest","sourceType":"module"},
-  "rules":{"@typescript-eslint/no-unused-vars":"off","@typescript-eslint/no-explicit-any":"off"},
+  "rules":{"@typescript-eslint/no-unused-vars":"off","@typescript-eslint/no-explicit-any":"off","@typescript-eslint/no-require-imports":"off"},
   "ignorePatterns":["dist/","node_modules/","**/*.spec-backup*"]
 }

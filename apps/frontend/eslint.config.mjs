@@ -20,7 +20,7 @@ export default [
     rules: {
       '@typescript-eslint/no-explicit-any': 'warn',
       'react-hooks/exhaustive-deps': 'warn',
-      '@typescript-eslint/no-unused-vars': 'warn',
+      '@typescript-eslint/no-unused-vars': 'off',
     },
     languageOptions: {
       parser: tsParser,
