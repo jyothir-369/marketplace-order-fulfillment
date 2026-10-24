@@ -1,11 +1,11 @@
-/** Reproduce: metadata lookup failure without root registration. Confirms fix. */
+﻿/** Reproduce: metadata lookup failure without root registration. Confirms fix. */
 import { describe, it, expect } from '@jest/globals';
 import * as fs from 'fs';
 import * as path from 'path';
 
 describe('PasswordResetToken metadata failure reproduction', () => {
   it('entity registered in source TypeORM root (app.module)', () => {
-    const src = fs.readFileSync(path.resolve(__dirname, '../../app.module.ts'), 'utf8');
+    const src = fs.readFileSync(path.resolve(__dirname, '../app.module.ts'), 'utf8');
     // Before fix: missing. After fix: present in both arrays.
     expect(src).toContain('PasswordResetToken');
   });

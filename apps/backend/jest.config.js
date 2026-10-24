@@ -32,7 +32,7 @@ module.exports = {
     //    getOrdersByVendor were implemented in Phase 2.
   ],
   transform: {
-    '^.+\\.(t|j)s$': 'ts-jest',
+    '^.+\\.(t|j)s$': require.resolve("ts-jest"),
   },
   testEnvironment: 'node',
   collectCoverageFrom: [

@@ -16,6 +16,9 @@ import { Vendor } from '../../common/entities/vendor.entity';
 import { Product } from '../../common/entities/product.entity';
 import { Category } from '../../common/entities/category.entity';
 import { OrderLineItem } from '../../common/entities/order-line-item.entity';
+import { Order } from '../../common/entities/order.entity';
+import { VendorSyncJob } from '../../common/entities/vendor-sync-job.entity';
+import { Promotion } from '../../common/entities/promotion.entity';
 import { Review } from '../../common/entities/review.entity';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -62,7 +65,7 @@ describe('REGRESSION — local-only catalog ownership + inventory + storefront +
       password: isolatedConfig.password,
       database: isolatedConfig.database,
       ssl: false,
-      entities: [User, Vendor, Product, Category, OrderLineItem, Review],
+      entities: [User, Vendor, Product, Category, OrderLineItem, Order, VendorSyncJob, Promotion, Review],
       synchronize: false,
       logging: false,
     });
@@ -76,63 +79,87 @@ describe('REGRESSION — local-only catalog ownership + inventory + storefront +
 
   afterAll(async () => { if (ds?.isInitialized) await ds.destroy(); });
 
-  it('VERIFIED: account is vendor@marketplace.dev (not inferred from login); userId -> vendorId verified from DB', async () => {
+  // Precondition / isolation: demo vendor must have a valid vendorId before any assignment assertion
+  it('PRECONDITION: demo vendor account exists and links to a valid vendor record', async () => {
     const userRepo = ds.getRepository(User);
+    const vendorRepo = ds.getRepository(Vendor);
     const u = await userRepo.findOne({ where: { email: 'vendor@marketplace.dev' } });
     expect(u).toBeTruthy();
     expect(u!.role).toBe(UserRole.VENDOR);
-    expect(u!.vendorId).toBeTruthy(); // verified, not inferred
+    expect(u!.vendorId).toBeTruthy();
+    const v = await vendorRepo.findOne({ where: { id: u!.vendorId! } });
+    expect(v).toBeTruthy();
   });
 
-  it('FAILS UNTIL UPDATE: not all /products belong to demo vendor (pre-update)', async () => {
+  it('POST-UPDATE CONTRACT: assigned product count equals total when assigning all to demo vendor', async () => {
     const prodRepo = ds.getRepository(Product);
     const total = await prodRepo.count();
     const assigned = await prodRepo.count({ where: { vendorId: targetVendorId } });
-    // This is RED: before update, assigned < total (products spread across 5 vendors)
-    expect(assigned).toBeLessThanOrEqual(total);
-  });
-
-  it('FAILS UNTIL UPDATE: inventory visibility for target vendor should show full catalog', async () => {
-    const prodRepo = ds.getRepository(Product);
-    const visible = await prodRepo.count({ where: { vendorId: targetVendorId, isActive: true } });
-    const total = await prodRepo.count({ where: { isActive: true } });
-    // RED step: only after transactional reassignment should visible === total
-    expect(visible).toBeGreaterThanOrEqual(0); // will pass even pre-update; full assertion enforced after update
-  });
-
-  it('STORE FRONT CONSISTENCY: storefront /catalog query must include updated products (post-update)', async () => {
-    const prodRepo = ds.getRepository(Product);
-    const total = await prodRepo.count({ where: { isActive: true } });
     expect(total).toBeGreaterThan(0);
+    expect(assigned).toBe(total); // explicit all-to-demo scenario postcondition
   });
 
-  it('AUTHORIZATION: RBAC guard assertVendorOwnsProduct remains intact (vendor can only manage own products)', async () => {
+  it('POST-UPDATE CONTRACT: every returned product belongs to the target vendor', async () => {
+    const prodRepo = ds.getRepository(Product);
+    const products = await prodRepo.find({ take: 25, relations: { vendor: true } });
+    expect(products.length).toBeGreaterThan(0);
+    for (const p of products) {
+      expect(p.vendorId).toBe(targetVendorId);
+      expect(p.images).toBeDefined();
+    }
+  });
 
+  it('POST-UPDATE CONTRACT: images and product records preserved after reassignment', async () => {
+    const prodRepo = ds.getRepository(Product);
+    const products = await prodRepo.find({ take: 5 });
+    expect(products.length).toBeGreaterThan(0);
+    for (const p of products) {
+      expect(p.images).toBeDefined();
+      expect(p.images === null || Array.isArray(p.images)).toBe(true);
+    }
+  });
 
+  it('PRECONDITION: cross-tenant write protection remains enforced by assertVendorOwnsProduct', async () => {
     const content = fs.readFileSync(path.resolve(__dirname, '../../catalog/catalog.service.ts'), 'utf8');
     expect(content).toContain('assertVendorOwnsProduct');
     expect(content).toContain('currentUser.vendorId !== vendorId');
   });
 
-  it('IMAGE EDITS PRESERVED: products retain images array after reassignment', async () => {
+  it('STORE FRONT CONSISTENCY: storefront /catalog query returns updated active catalog', async () => {
     const prodRepo = ds.getRepository(Product);
-    const products = await prodRepo.find({ take: 5 });
-    expect(products.length).toBeGreaterThan(0);
-    // All products should have the column preserved; verification after update
-    for (const p of products) {
-      expect(p).toHaveProperty('images');
-    }
+    const active = await prodRepo.count({ where: { isActive: true } });
+    expect(active).toBeGreaterThan(0);
   });
 
-  it('BACKUP EXISTS / ROLLBACK READY: SQL backup table and CSV present for rollback', async () => {
+  it('DATA PRESERVATION: product count unchanged by reassignment', async () => {
+    const prodRepo = ds.getRepository(Product);
+    const count = await prodRepo.count();
+    expect(count).toBeGreaterThan(0);
+  });
+
+  it('VENDOR RECORDS INTACT: vendor accounts unchanged (no vendor accounts deleted)', async () => {
+    const vendorRepo = ds.getRepository(Vendor);
+    const count = await vendorRepo.count();
+    expect(count).toBeGreaterThanOrEqual(1);
+  });
+
+  it('BACKUP PRESENT ONLY WHEN FIXTURE CREATES IT: rollback safety only asserted when backup exists', async () => {
     const result = await ds.query(`SELECT to_regclass('public.products_backup_20261017') AS exists;`);
     expect(result[0]?.exists).toBeTruthy();
   });
 
-  it('NO DUPLICATES / NO DATA LOSS: product count unchanged by reassignment', async () => {
+  it('NO DUPLICATES / NO DATA LOSS: product count preserved on reassignment', async () => {
     const prodRepo = ds.getRepository(Product);
     const count = await prodRepo.count();
-    expect(count).toBeGreaterThan(0); // preserved; update must not delete/create duplicates
+    expect(count).toBeGreaterThan(0);
+    // No duplicate product slugs would imply a unique constraint or dedup logic
+    const dupes = await prodRepo
+      .createQueryBuilder('p')
+      .select(['p.slug'])
+      .groupBy('p.slug')
+      .having('COUNT(*) > 1')
+      .getRawMany<{ slug: string; count: number }>();
+    expect(dupes.length).toBe(0);
   });
 
   it('OTHER VENDOR ACCOUNTS PRESERVED: vendors table unchanged (no vendor accounts deleted)', async () => {

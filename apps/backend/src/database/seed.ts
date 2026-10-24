@@ -1,6 +1,8 @@
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import { Vendor, Product, Order, OrderLineItem, VendorSyncJob, User, UserRole, Category } from '../common/entities';
+import { Review } from '../common/entities/review.entity';
+import { Promotion } from '../common/entities/promotion.entity';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 import * as bcrypt from 'bcryptjs';
@@ -40,7 +42,7 @@ const dbConfig = parseDatabaseUrl();
 // Run migrations first, then `npm run seed` against the migrated schema.
 const AppDataSource = new DataSource({
   ...dbConfig,
-  entities: [Vendor, Category, Product, Order, OrderLineItem, VendorSyncJob, User],
+  entities: [Vendor, Category, Product, Order, OrderLineItem, VendorSyncJob, User, Review, Promotion],
   synchronize: false,
   logging: true,
 });

@@ -1,5 +1,5 @@
 /**
- * Regression tests — catalog visibility + authorization after assigning all
+ * Regression tests â€” catalog visibility + authorization after assigning all
  * products to demo_vendor (vendor@marketplace.dev / first seeded vendor).
  *
  * TDD order (per loaded skill): RED (failing) -> GREEN (code passes) -> REFACTOR.
@@ -7,7 +7,7 @@
  * does not break; the production change (update script) is already written
  * and must pass these assertions.
  *
- * ── DATABASE ISOLATION CONTRACT (fail-closed) ───────────────────────────────
+ * â”€â”€ DATABASE ISOLATION CONTRACT (fail-closed) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
  * This suite talks to a real Postgres, so the connection MUST be an explicitly
  * supplied, isolated test endpoint. It never falls back to the application
  * `.env`, to `localhost:5432`, to Supabase, or to any production database.
@@ -15,13 +15,19 @@
  * Fail-closed isolation preserved: assertions are NOT skipped and NOT reported
  * as passed when DB is unavailable. If dbReady is false, the suite reports a
  * block via beforeAll either throwing (hard fail) or the assertions remain
- * unskipped — no false `expect(true).toBe(true)` replacements inside assertions.
+ * unskipped â€” no false `expect(true).toBe(true)` replacements inside assertions.
  */
+import { Review } from '../../common/entities/review.entity';
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import { DataSource } from 'typeorm';
 import { User, UserRole } from '../../common/entities/user.entity';
 import { Vendor } from '../../common/entities/vendor.entity';
 import { Product } from '../../common/entities/product.entity';
+import { Category } from '../../common/entities/category.entity';
+import { OrderLineItem } from '../../common/entities/order-line-item.entity';
+import { Order } from '../../common/entities/order.entity';
+import { VendorSyncJob } from '../../common/entities/vendor-sync-job.entity';
+import { Promotion } from '../../common/entities/promotion.entity';
 import { assertCatalogRegressionDB } from './catalog-regression-db-guard';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -53,8 +59,8 @@ describe('Regression: product-vendor assignment + catalog visibility + RBAC', ()
   beforeAll(async () => {
     if (!dbReady) {
       // Preserve fail-closed isolation: report block, never proceed with defaults.
-      console.error('BLOCK: catalog regression DB unavailable — isolated config required (CATALOG_REGRESSION_DB_*)');
-      // Do NOT return; do NOT skip assertions inside it() — let the suite fail/report block.
+      console.error('BLOCK: catalog regression DB unavailable â€” isolated config required (CATALOG_REGRESSION_DB_*)');
+      // Do NOT return; do NOT skip assertions inside it() â€” let the suite fail/report block.
       throw new Error('FAIL-CLOSED: catalog regression DB unavailable; isolated test endpoint required');
     }
 
@@ -78,7 +84,7 @@ describe('Regression: product-vendor assignment + catalog visibility + RBAC', ()
       password,
       database,
       ssl: false,
-      entities: [User, Vendor, Product],
+      entities: [User, Vendor, Product, Category, Order, OrderLineItem, VendorSyncJob, Promotion, Review],
       synchronize: false,
       logging: false,
     });
@@ -115,7 +121,12 @@ describe('Regression: product-vendor assignment + catalog visibility + RBAC', ()
     const total = await prodRepo.count();
     const assignedToTarget = await prodRepo.count({ where: { vendorId: targetVendorId } });
     expect(total).toBeGreaterThan(0);
-    expect(assignedToTarget).toBe(total); // every product -> demo vendor
+    expect(assignedToTarget).toBe(total);
+    // Meaningful postcondition: each active product's vendorId equals target vendor
+    const allActive = await prodRepo.find({ where: { isActive: true } });
+    for (const p of allActive) {
+      expect(p.vendorId).toBe(targetVendorId);
+    }
   });
 
   it('target vendor portal sees full catalog (catalog visibility regression)', async () => {
@@ -140,13 +151,17 @@ describe('Regression: product-vendor assignment + catalog visibility + RBAC', ()
     expect(content).toContain('currentUser.vendorId !== vendorId');
   });
 
-  it('product data preserved: count unchanged, vendor records intact, no deleted rows', async () => {
+  it('product data preserved: count unchanged, vendor records intact, images preserved', async () => {
     const prodRepo = ds.getRepository(Product);
     const vendorRepo = ds.getRepository(Vendor);
     const afterTotal = await prodRepo.count();
     expect(afterTotal).toBeGreaterThan(0);
     const vendors = await vendorRepo.find();
     expect(vendors.length).toBeGreaterThanOrEqual(1);
+    const samples = await prodRepo.find({ take: 5 });
+    for (const p of samples) {
+      expect(p.images).toBeDefined();
+    }
   });
 
   it('backup table exists for rollback (data protection)', async () => {
