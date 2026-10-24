@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { MIGRATION_REGISTRY } from './registry';
 
 describe('offline migration discovery', () => {
   const dir = __dirname;
@@ -29,7 +30,7 @@ describe('offline migration discovery', () => {
   });
 
   it('registry and datasource agree on presence of Razorpay and categories', () => {
-    const { MIGRATION_REGISTRY } = require('./registry');
+    
     expect(MIGRATION_REGISTRY).toContain('1716000000000-AddRazorpayPaymentSupport');
     expect(MIGRATION_REGISTRY).toContain('1710000000005-AddFulfillmentOperationRecord');
     expect(MIGRATION_REGISTRY).toContain('1710000000005-CategoriesAndCatalogContract');
