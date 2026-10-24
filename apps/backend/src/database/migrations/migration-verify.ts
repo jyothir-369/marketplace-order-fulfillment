@@ -78,8 +78,10 @@ const expectedClasses: Record<string, string> = {
   'AddPartialUniquePendingApplicantIndex2026101300000': 'AddPartialUniquePendingApplicantIndex2026101300000',
   'AddVendorUserConstraints2026101300000': 'AddVendorUserConstraints2026101300000',
 };
-for (const [cls, expected] of Object.entries(expectedClasses)) {
-  if (cls !== expected) exitFail('Class identity mismatch for ' + cls);
+for (const expectedClass of Object.keys(expectedClasses)) {
+  if (!classNames.has(expectedClass)) {
+    exitFail('Missing expected collision migration class: ' + expectedClass);
+  }
 }
 console.log('PASS: All 4 collision migration classes verified independently');
 

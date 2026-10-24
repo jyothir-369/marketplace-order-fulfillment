@@ -44,6 +44,8 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
+          cache-dependency-path: package-lock.json
+
       - name: Install dependencies
         run: npm ci
 
@@ -75,6 +77,8 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
+          cache-dependency-path: package-lock.json
+
       - name: Install dependencies
         run: npm ci
 
@@ -102,6 +106,8 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
+          cache-dependency-path: package-lock.json
+
       - name: Install dependencies
         run: npm ci
 
@@ -128,6 +134,33 @@ jobs:
           retention-days: 7
 
   # ============================================
+  # Migration Registry & Integration Tests
+  # ============================================
+  migration-registry-verify:
+    name: Migration Registry Verification
+    runs-on: ubuntu-latest
+    needs:
+      - lint-and-typecheck
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+
+      - name: Migration registry verification
+        working-directory: apps/backend
+        run: npm run migration:verify
+
+  # ============================================
   # Build Frontend
   # ============================================
   build-frontend:
@@ -145,6 +178,8 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
+
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci
