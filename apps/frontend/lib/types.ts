@@ -157,6 +157,13 @@ export interface AuditLogResponseDto {
 // Admin dashboard / orders / DLQ
 // ---------------------------------------------------------------------------
 
+export interface AdminAnalyticsDto {
+  window: { start: string; end: string; timezone: string };
+  throughput: Array<{ date: string; placed: number; fulfilling: number; fulfilled: number; cancelled: number }>;
+  latency: { computedFrom: string; unit: string; averageMs: number | null; count: number; note: string };
+  sources: string[];
+}
+
 export interface AdminDashboardDto {
   totalOrders: number;
   totalRevenue: number;
@@ -470,3 +477,12 @@ export interface DashboardOverviewData {
 export interface ReconciliationResultDto { processed: number; resolved: number; stillAmbiguous: number; errors: string[]; }
 export interface ReconcilePayload { olderThanMinutes?: number; }
 export interface AmbiguousJobDto extends DeadLetterJobDto { status: "ambiguous"; orderLineItemId: Uuid; correlationId?: string | null; errorMessage?: string | null; lastAttemptedAt?: IsoDateTime | null; }
+export interface AdminKpiDto { aov:number; activeVendors:number; pendingApplications:number; fulfillmentRate:number; categoryTrends:Array<{category:string;count:number}>; vendorTrends:Array<{vendorName:string;productCount:number}>; operationalAlerts:Array<{type:string;message:string;severity:string}>; recentActivity:Array<{label:string;timestamp:string}>; }
+
+// === ADMIN CUSTOMERS ===
+export interface CustomerDto {
+  buyerId: Uuid;
+  email?: string;
+  orderCount: number;
+  totalSpend?: number;
+}

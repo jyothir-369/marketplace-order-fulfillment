@@ -23,6 +23,7 @@ export const MIGRATION_REGISTRY = [
   '20261013-AddPartialUniquePendingApplicantIndex',
   '20261013-AddVendorUserConstraints',
   '20261014-FixProductVendorIdColumn',
+  '20261024-FixProductVendorIdReconcile',
   '20261015-AddBuyerIdempotencyKeyConstraint',
   '20261015-AddOAuthIdentityTable',
   '20261016-AddPasswordResetTokens',

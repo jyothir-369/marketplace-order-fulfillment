@@ -1,19 +1,19 @@
 "use client";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { confirmPasswordReset } from "@/lib/api";
 
 export default function ResetPasswordPage() {
-  const [searchParams] = useState(() => {
-    if (typeof window !== "undefined") {
-      return new URLSearchParams(window.location.search);
-    }
-    return new URLSearchParams();
-  });
-  const token = searchParams.get("token") || "";
+  const [searchParams, setSearchParams] = useState<URLSearchParams | null>(null);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
   const [message, setMessage] = useState("");
+  // Avoid hydration mismatch: do not read window during initial render.
+  useEffect(() => {
+    setSearchParams(new URLSearchParams(window.location.search));
+  }, []);
+  const token = searchParams ? searchParams.get("token") || "" : "";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -25,22 +25,19 @@ export default function ResetPasswordPage() {
     if (password !== confirm) return;
     setStatus("sending");
     try {
-      const res = await fetch("/api/auth/reset/confirm", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, password }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        setStatus("done");
-        setMessage(data.message || "Password updated securely.");
-      } else {
-        setStatus("error");
-        setMessage(data.message || "Reset failed.");
-      }
-    } catch {
+      const data = await confirmPasswordReset({ token, password });
+      setStatus("done");
+      setMessage(data.message || "Password updated securely.");
+    } catch (err: unknown) {
       setStatus("error");
-      setMessage("Network error. Please try again.");
+      let msg = "Reset failed.";
+      if (err && typeof err === "object") {
+        const e = err as { body?: { message?: string | string[] }; message?: string; statusCode?: number };
+        const raw = e.body?.message || e.message || "";
+        msg = Array.isArray(raw) ? raw.join("; ") : (typeof raw === "string" ? raw : "Reset failed.");
+      }
+      if (msg.length > 200 || msg.toLowerCase().includes("internal")) msg = "Reset failed. Please try again.";
+      setMessage(msg);
     }
   }
 

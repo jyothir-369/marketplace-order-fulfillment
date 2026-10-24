@@ -27,6 +27,13 @@ export class AdminDashboardDto {
   ambiguousJobs: number;
 }
 
+export class AdminAnalyticsDto {
+  window: { start: string; end: string; timezone: string };
+  throughput: Array<{ date: string; placed: number; fulfilling: number; fulfilled: number; cancelled: number }>;
+  latency: { computedFrom: string; unit: string; averageMs: number | null; count: number; note: string };
+  sources: string[];
+}
+
 export class StuckOrderLineItemDto {
   lineItemId: string;
   productId: string;
@@ -44,6 +51,11 @@ export class StuckOrderDto {
   createdAt: Date;
   stuckReason: string;
   stuckLineItems: StuckOrderLineItemDto[];
+}
+
+export class AdminOrderListDto {
+  total: number;
+  orders: Array<{ orderId: string; buyerId: string; status: string; createdAt: Date; lineItems: any[]; stuckReason?: string }>;
 }
 
 export class StuckOrdersResponseDto {

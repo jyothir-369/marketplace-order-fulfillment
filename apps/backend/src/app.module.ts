@@ -1,10 +1,11 @@
 import * as path from 'path';
 import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { getBullMQConnectionOptions } from './common/config/redis-connection.factory';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bullmq';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { CatalogModule } from './catalog/catalog.module';
 import { VendorApplicationModule } from './vendor/vendor-application.module';
 import { VendorPromotionsModule } from './vendor/vendor-promotions.module';
@@ -28,6 +29,7 @@ import { OrderLineItem } from './common/entities/order-line-item.entity';
 import { VendorSyncJob } from './common/entities/vendor-sync-job.entity';
 import { User } from './common/entities/user.entity';
 import { RefreshToken } from './common/entities/refresh-token.entity';
+import { PasswordResetToken } from './common/entities/password-reset-token.entity';
 import { PaymentAuthorization } from './common/entities/payment-authorization.entity';
 import { WebhookEvent } from './common/entities/webhook-event.entity';
 import { CustomerAddress } from './customer/customer-address.entity';
@@ -56,7 +58,7 @@ import { PaymentsModule } from './payments/payments.module';
           return {
             type: 'postgres',
             url: dbUrl,
-            entities: [Vendor, Category, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken, PaymentAuthorization, Review, WebhookEvent, CustomerAddress, VendorApplication, Promotion],
+            entities: [Vendor, Category, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken, PasswordResetToken, PaymentAuthorization, Review, WebhookEvent, CustomerAddress, VendorApplication, Promotion],
             // Phase 2.1: migrations own the schema — no more synchronize in any env.
             synchronize: false,
             logging: configService.get('NODE_ENV') === 'development',
@@ -73,7 +75,7 @@ import { PaymentsModule } from './payments/payments.module';
           database: configService.get('DB_DATABASE', 'marketplace'),
           // Fixed a latent drift: the fallback branch was missing Category from
           // entities, so `sync:true` would have silently dropped categories.
-          entities: [Vendor, Category, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken, PaymentAuthorization, Review, WebhookEvent, CustomerAddress, VendorApplication, Promotion],
+          entities: [Vendor, Category, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken, PasswordResetToken, PaymentAuthorization, Review, WebhookEvent, CustomerAddress, VendorApplication, Promotion],
           synchronize: false,
           logging: configService.get('NODE_ENV') === 'development',
           ssl: false,
@@ -131,6 +133,12 @@ import { PaymentsModule } from './payments/payments.module';
     // route; the abuse-sensitive auth + checkout routes get a tighter
     // per-method limit via @Throttle on the controller methods.
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
   ],
 })
 export class AppModule implements NestModule {

@@ -5,7 +5,8 @@ import { Plus, X, AlertTriangle, RefreshCw } from "lucide-react";
 import {
   Product,
   getVendorProducts,
-  updateStock,
+  adjustStock,
+  deleteProduct,
   createProduct,
 } from "@/lib/api";
 import { useVendorId } from "@/lib/hooks/use-vendor-id";
@@ -39,6 +40,7 @@ function InventoryInner() {
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState<NewProductForm>(emptyForm);
   const [creating, setCreating] = useState(false);
@@ -62,6 +64,13 @@ function InventoryInner() {
 
   useEffect(() => { void refresh(); }, [vendorId]);
 
+  /**
+   * Stock changes go through the audited inventory endpoint
+   * (POST /inventory/:productId/adjust), not PATCH /catalog/:id — the catalog
+   * write path rejects vendor stockCount changes (it requires the audited
+   * delta endpoint). The delta is computed from the confirmed persisted
+   * quantity so the server stays the source of truth.
+   */
   const saveStock = async (productId: string) => {
     const raw = editing[productId];
     if (raw === undefined || raw === "") {
@@ -73,16 +82,49 @@ function InventoryInner() {
       toast("Stock must be a non-negative number.", "error");
       return;
     }
-    setSavingId(productId);
-    try {
-      const updated = await updateStock(productId, { stockCount: next });
-      setProducts((prev) => prev.map((p) => (p.id === productId ? updated : p)));
+    const current = products.find((p) => p.id === productId);
+    if (!current) {
+      toast("This item is no longer in your inventory. Refresh and try again.", "error");
+      return;
+    }
+    const delta = next - current.stockCount;
+    if (delta === 0) {
       setEditing((prev) => {
         const copy = { ...prev };
         delete copy[productId];
         return copy;
       });
-      toast("Stock updated for " + updated.name, "success");
+      return;
+    }
+    setSavingId(productId);
+    try {
+      const result = await adjustStock(productId, {
+        delta,
+        reason: delta > 0 ? "Vendor restock" : "Vendor stock reduction",
+      });
+      if (!result.success) {
+        toast(result.message || "Stock update was rejected by the server.", "error");
+        setEditing((prev) => {
+          const copy = { ...prev };
+          delete copy[productId];
+          return copy;
+        });
+        void refresh();
+        return;
+      }
+      // Apply the server-confirmed value so the row, the status badge and the
+      // low/out-of-stock counts all reflect what was actually persisted.
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.id === productId ? { ...p, stockCount: result.newStock } : p
+        )
+      );
+      setEditing((prev) => {
+        const copy = { ...prev };
+        delete copy[productId];
+        return copy;
+      });
+      toast("Stock updated for " + current.name, "success");
     } catch (err) {
       const statusCode =
         err && typeof err === "object" && "statusCode" in err
@@ -102,6 +144,28 @@ function InventoryInner() {
       }
     } finally {
       setSavingId(null);
+    }
+  };
+
+  /**
+   * Deactivate (soft delete) a product. The backend deactivates rather than
+   * hard-deletes so existing order history stays referentially intact.
+   */
+  const removeProduct = async (product: Product) => {
+    const confirmed = window.confirm(
+      `Deactivate "${product.name}"? It will no longer appear in the public catalogue. Existing order history will be preserved.`
+    );
+    if (!confirmed) return;
+    setDeletingId(product.id);
+    try {
+      await deleteProduct(product.id);
+      setProducts((prev) => prev.filter((p) => p.id !== product.id));
+      toast(`Deactivated ${product.name}`, "success");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to deactivate product";
+      toast(msg, "error");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -348,15 +412,26 @@ function InventoryInner() {
                           </button>
                         </div>
                       ) : (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setEditing((prev) => ({ ...prev, [p.id]: String(p.stockCount) }))
-                          }
-                          className="text-xs font-medium text-[var(--color-info)] hover:underline"
-                        >
-                          Adjust
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setEditing((prev) => ({ ...prev, [p.id]: String(p.stockCount) }))
+                            }
+                            className="text-xs font-medium text-[var(--color-info)] hover:underline"
+                          >
+                            Adjust
+                          </button>
+                          <button
+                            type="button"
+                            disabled={deletingId === p.id}
+                            onClick={() => void removeProduct(p)}
+                            className="text-xs font-medium text-[var(--color-destructive)] hover:underline ml-2"
+                            aria-label={"Deactivate " + p.name}
+                          >
+                            {deletingId === p.id ? "Deactivating..." : "Deactivate"}
+                          </button>
+                        </>
                       )}
                     </td>
                   </tr>

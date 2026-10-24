@@ -97,6 +97,12 @@
       "skillPath": "plugins/api-contract-testing/skills/api-contract-testing/SKILL.md",
       "computedHash": "08fd5855432b3d79dab9b08c4e91208249c8b76513ebb55d4f486a21ac1c1e2c"
     },
+    "api-design-patterns": {
+      "source": "i-onlabs/claude-code-skills",
+      "sourceType": "github",
+      "skillPath": "api-design-patterns/SKILL.md",
+      "computedHash": "b898d98f20640a13fdb2381b3b82483591f7c16d6f346f560c9f3c9f2977a172"
+    },
     "api-design-principles": {
       "source": "secondsky/claude-skills",
       "sourceType": "github",
@@ -793,6 +799,12 @@
       "skillPath": "plugins/cloudflare-zero-trust-access/skills/cloudflare-zero-trust-access/SKILL.md",
       "computedHash": "3c8f93328c64c24cad1517bfbceed80015f81a6f1484c2730a57ecbccf845cc2"
     },
+    "code-auditor": {
+      "source": "i-onlabs/claude-code-skills",
+      "sourceType": "github",
+      "skillPath": "code-auditor/SKILL.md",
+      "computedHash": "0e256f0158b9cc5ececffc81d628bf09addf6fa59fba2f2bde8f22e22e20205a"
+    },
     "code-improver": {
       "source": "trailofbits/skills",
       "sourceType": "github",
@@ -805,11 +817,23 @@
       "skillPath": "plugins/building-secure-contracts/skills/code-maturity-assessor/SKILL.md",
       "computedHash": "28383d3b6107c75af6fddfcec037cca73d8fbf4e4254bf050ba865b0626f9d22"
     },
+    "code-refactor": {
+      "source": "i-onlabs/claude-code-skills",
+      "sourceType": "github",
+      "skillPath": "code-refactor/SKILL.md",
+      "computedHash": "003197b99a48141070aa6d053a0a94a709a6d79c1efa11ad435d366ab87ede29"
+    },
     "code-review": {
       "source": "secondsky/claude-skills",
       "sourceType": "github",
       "skillPath": "plugins/code-review/skills/code-review/SKILL.md",
       "computedHash": "685097330ec5c84e840caff3cae783a57b258fa405f7b66f0ff39d24d6bce02f"
+    },
+    "code-reviewer": {
+      "source": "i-onlabs/claude-code-skills",
+      "sourceType": "github",
+      "skillPath": "code-reviewer/SKILL.md",
+      "computedHash": "e86db66846b35a0f334e6718ee2e612696dc53348d53d78949bca1be6109c2fa"
     },
     "codeql": {
       "source": "trailofbits/skills",
@@ -1236,6 +1260,12 @@
       "sourceType": "github",
       "skillPath": "plugins/feature-dev/skills/feature-dev/SKILL.md",
       "computedHash": "313f1c2302cb16e51764591ce2b21d4b0fd4e3ac8a18f5e31a7cd864bdbf3817"
+    },
+    "feature-planning": {
+      "source": "i-onlabs/claude-code-skills",
+      "sourceType": "github",
+      "skillPath": "feature-planning/SKILL.md",
+      "computedHash": "eb2c442c28382ff7d7707b46e0a08eddfa6dc82cca6fa96a895aec807c740e4d"
     },
     "financial-statements": {
       "source": "anthropics/knowledge-work-plugins",
@@ -1957,6 +1987,12 @@
       "skillPath": "plugins/progressive-web-app/skills/progressive-web-app/SKILL.md",
       "computedHash": "36fdf85782ec1f4569cec2c9b47129a4adcb63bd20a6c017033f0bd917b77a05"
     },
+    "project-context": {
+      "source": "i-onlabs/claude-code-skills",
+      "sourceType": "github",
+      "skillPath": "project-context/SKILL.md",
+      "computedHash": "a96734fed3c5afda8718e0afffeeaf44805d007fbbec1942869d95a860f6f92a"
+    },
     "property-based-testing": {
       "source": "trailofbits/skills",
       "sourceType": "github",
@@ -1980,6 +2016,12 @@
       "sourceType": "github",
       "skillPath": "plugins/push-notification-setup/skills/push-notification-setup/SKILL.md",
       "computedHash": "d213ec048dc378c7441b9166ab1d11906661df07a219c59842b3ae56a2c095f6"
+    },
+    "quality-gates": {
+      "source": "i-onlabs/claude-code-skills",
+      "sourceType": "github",
+      "skillPath": "quality-gates/SKILL.md",
+      "computedHash": "c3cc3a604c0ea7d59d7b42b577ae74e662960ba8157082d4af28c11ea38cba3f"
     },
     "react-best-practices": {
       "source": "secondsky/claude-skills",
@@ -2238,6 +2280,36 @@
       "sourceType": "github",
       "skillPath": "plugins/semgrep-rule-variant-creator/skills/semgrep-rule-variant-creator/SKILL.md",
       "computedHash": "d81219a114d157f724be7f512978f17fe6815ba7c3a9341fb67799ae4e0f9255"
+    },
+    "senior-backend": {
+      "source": "i-onlabs/claude-code-skills",
+      "sourceType": "github",
+      "skillPath": "senior-backend/SKILL.md",
+      "computedHash": "c15972382ed35ec141f419c3caec031156721d85b26c29fd22cd4cf9991acd7b"
+    },
+    "senior-devops": {
+      "source": "i-onlabs/claude-code-skills",
+      "sourceType": "github",
+      "skillPath": "senior-devops/SKILL.md",
+      "computedHash": "1bcff120b84c851b3c16aa3abc9c66b1ffd93c9482616467a4cca1c86b66c809"
+    },
+    "senior-fullstack": {
+      "source": "i-onlabs/claude-code-skills",
+      "sourceType": "github",
+      "skillPath": "senior-fullstack/SKILL.md",
+      "computedHash": "f5e896578aa49e4d9b573c9950336cada44821bf7a1d4771b547c05bf2e42449"
+    },
+    "senior-qa": {
+      "source": "i-onlabs/claude-code-skills",
+      "sourceType": "github",
+      "skillPath": "senior-qa/SKILL.md",
+      "computedHash": "d08a98dae716b409de5ef92f0a50278b2b6add0e4360cbb70456b5b9957a8de3"
+    },
+    "senior-security": {
+      "source": "i-onlabs/claude-code-skills",
+      "sourceType": "github",
+      "skillPath": "senior-security/SKILL.md",
+      "computedHash": "9489abd6ae7b28d6d7fba1a75cdcc78cb370558d9c3129cc6a0276bc1630823a"
     },
     "seo-ai-visibility": {
       "source": "anthropics/knowledge-work-plugins",
@@ -2504,10 +2576,10 @@
       "computedHash": "9b334dd1bc654fda2ed014680e1910f33fcb4b0daa6fee2b91ef50156f401b81"
     },
     "systematic-debugging": {
-      "source": "secondsky/claude-skills",
+      "source": "i-onlabs/claude-code-skills",
       "sourceType": "github",
-      "skillPath": "plugins/systematic-debugging/skills/systematic-debugging/SKILL.md",
-      "computedHash": "99f9a4719597342d6caf6bf1f8acaeaa6136909dbde7641de032615f524ff391"
+      "skillPath": "systematic-debugging/SKILL.md",
+      "computedHash": "e2805f1877beb2304ba2c7192b4fe63cc8017d064aa9b39cbecdd9a30acbe940"
     },
     "tailwind-v4-shadcn": {
       "source": "secondsky/claude-skills",
@@ -2786,10 +2858,10 @@
       "computedHash": "88c9f884917dd5002b937690377778676a56df2864610072119b7c06ddc1d860"
     },
     "verification-before-completion": {
-      "source": "obra/superpowers",
+      "source": "i-onlabs/claude-code-skills",
       "sourceType": "github",
-      "skillPath": "skills/verification-before-completion/SKILL.md",
-      "computedHash": "b529822bdac4b197b180fe12225cff86b930b65910435103c10622df7f041651"
+      "skillPath": "verification-before-completion/SKILL.md",
+      "computedHash": "a601754d7bc96487b23101f2ed669e71df6468f6a005fa17d615f45e17d385c7"
     },
     "view-pdf": {
       "source": "anthropics/knowledge-work-plugins",
@@ -2826,6 +2898,12 @@
       "sourceType": "github",
       "skillPath": "plugins/web-performance-optimization/skills/web-performance-optimization/SKILL.md",
       "computedHash": "84baabbca516bf3ea42f44199ed3801053eec107ba078478c6f32b65f4462864"
+    },
+    "webapp-testing": {
+      "source": "i-onlabs/claude-code-skills",
+      "sourceType": "github",
+      "skillPath": "webapp-testing/SKILL.md",
+      "computedHash": "5a6a18c0137cfbabec058e86fc1c8f6919d846a7b2a34ee978cc8ced866ee2e5"
     },
     "websocket-implementation": {
       "source": "secondsky/claude-skills",

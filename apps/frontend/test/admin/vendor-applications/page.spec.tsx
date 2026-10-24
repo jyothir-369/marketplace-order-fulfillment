@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import VendorApplicationsPage from "../../../app/(operational)/admin/vendor-applications/page";
 import * as api from "../../../lib/api";
 
@@ -24,7 +24,7 @@ describe("Admin vendor-applications", () => {
   it("loads applications, approves one, and refreshes the list", async () => {
     let listCalls = 0;
 
-    (api.getPendingVendorApplications as jest.Mock).mockImplementation(async () => { listCalls += 1; return (listCalls === 1 ? [application] : []); });
+    (api.getPendingVendorApplications as jest.Mock).mockImplementation(async () => { listCalls += 1; return listCalls === 1 ? [application] : []; });
     (api.approveVendorApplication as jest.Mock).mockResolvedValue({ id: 'a-1', status: 'approved' });
 
     render(<VendorApplicationsPage />);
@@ -32,8 +32,12 @@ describe("Admin vendor-applications", () => {
     await screen.findByText("v@test.com");
     fireEvent.click(screen.getByRole("button", { name: "Approve" }));
 
+    // Confirm modal appears; enter empty reason; confirm
+    await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Confirm approve" }));
+
     await waitFor(() => {
-      expect(api.approveVendorApplication).toHaveBeenCalledWith('a-1', { decision: 'approve' });
+      expect(api.approveVendorApplication).toHaveBeenCalledWith('a-1', { decision: 'approve', reason: undefined });
       expect(screen.getByText("No pending applications.")).toBeInTheDocument();
     });
 
@@ -52,7 +56,7 @@ describe("Admin vendor-applications", () => {
     let listCalls = 0;
     let resolveApproval!: () => void;
 
-    (api.getPendingVendorApplications as jest.Mock).mockImplementation(async () => { listCalls += 1; return (listCalls === 1 ? [application] : []); });
+    (api.getPendingVendorApplications as jest.Mock).mockImplementation(async () => { listCalls += 1; return listCalls === 1 ? [application] : []; });
     (api.approveVendorApplication as jest.Mock).mockImplementation(() => new Promise<void>((r) => { resolveApproval = r as any; }));
 
     render(<VendorApplicationsPage />);
@@ -64,6 +68,13 @@ describe("Admin vendor-applications", () => {
 
     fireEvent.click(approve);
 
+    // The inline modal opens; no request is made until Confirm.
+    await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
+    expect(api.approveVendorApplication).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Confirm approve" }));
+
+    // While the request is in flight the row action buttons stay disabled.
     await waitFor(() => {
       expect(approve).toBeDisabled();
       expect(reject).toBeDisabled();
@@ -75,5 +86,103 @@ describe("Admin vendor-applications", () => {
     await waitFor(() => {
       expect(screen.getByText("No pending applications.")).toBeInTheDocument();
     });
+  });
+
+  it("sends entered review reason on approve", async () => {
+    (api.getPendingVendorApplications as jest.Mock).mockResolvedValue([application]);
+    (api.approveVendorApplication as jest.Mock).mockResolvedValue({ id: 'a-1', status: 'approved' });
+
+    render(<VendorApplicationsPage />);
+    await screen.findByText("v@test.com");
+
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText("Review reason"), { target: { value: "Good business docs" } });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm approve" }));
+
+    await waitFor(() => {
+      expect(api.approveVendorApplication).toHaveBeenCalledWith('a-1', { decision: 'approve', reason: 'Good business docs' });
+    });
+  });
+
+  it("sends entered review reason on reject", async () => {
+    (api.getPendingVendorApplications as jest.Mock).mockResolvedValue([application]);
+    (api.rejectVendorApplication as jest.Mock).mockResolvedValue({ id: 'a-1', status: 'rejected' });
+
+    render(<VendorApplicationsPage />);
+    await screen.findByText("v@test.com");
+
+    fireEvent.click(screen.getByRole("button", { name: "Reject" }));
+    await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText("Review reason"), { target: { value: "Incomplete details" } });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm reject" }));
+
+    await waitFor(() => {
+      expect(api.rejectVendorApplication).toHaveBeenCalledWith('a-1', { decision: 'reject', reason: 'Incomplete details' });
+    });
+  });
+
+  it("allows empty review reason and submits", async () => {
+    (api.getPendingVendorApplications as jest.Mock).mockResolvedValue([application]);
+    (api.approveVendorApplication as jest.Mock).mockResolvedValue({ id: 'a-1', status: 'approved' });
+
+    render(<VendorApplicationsPage />);
+    await screen.findByText("v@test.com");
+
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
+
+    // Leave reason empty (default); confirm
+    fireEvent.click(screen.getByRole("button", { name: "Confirm approve" }));
+
+    await waitFor(() => {
+      expect(api.approveVendorApplication).toHaveBeenCalledWith('a-1', { decision: 'approve', reason: undefined });
+    });
+  });
+
+  it("cancel prevents API call", async () => {
+    (api.getPendingVendorApplications as jest.Mock).mockResolvedValue([application]);
+
+    render(<VendorApplicationsPage />);
+    await screen.findByText("v@test.com");
+
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(api.approveVendorApplication).not.toHaveBeenCalled();
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("enforces 500 character max on review reason textarea", async () => {
+    (api.getPendingVendorApplications as jest.Mock).mockResolvedValue([application]);
+
+    render(<VendorApplicationsPage />);
+    await screen.findByText("v@test.com");
+
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
+
+    const textarea = screen.getByLabelText("Review reason") as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: "A".repeat(510) } });
+    expect((textarea as HTMLTextAreaElement).value.length).toBeLessThanOrEqual(500);
+  });
+
+  it("shows separate approve/reject context in modal labels", async () => {
+    (api.getPendingVendorApplications as jest.Mock).mockResolvedValue([application]);
+
+    render(<VendorApplicationsPage />);
+    await screen.findByText("v@test.com");
+
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    await waitFor(() => expect(screen.getByRole("dialog", { name: /Approve application/i })).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Reject" }));
+    await waitFor(() => expect(screen.getByRole("dialog", { name: /Reject application/i })).toBeInTheDocument());
   });
 });

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+﻿import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ResetPasswordPage from '../app/(auth)/reset-password/page';
 
@@ -24,7 +24,7 @@ describe('reset-password confirmation (focused)', () => {
 
   it('shows error on missing token', () => {
     render(<ResetPasswordPage />);
-    // token missing when no query param — error shown by page logic
+    // token missing when no query param â€” error shown by page logic
     expect(screen.getByText(/invalid reset link/i)).toBeInTheDocument();
   });
 
@@ -53,7 +53,7 @@ describe('reset-password confirmation (focused)', () => {
     await user.type(screen.getByPlaceholderText('New password'), 'new');
     await user.type(screen.getByPlaceholderText(/confirm new password/i), 'new');
     await user.click(screen.getByRole('button', { name: /update/i }));
-    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/auth/reset/confirm', expect.any(Object)));
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringMatching(/\/api\/auth\/reset\/confirm$/), expect.any(Object)));
   });
 
   it('shows success after API success', async () => {
@@ -79,7 +79,7 @@ describe('reset-password confirmation (focused)', () => {
   });
 
   it('shows network error on fetch exception', async () => {
-    global.fetch = jest.fn().mockRejectedValue(new Error('net')) as any;
+    global.fetch = jest.fn().mockRejectedValue(new Error('Network error')) as any;
     const user = userEvent.setup();
     window.history.replaceState({}, '', '/reset-password?token=t1');
     render(<ResetPasswordPage />);
@@ -89,3 +89,4 @@ describe('reset-password confirmation (focused)', () => {
     await waitFor(() => expect(screen.getByText(/network error/i)).toBeInTheDocument());
   });
 });
+

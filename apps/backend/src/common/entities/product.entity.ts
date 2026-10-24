@@ -18,12 +18,11 @@ export class Product {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  /** Phase 2.4: normalised to snake_case to match every other FK in the DB. */
-  @Column({ type: 'uuid', name: 'vendorId' })
+  @Column({ type: 'uuid', name: 'vendor_id' })
   vendorId: string;
 
   @ManyToOne(() => Vendor, (vendor) => vendor.products)
-  @JoinColumn({ name: 'vendorId' })
+  @JoinColumn({ name: 'vendor_id' })
   vendor: Vendor;
 
   @Column({ type: 'varchar', length: 255 })

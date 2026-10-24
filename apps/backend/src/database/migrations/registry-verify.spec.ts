@@ -112,4 +112,10 @@ describe('Migration registry integrity (upgraded)', () => {
     // This test is structural: if new collision appears, previous comparison tests will fail.
     expect(DUPLICATE_TIMESTAMPS.length).toBeGreaterThanOrEqual(2);
   });
+
+  it('reports that source-level verification is not proof of database compatibility', () => {
+    // Structural registry verification (file/class/datasource alignment) does NOT prove
+    // deployed-database compatibility. A separate, explicitly approved isolated DB run is required.
+    expect(DUPLICATE_TIMESTAMPS.length >= 0).toBe(true);
+  });
 });

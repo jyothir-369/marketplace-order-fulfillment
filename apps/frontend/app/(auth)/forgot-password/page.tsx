@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
+import { requestPasswordReset } from "@/lib/api";
 
 export default function ForgotPasswordPage() {
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
@@ -12,22 +13,20 @@ export default function ForgotPasswordPage() {
     const formData = new FormData(e.currentTarget);
     const email = String(formData.get("email") || "").trim();
     try {
-      const res = await fetch("/api/auth/reset/request", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        setStatus("sent");
-        setMessage(data.message || "If an account exists, a reset link has been sent.");
-      } else {
-        setStatus("error");
-        setMessage(data.message || "Request failed.");
-      }
-    } catch {
+      const data = await requestPasswordReset(email);
+      setStatus("sent");
+      setMessage(data.message || "If an account exists, a reset link has been sent.");
+    } catch (err: unknown) {
       setStatus("error");
-      setMessage("Network error. Please try again.");
+      let msg = "Request failed.";
+      if (err && typeof err === "object") {
+        const e = err as { body?: { message?: string | string[] }; message?: string; statusCode?: number };
+        const raw = e.body?.message || e.message || "";
+        msg = Array.isArray(raw) ? raw.join("; ") : (typeof raw === "string" ? raw : "Request failed.");
+      }
+      // Prevent internal leakage: do not expose server stack / tokens / details
+      if (msg.length > 200 || msg.toLowerCase().includes("internal")) msg = "Request failed. Please try again.";
+      setMessage(msg);
     }
   }
 

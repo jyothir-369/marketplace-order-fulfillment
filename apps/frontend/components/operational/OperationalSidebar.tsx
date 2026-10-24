@@ -10,7 +10,7 @@ import { useAuth } from "@/lib/auth-context";
 import {
   LayoutGrid, Package, ShoppingCart, AlertTriangle,
   BarChart3, ClipboardList, DatabaseZap, LayoutDashboard,
-  FolderTree, Building2, Tag, Settings, LogOut,
+  FolderTree, Building2, FileCheck, Tag, Settings, LogOut,
 } from "lucide-react";
 
 type Role = "vendor" | "admin";
@@ -32,6 +32,8 @@ const ADMIN_NAV: NavItem[] = [
   { href: "/admin/orders", label: "All Orders", icon: ClipboardList },
   { href: "/admin/categories", label: "Categories", icon: FolderTree },
   { href: "/admin/vendors", label: "Vendors", icon: Building2 },
+  { href: "/admin/vendor-applications", label: "Vendor Applications", icon: FileCheck },
+  { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/admin/dead-letter", label: "Dead-Letter", icon: AlertTriangle },
   { href: "/admin/audit-logs", label: "Audit Logs", icon: DatabaseZap },
 ];
