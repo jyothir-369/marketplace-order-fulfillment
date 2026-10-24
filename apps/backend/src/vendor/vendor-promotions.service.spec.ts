@@ -75,10 +75,10 @@ describe('hardening regression', () => {
   });
 
   it('preserves no destructive down() change without approval', () => {
-    import * as fs from 'fs'; import * as path from 'path';
     // Runtime file check preserved — verifies migration file presence, not DB mutation.
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const downExists = (require('fs') as typeof fs).existsSync(require('path').resolve(__dirname, '../database/migrations/20261017-AddPromotionsTable.ts'));
+    const fs = require('fs'); const path = require('path');
+    const downExists = fs.existsSync(path.resolve(__dirname, '../database/migrations/20261017-AddPromotionsTable.ts'));
     expect(downExists).toBe(true);
   });
 
