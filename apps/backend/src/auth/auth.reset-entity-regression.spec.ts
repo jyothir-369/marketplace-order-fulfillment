@@ -10,12 +10,9 @@ describe('PasswordResetToken metadata failure reproduction', () => {
     expect(src).toContain('PasswordResetToken');
   });
 
-  it('compiled dist reflects same registration', () => {
+  it('compiled dist reflects same registration — fails if build output missing', () => {
     const distPath = path.resolve(__dirname, '../../dist/app.module.js');
-    if (!fs.existsSync(distPath)) {
-      console.log('SKIP: compiled dist not present in CI (build runs separately); source registration verified above.');
-      return;
-    }
+    expect(fs.existsSync(distPath)).toBe(true); // never silently skip when dist absent
     const dist = fs.readFileSync(distPath, 'utf8');
     expect(dist).toContain('password_reset_token_entity');
   });
