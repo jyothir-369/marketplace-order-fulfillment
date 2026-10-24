@@ -82,4 +82,27 @@ export class HealthController {
       ready,
     };
   }
+
+  @Get("bounded")
+  async boundedHealth(): Promise<{ status: string; boundedAt: string; databaseStatus: string; memoryPercent: number; uptimeSec: number; timestamp: string }> {
+    const boundedAt = new Date().toISOString();
+    let dbStatus = "unknown";
+    let dbOk = false;
+    try {
+      if (this.dataSource.isInitialized) {
+        await Promise.race([this.dataSource.query("SELECT 1"), new Promise((_,r)=>setTimeout(r,3000,"timeout"))]);
+        dbStatus = "connected"; dbOk = true;
+      } else { dbStatus = "not_initialized"; }
+    } catch (e) { dbStatus = "error: " + (e instanceof Error ? e.message : String(e)); }
+    const mem = process.memoryUsage();
+    return {
+      status: dbOk ? "healthy" : "degraded",
+      boundedAt,
+      databaseStatus: dbStatus,
+      memoryPercent: Math.round((mem.heapUsed / mem.heapTotal) * 10000) / 100,
+      uptimeSec: Math.floor((Date.now() - this.startTime) / 1000),
+      timestamp: new Date().toISOString(),
+    };
+  }
+
 }

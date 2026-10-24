@@ -10,6 +10,8 @@ import { VendorSyncJob } from '../common/entities/vendor-sync-job.entity';
 import { OrdersService } from '../orders/orders.service';
 import { FulfillmentService } from '../fulfillment/fulfillment.service';
 import { AuditService } from '../common/audit/audit.service';
+import { Product } from '../common/entities/product.entity';
+import { VendorApplication } from '../vendor/vendor-application.entity';
 
 describe('AdminService', () => {
   let service: AdminService;
@@ -49,6 +51,8 @@ describe('AdminService', () => {
         { provide: getRepositoryToken(VendorSyncJob), useValue: syncJobRepositoryMock },
         { provide: getRepositoryToken(User), useValue: { findOne: jest.fn(), find: jest.fn(), manager: { transaction: jest.fn(async (fn) => fn({ findOne: jest.fn(), update: jest.fn() })) } } },
         { provide: getRepositoryToken(Vendor), useValue: { findOne: jest.fn() } },
+        { provide: getRepositoryToken(Product), useValue: { count: jest.fn().mockResolvedValue(0), findOne: jest.fn() } },
+        { provide: getRepositoryToken(VendorApplication), useValue: { count: jest.fn().mockResolvedValue(0) } },
         { provide: AuthService, useValue: { revokeAllForUser: jest.fn(async () => 1) } },
         { provide: OrdersService, useValue: {} },
         { provide: FulfillmentService, useValue: fulfillmentServiceMock },
@@ -192,7 +196,9 @@ describe('AdminService — Phase 1 vendor-account linking (D1/D9/D10)', () => {
         { provide: getRepositoryToken(VendorSyncJob), useValue: { count: jest.fn().mockResolvedValue(0) } },
         { provide: getRepositoryToken(User), useValue: { findOne: jest.fn().mockResolvedValue({ id: 'u1', email: 'buyer@test.dev', role: UserRole.BUYER, vendorId: null }), manager: { transaction: jest.fn(async (fn: any) => { const m = { findOne: jest.fn().mockResolvedValue({ id: 'u1', role: UserRole.BUYER, vendorId: null }), update: jest.fn().mockImplementation((e: any, id: any, d: any) => Promise.resolve({ id, ...d })) }; return fn(m); }) } } },
         { provide: getRepositoryToken(Vendor), useValue: { findOne: jest.fn().mockResolvedValue({ id: 'v1', name: 'Demo Vendor' }) } },
+        { provide: getRepositoryToken(Product), useValue: { count: jest.fn().mockResolvedValue(0), findOne: jest.fn() } },
         { provide: AuthService, useValue: { revokeAllForUser: revokeMock } },
+        { provide: getRepositoryToken(VendorApplication), useValue: { count: jest.fn().mockResolvedValue(0) } },
         { provide: AuditService, useValue: { log: auditMock.log, logAdminResolution: jest.fn() } },
         { provide: OrdersService, useValue: {} },
         { provide: FulfillmentService, useValue: {} },
@@ -216,8 +222,10 @@ describe('AdminService — Phase 1 vendor-account linking (D1/D9/D10)', () => {
         { provide: getRepositoryToken(Order), useValue: { findOne: jest.fn(), createQueryBuilder: jest.fn() } },
         { provide: getRepositoryToken(OrderLineItem), useValue: { findOne: jest.fn(), createQueryBuilder: jest.fn() } },
         { provide: getRepositoryToken(VendorSyncJob), useValue: { count: jest.fn().mockResolvedValue(0) } },
+        { provide: getRepositoryToken(Product), useValue: { count: jest.fn().mockResolvedValue(0), findOne: jest.fn() } },
         { provide: getRepositoryToken(User), useValue: { findOne: jest.fn().mockResolvedValue({ id: 'u1', email: 'buyer@test.dev', role: UserRole.VENDOR, vendorId: 'v1' }), manager: { transaction: jest.fn(async (fn: any) => { const m = { findOne: jest.fn().mockResolvedValue({ id: 'u1', role: UserRole.VENDOR, vendorId: 'v1' }), update: jest.fn() }; return fn(m); }) } } },
         { provide: getRepositoryToken(Vendor), useValue: { findOne: jest.fn().mockResolvedValue({ id: 'v1' }) } },
+        { provide: getRepositoryToken(VendorApplication), useValue: { count: jest.fn().mockResolvedValue(0) } },
         { provide: AuthService, useValue: { revokeAllForUser: jest.fn() } },
         { provide: AuditService, useValue: { log: jest.fn(), logAdminResolution: jest.fn() } },
         { provide: OrdersService, useValue: {} },
@@ -235,9 +243,11 @@ describe('AdminService — Phase 1 vendor-account linking (D1/D9/D10)', () => {
         AdminService,
         { provide: getRepositoryToken(Order), useValue: { findOne: jest.fn(), createQueryBuilder: jest.fn() } },
         { provide: getRepositoryToken(OrderLineItem), useValue: { findOne: jest.fn(), createQueryBuilder: jest.fn() } },
+        { provide: getRepositoryToken(Product), useValue: { count: jest.fn().mockResolvedValue(0), findOne: jest.fn() } },
         { provide: getRepositoryToken(VendorSyncJob), useValue: { count: jest.fn().mockResolvedValue(0) } },
         { provide: getRepositoryToken(User), useValue: { findOne: jest.fn().mockResolvedValue({ id: 'u1', email: 'admin@test.dev', role: UserRole.ADMIN, vendorId: null }), manager: { transaction: jest.fn() } } },
         { provide: getRepositoryToken(Vendor), useValue: { findOne: jest.fn().mockResolvedValue({ id: 'v1' }) } },
+        { provide: getRepositoryToken(VendorApplication), useValue: { count: jest.fn().mockResolvedValue(0) } },
         { provide: AuthService, useValue: { revokeAllForUser: jest.fn() } },
         { provide: AuditService, useValue: { log: jest.fn() } },
         { provide: OrdersService, useValue: {} },
@@ -256,8 +266,10 @@ describe('AdminService — Phase 1 vendor-account linking (D1/D9/D10)', () => {
         { provide: getRepositoryToken(Order), useValue: { findOne: jest.fn(), createQueryBuilder: jest.fn() } },
         { provide: getRepositoryToken(OrderLineItem), useValue: { findOne: jest.fn(), createQueryBuilder: jest.fn() } },
         { provide: getRepositoryToken(VendorSyncJob), useValue: { count: jest.fn().mockResolvedValue(0) } },
+        { provide: getRepositoryToken(Product), useValue: { count: jest.fn().mockResolvedValue(0), findOne: jest.fn() } },
         { provide: getRepositoryToken(User), useValue: { findOne: jest.fn().mockResolvedValue({ id: 'u1', email: 'buyer@test.dev', role: UserRole.VENDOR, vendorId: 'v1' }), manager: { transaction: jest.fn(async (fn) => { const m = { findOne: jest.fn().mockResolvedValue({ id: 'u1', role: UserRole.VENDOR, vendorId: 'v1' }), update: jest.fn().mockImplementation((e: any, id:any,d:any) => Promise.resolve({id,...d})) }; return fn(m); }) } } },
         { provide: getRepositoryToken(Vendor), useValue: { findOne: jest.fn().mockResolvedValue({ id: 'v1' }) } },
+        { provide: getRepositoryToken(VendorApplication), useValue: { count: jest.fn().mockResolvedValue(0) } },
         { provide: AuthService, useValue: { revokeAllForUser: jest.fn().mockResolvedValue(1) } },
         { provide: AuditService, useValue: { log: jest.fn().mockResolvedValue(1), logAdminResolution: jest.fn() } },
         { provide: OrdersService, useValue: {} },

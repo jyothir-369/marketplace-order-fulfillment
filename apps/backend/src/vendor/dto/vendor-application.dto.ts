@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsEmail, MaxLength, IsIn } from 'class-validator';
+import { IsString, IsNotEmpty, IsEmail, MaxLength, IsIn, IsOptional } from 'class-validator';
 
 export class SubmitApplicationDto {
   @IsEmail()
@@ -16,6 +16,10 @@ export class SubmitApplicationDto {
 }
 
 export class ReviewApplicationDto {
+  @IsString()
+  @IsOptional()
+  @MaxLength(500)
+  reason?: string;
   @IsString()
   @IsNotEmpty()
   @IsIn(['approve', 'reject'])

@@ -1,4 +1,4 @@
-﻿import { Test, TestingModule } from '@nestjs/testing';
+import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConflictException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { VendorApplication, VendorApplicationStatus } from './vendor-application.entity';
@@ -215,7 +215,7 @@ describe('VendorApplicationService', () => {
   });
 });
 describe('additional authorization and transaction tests', () => {
-  it('rejects anonymous approval by committing REJECTED before throwing ConflictException', async () => {
+  it('rejects anonymous approval without mutating the application', async () => {
     const updateMock: any = jest.fn();
     const testModule: TestingModule = await Test.createTestingModule({
       providers: [
@@ -237,11 +237,8 @@ describe('additional authorization and transaction tests', () => {
     }).compile();
     const svc = testModule.get<VendorApplicationService>(VendorApplicationService);
     await expect(svc.review('anon-app', { decision: 'approve' } as any, { role: UserRole.ADMIN, id: 'admin-1' } as any)).rejects.toBeInstanceOf(ConflictException);
-    // The rejection must be committed (update called with REJECTED) before exception is thrown
-    expect(updateMock).toHaveBeenCalledWith(
-      { id: 'anon-app' },
-      expect.objectContaining({ status: VendorApplicationStatus.REJECTED, reviewerUserId: 'admin-1' })
-    );
+    // Anonymous approval must fail closed without changing the application.
+    expect(updateMock).not.toHaveBeenCalled();
   });
 
   it('rejection does not modify applicant vendor role or association', async () => {

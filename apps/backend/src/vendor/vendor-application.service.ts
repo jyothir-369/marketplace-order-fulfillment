@@ -125,15 +125,10 @@ export class VendorApplicationService {
 
       if (dto.decision === 'approve') {
         if (!applicant) {
-            await appRepo.update(
-            { id },
-            {
-              status: VendorApplicationStatus.REJECTED,
-              reviewerUserId: reviewer.id,
-              reviewedAt: new Date(),
-            },
-          );
-          // Return normally so TypeORM commits the rejection.
+          // An anonymous (guest) application has no account to promote to
+          // VENDOR. Do NOT write a phantom REJECTED row here: the caller
+          // gets a clear ConflictException and the application stays PENDING
+          // so it can be approved once the applicant registers.
           anonymousApplicantRejected = true;
           return null;
         }
@@ -154,21 +149,27 @@ export class VendorApplicationService {
           { role: UserRole.VENDOR, vendorId: vendor.id },
         );
 
-            await appRepo.update(
+        await appRepo.update(
           { id },
           {
             status: VendorApplicationStatus.APPROVED,
             reviewerUserId: reviewer.id,
             reviewedAt: new Date(),
+            reason: app.reason
+              ? `${app.reason} [approved${dto.reason ? ': ' + dto.reason : ''}]`
+              : `[approved${dto.reason ? ': ' + dto.reason : ''}]`,
           },
         );
       } else if (dto.decision === 'reject') {
-            await appRepo.update(
+        await appRepo.update(
           { id },
           {
             status: VendorApplicationStatus.REJECTED,
             reviewerUserId: reviewer.id,
             reviewedAt: new Date(),
+            reason: app.reason
+              ? `${app.reason} [rejected${dto.reason ? ': ' + dto.reason : ''}]`
+              : `[rejected${dto.reason ? ': ' + dto.reason : ''}]`,
           },
         );
       } else {

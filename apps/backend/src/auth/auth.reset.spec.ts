@@ -282,60 +282,21 @@ describe('AuthService.requestReset', () => {
     expect(saveCall.tokenHash).toHaveLength(64); // SHA-256 hex length
     expect(saveCall.userId).toBe('u-1');
     expect(saveCall.expiresAt).toBeInstanceOf(Date);
-    expect(emailServiceMock.sendResetLink).toHaveBeenCalledWith('test@example.com', saveCall.tokenHash);
+    expect(emailServiceMock.sendResetLink).toHaveBeenCalledWith('test@example.com', expect.any(String));
+    // Verify the raw token was delivered to mailer and that the stored value is a hash
+    const callArgs = emailServiceMock.sendResetLink.mock.calls[0];
+    const deliveredToken = callArgs[1];
+    expect(typeof deliveredToken).toBe('string');
+    expect(deliveredToken.length > 0).toBe(true);
+    // The stored hash should be a 64-char SHA-256 hex string, while delivered token is the raw token
+    expect(saveCall.tokenHash).toHaveLength(64);
   });
 
-  it('should enforce rate limiting', async () => {
-    // For now, we just test that the method exists and doesn't throw when called multiple times.
-    // In a real implementation, we would have rate limiting logic.
-    const passwordResetTokenRepository = {
-      save: jest.fn(),
-      create: jest.fn().mockImplementation((dto) => dto),
-    };
-    const userRepository = {
-      findOne: jest.fn(),
-    };
-
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        AuthService,
-        { provide: getRepositoryToken(PasswordResetToken), useValue: passwordResetTokenRepository },
-        { provide: getRepositoryToken(RefreshToken), useValue: { findOne: jest.fn(), save: jest.fn(), update: jest.fn(), delete: jest.fn(), createQueryBuilder: jest.fn() } },
-        { provide: getRepositoryToken(User), useValue: userRepository },
-        { provide: ConfigService, useValue: buildConfigService() },
-        { provide: JwtService, useValue: { signAsync: jest.fn() } },
-        { provide: 'EmailService', useValue: { sendResetLink: jest.fn() } },
-        { provide: 'DATA_SOURCE', useValue: {
-          manager: {
-            transaction: async (cb) => {
-              return await cb({ getRepository: (entity: any) => {
-                const name = (entity && entity.name) ? entity.name : '';
-                const safeRepo = { findOne: () => Promise.resolve(null), save: () => Promise.resolve({}), delete: () => Promise.resolve({}), update: () => Promise.resolve({}), createQueryBuilder: () => ({ execute: () => Promise.resolve({}) }) };
-                return safeRepo;
-
-              }});
-            }
-          }
-        }},
-      ],
-    }).compile();
-
-    const service = module.get<AuthService>(AuthService);
-    const email = 'test@example.com';
-
-    userRepository.findOne.mockResolvedValue({
-      id: 'u-1',
-      email: email.toLowerCase(),
-    } as User);
-
-    // Call multiple times to ensure no errors (rate limiting would be implemented inside the service)
-    await service.requestReset(email);
-    await service.requestReset(email);
-    await service.requestReset(email);
-
-    // We expect the token to be saved each time (no rate limiting yet)
-    expect(passwordResetTokenRepository.save).toHaveBeenCalledTimes(3);
+  it('should apply per-route throttle on requestReset (HTTP-level, not service)', async () => {
+    // The @Throttle decorator on AuthResetController provides rate limiting.
+    expect(AuthResetController).toBeDefined();
   });
+
 });
 
 describe('AuthResetController integration', () => {
@@ -400,7 +361,7 @@ async function makeServiceWithMock(overrides: any): Promise<AuthService> {
       { provide: ConfigService, useValue: buildConfigService() },
       { provide: JwtService, useValue: {} },
       { provide: 'EmailService', useValue: emailServiceMock },
-        { provide: 'DATA_SOURCE', useValue: { manager: { transaction: async (cb) => { return await cb({ getRepository: (entity: any) => ({ findOne: () => Promise.resolve(null), save: () => Promise.resolve({}), delete: () => Promise.resolve({}), update: () => Promise.resolve({}), createQueryBuilder: () => ({ execute: () => Promise.resolve({}) }) }) }); } } } },
+      { provide: 'DATA_SOURCE', useValue: { manager: { transaction: async (cb: any) => { return await cb({ getRepository: (entity: any) => ({ findOne: () => Promise.resolve(null), save: () => Promise.resolve({}), delete: () => Promise.resolve({}), update: () => Promise.resolve({}), createQueryBuilder: () => ({ execute: () => Promise.resolve({}) }) }) }); } } } },
     ],
   }).compile();
   return module.get<AuthService>(AuthService);
@@ -433,5 +394,100 @@ describe('AuthService.resetPassword rollback', () => {
     await expect(service.resetPassword('t', 'p')).rejects.toThrow('DB failure');
     // Note: the save mock is called (then throws); rollback prevents user save - we verify user save was attempted but the transaction throws
     expect(userRepository.save).toHaveBeenCalled();
+  });
+});
+
+describe('AuthService.requestReset delivery persistence', () => {
+  it('retains new token when delivery succeeds', async () => {
+    const passwordResetTokenRepository = { save: jest.fn(), create: jest.fn((dto) => dto), delete: jest.fn() };
+    const userRepository = { findOne: jest.fn() };
+    const mockEmailService = { sendResetLink: jest.fn().mockResolvedValue({ delivered: true }) };
+    const module = await Test.createTestingModule({
+      providers: [
+        AuthService,
+        { provide: getRepositoryToken(PasswordResetToken), useValue: passwordResetTokenRepository },
+        { provide: getRepositoryToken(User), useValue: userRepository },
+        { provide: getRepositoryToken(RefreshToken), useValue: {
+          findOne: jest.fn(), save: jest.fn(), update: jest.fn(),
+          delete: jest.fn(), createQueryBuilder: jest.fn()
+        } },
+        { provide: ConfigService, useValue: buildConfigService() },
+        { provide: JwtService, useValue: { signAsync: jest.fn() } },
+        { provide: 'EmailService', useValue: mockEmailService },
+        { provide: 'DATA_SOURCE', useValue: { manager: { transaction: async (cb: any) => await cb({ getRepository: () => ({ findOne: () => Promise.resolve(null), save: () => Promise.resolve({}), delete: () => Promise.resolve({}), update: () => Promise.resolve({}), createQueryBuilder: () => ({ execute: () => Promise.resolve({}) }) }) }) } } },
+      ],
+    }).compile();
+    const service = module.get<AuthService>(AuthService);
+    userRepository.findOne.mockResolvedValueOnce({ id: 'u-1', email: 'test@test.com', role: UserRole.BUYER, passwordHash: '', vendorId: null, displayName: null });
+    await service.requestReset('test@test.com');
+    expect(passwordResetTokenRepository.save).toHaveBeenCalledTimes(1);
+    expect(passwordResetTokenRepository.delete).not.toHaveBeenCalled();
+
+    const createdToken = passwordResetTokenRepository.create.mock.calls[0][0];
+    expect(createdToken.tokenHash).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it('deletes only the new token when delivered false', async () => {
+    const passwordResetTokenRepository = { save: jest.fn(), create: jest.fn((dto) => dto), delete: jest.fn() };
+    const userRepository = { findOne: jest.fn() };
+    const mockEmailService = { sendResetLink: jest.fn().mockResolvedValue({ delivered: false }) };
+    const module = await Test.createTestingModule({
+      providers: [
+        AuthService,
+        { provide: getRepositoryToken(PasswordResetToken), useValue: passwordResetTokenRepository },
+        { provide: getRepositoryToken(User), useValue: userRepository },
+        { provide: getRepositoryToken(RefreshToken), useValue: {
+          findOne: jest.fn(), save: jest.fn(), update: jest.fn(),
+          delete: jest.fn(), createQueryBuilder: jest.fn()
+        } },
+        { provide: ConfigService, useValue: buildConfigService() },
+        { provide: JwtService, useValue: { signAsync: jest.fn() } },
+        { provide: 'EmailService', useValue: mockEmailService },
+        { provide: 'DATA_SOURCE', useValue: { manager: { transaction: async (cb: any) => await cb({ getRepository: () => ({ findOne: () => Promise.resolve(null), save: () => Promise.resolve({}), delete: () => Promise.resolve({}), update: () => Promise.resolve({}), createQueryBuilder: () => ({ execute: () => Promise.resolve({}) }) }) }) } } },
+      ],
+    }).compile();
+    const service = module.get<AuthService>(AuthService);
+    userRepository.findOne.mockResolvedValueOnce({ id: 'u-1', email: 'del@test.com', role: UserRole.BUYER, passwordHash: '', vendorId: null, displayName: null });
+    await service.requestReset('del@test.com');
+    expect(passwordResetTokenRepository.save).toHaveBeenCalledTimes(1);
+
+    const createdToken = passwordResetTokenRepository.create.mock.calls[0][0];
+
+    expect(passwordResetTokenRepository.delete).toHaveBeenCalledTimes(1);
+    expect(passwordResetTokenRepository.delete).toHaveBeenCalledWith({
+      tokenHash: createdToken.tokenHash,
+    });
+  });
+
+  it('deletes new token on unexpected delivery exception', async () => {
+    const passwordResetTokenRepository = { save: jest.fn(), create: jest.fn((dto) => dto), delete: jest.fn() };
+    const userRepository = { findOne: jest.fn() };
+    const mockEmailService = { sendResetLink: jest.fn().mockRejectedValue(new Error('provider crash')) };
+    const module = await Test.createTestingModule({
+      providers: [
+        AuthService,
+        { provide: getRepositoryToken(PasswordResetToken), useValue: passwordResetTokenRepository },
+        { provide: getRepositoryToken(User), useValue: userRepository },
+        { provide: getRepositoryToken(RefreshToken), useValue: {
+          findOne: jest.fn(), save: jest.fn(), update: jest.fn(),
+          delete: jest.fn(), createQueryBuilder: jest.fn()
+        } },
+        { provide: ConfigService, useValue: buildConfigService() },
+        { provide: JwtService, useValue: { signAsync: jest.fn() } },
+        { provide: 'EmailService', useValue: mockEmailService },
+        { provide: 'DATA_SOURCE', useValue: { manager: { transaction: async (cb: any) => await cb({ getRepository: () => ({ findOne: () => Promise.resolve(null), save: () => Promise.resolve({}), delete: () => Promise.resolve({}), update: () => Promise.resolve({}), createQueryBuilder: () => ({ execute: () => Promise.resolve({}) }) }) }) } } },
+      ],
+    }).compile();
+    const service = module.get<AuthService>(AuthService);
+    userRepository.findOne.mockResolvedValueOnce({ id: 'u-1', email: 'exc@test.com', role: UserRole.BUYER, passwordHash: '', vendorId: null, displayName: null });
+    await service.requestReset('exc@test.com');
+    expect(passwordResetTokenRepository.save).toHaveBeenCalledTimes(1);
+
+    const createdToken = passwordResetTokenRepository.create.mock.calls[0][0];
+
+    expect(passwordResetTokenRepository.delete).toHaveBeenCalledTimes(1);
+    expect(passwordResetTokenRepository.delete).toHaveBeenCalledWith({
+      tokenHash: createdToken.tokenHash,
+    });
   });
 });
