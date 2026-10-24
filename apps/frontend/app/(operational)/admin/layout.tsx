@@ -18,6 +18,7 @@ import { ToastProvider } from "@/components/ui/toast";
 import { ErrorBoundary } from "@/components/operational/ErrorBoundary";
 import { NetworkStatusBanner } from "@/components/order/NetworkStatusBanner";
 import { RequireRole } from "@/components/auth/RequireRole";
+import { ADMIN_OPERATIONS_ROLES } from "@/lib/rbac";
 
 export const metadata: Metadata = {
   title: {
@@ -28,7 +29,7 @@ export const metadata: Metadata = {
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
-    <RequireRole roles={["admin", "operations"]}>
+    <RequireRole roles={ADMIN_OPERATIONS_ROLES}>
     <ErrorBoundary label="Admin portal">
       <div
         className="flex min-h-screen bg-[var(--color-background)]"

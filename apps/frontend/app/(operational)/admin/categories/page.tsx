@@ -4,9 +4,9 @@
 
 "use client";
 
-import { FormEvent, useEffect, useState } from "react"
+import { FormEvent, useEffect, useState, useRef, useCallback } from "react"
 import { FolderTree, Plus, RefreshCw, X } from "lucide-react"
-import { getAdminCategories, createCategory } from "@/lib/api"
+import { getAdminCategories, createCategory, isAbortError } from "@/lib/api"
 import { ToastProvider, useToast } from "@/components/ui/toast"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
@@ -21,22 +21,48 @@ function AdminCategoriesInner() {
   const [newName, setNewName] = useState("")
   const [creating, setCreating] = useState(false)
 
-  const load = async () => {
+  // Request-race guards: only the newest load may commit state, and an
+  // in-flight fetch is cancelled when a newer load starts (e.g. the user
+  // hits Refresh while the first load is still pending).
+  const requestIdRef = useRef(0)
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const mountedRef = useRef(true)
+
+  const load = useCallback(async () => {
+    const requestId = ++requestIdRef.current
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+    const ac = new AbortController()
+    abortControllerRef.current = ac
     setLoading(true)
     setError(null)
     try {
-      const data = await getAdminCategories()
+      const data = await getAdminCategories(ac.signal)
+      if (requestId !== requestIdRef.current || !mountedRef.current) return
       setCategories(data)
     } catch (err) {
+      if (isAbortError(err)) return
+      if (requestId !== requestIdRef.current || !mountedRef.current) return
       const msg = err instanceof Error ? err.message : "Failed to load categories"
       setError(msg)
       toast(msg, "error")
     } finally {
-      setLoading(false)
+      if (requestId === requestIdRef.current && mountedRef.current) setLoading(false)
     }
-  }
+  }, [toast])
 
-  useEffect(() => { void load() }, [])
+  useEffect(() => {
+    mountedRef.current = true
+    void load()
+    return () => {
+      mountedRef.current = false
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+        abortControllerRef.current = null
+      }
+    }
+  }, [load])
 
   const handleCreate = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()

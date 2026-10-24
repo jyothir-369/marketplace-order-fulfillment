@@ -14,6 +14,7 @@ import type {
   CancelOrderDto,
   AuditLogResponseDto,
   AdminDashboardDto,
+  AdminAnalyticsDto,
   AdminOrderListDto,
   AdminResolveLineItemDto,
   DeadLetterJobDto,
@@ -55,6 +56,21 @@ if (typeof window !== 'undefined' && !process.env.NEXT_PUBLIC_API_BASE_URL && !p
 // Fetch utility
 // ---------------------------------------------------------------------------
 
+/**
+ * True when the thrown value is an abort (cancellation) rather than a real
+ * failure. Callers use this to stay silent for intentionally-cancelled
+ * requests instead of showing an error toast.
+ */
+export function isAbortError(err: unknown): boolean {
+  if (err instanceof DOMException && err.name === "AbortError") return true;
+  // Some polyfills / older runtimes surface a plain Error with `name`.
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    (err as { name?: unknown }).name === "AbortError"
+  );
+}
+
 async function apiFetch<T>(
   path: string,
   init?: RequestInit & { params?: Record<string, string | number | undefined> }
@@ -70,7 +86,12 @@ async function apiFetch<T>(
     if (q) url += `?${q}`;
   }
 
-  const { params: _params, ...fetchInit } = init ?? {};
+  // Pull `params` and `headers` out of the init object so the remaining
+  // spread below cannot clobber them. Previously `...fetchInit` was spread
+  // AFTER the merged `headers` key, which meant a caller-supplied
+  // `headers` object replaced the merged one entirely — silently dropping
+  // both the `Authorization` bearer token and `Content-Type`.
+  const { params: _paramsInit, headers: initHeaders, ...fetchInit } = init ?? {};
 
   // Attach the bearer token when present (Phase 1 auth). SSR-safe: reads are
   // no-ops without `window`, and authenticated calls only run in the browser.
@@ -80,8 +101,12 @@ async function apiFetch<T>(
     : {};
 
   const res = await fetch(url, {
-    headers: { "Content-Type": "application/json", ...authHeaders, ...fetchInit?.headers },
     ...fetchInit,
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders,
+      ...(initHeaders as Record<string, string> | undefined),
+    },
   });
 
   if (!res.ok) {
@@ -211,6 +236,17 @@ export const getVendorCatalog = getVendorProducts;
 // ---------------------------------------------------------------------------
 // Inventory / vendor product management
 // ---------------------------------------------------------------------------
+
+/** POST /api/inventory/:id/adjust — audited delta-based stock update (ownership + pessimistic lock + audit). */
+export async function adjustStock(
+  productId: string,
+  payload: { delta: number; reason: string }
+): Promise<{ success: boolean; productId: string; previousStock: number; newStock: number; requestedQuantity: number; message?: string }> {
+  return apiFetch<{ success: boolean; productId: string; previousStock: number; newStock: number; requestedQuantity: number; message?: string }>(`/inventory/${productId}/adjust`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
 
 /** PATCH /api/catalog/:id */
 export async function updateStock(
@@ -380,8 +416,8 @@ export async function getCategories(): Promise<CategorySummaryDto[]> {
 // ---------------------------------------------------------------------------
 
 /** GET /api/catalog/categories (admin alias — same endpoint) */
-export async function getAdminCategories(): Promise<CategorySummaryDto[]> {
-  return apiFetch<CategorySummaryDto[]>("/catalog/categories");
+export async function getAdminCategories(signal?: AbortSignal): Promise<CategorySummaryDto[]> {
+  return apiFetch<CategorySummaryDto[]>("/catalog/categories", { signal });
 }
 
 /** POST /api/catalog/categories */
@@ -397,8 +433,8 @@ export async function createCategory(payload: { name: string }): Promise<Categor
 // ---------------------------------------------------------------------------
 
 /** GET /api/catalog/vendors/admin */
-export async function getAdminVendors(): Promise<VendorDetailDto[]> {
-  return apiFetch<VendorDetailDto[]>("/catalog/vendors/admin");
+export async function getAdminVendors(signal?: AbortSignal): Promise<VendorDetailDto[]> {
+  return apiFetch<VendorDetailDto[]>("/catalog/vendors/admin", { signal });
 }
 
 /** POST /api/catalog/vendors */
@@ -410,8 +446,8 @@ export async function createVendor(payload: { name: string }): Promise<VendorDet
 }
 
 /** GET /api/admin/vendors/:vendorId/users */
-export async function getLinkedUsers(vendorId: string): Promise<Array<{ id: string; email: string; role: string; vendorId: string | null }>> {
-  return apiFetch<Array<{ id: string; email: string; role: string; vendorId: string | null }>>(`/admin/vendors/${vendorId}/users`);
+export async function getLinkedUsers(vendorId: string, signal?: AbortSignal): Promise<Array<{ id: string; email: string; role: string; vendorId: string | null }>> {
+  return apiFetch<Array<{ id: string; email: string; role: string; vendorId: string | null }>>(`/admin/vendors/${vendorId}/users`, { signal });
 }
 
 /** POST /api/admin/vendors/:vendorId/users */
@@ -439,8 +475,37 @@ export async function getAutocomplete(q?: string): Promise<{ products: string[];
 }
 
 /** GET /api/admin/dashboard */
-export async function getAdminDashboard(): Promise<AdminDashboardDto> {
-  return apiFetch<AdminDashboardDto>("/admin/dashboard");
+export async function getAdminAnalytics(
+  days = 14,
+  signal?: AbortSignal,
+): Promise<AdminAnalyticsDto> {
+  return apiFetch<AdminAnalyticsDto>("/admin/analytics", { params: { days: String(days) }, signal });
+}
+
+export async function getAdminDashboard(signal?: AbortSignal): Promise<AdminDashboardDto> {
+  return apiFetch<AdminDashboardDto>("/admin/dashboard", { signal });
+}
+
+export async function getAdminKPI(signal?: AbortSignal): Promise<any> {
+  return apiFetch<any>("/admin/kpi", { signal });
+}
+
+/** POST /api/auth/reset/request — forgot-password flow */
+export async function requestPasswordReset(email: string): Promise<{ message?: string }> {
+  return apiFetch<{ message?: string }>("/auth/reset/request", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+}
+
+/** POST /api/auth/reset/confirm — reset-password confirmation */
+export async function confirmPasswordReset(payload: { token: string; password: string }): Promise<{ message?: string }> {
+  return apiFetch<{ message?: string }>("/auth/reset/confirm", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
 }
 
 /** GET /api/admin/orders */
@@ -451,7 +516,8 @@ export async function getAdminOrders(
     type?: string;
     limit?: number;
     offset?: number;
-  } = {}
+  } = {},
+  signal?: AbortSignal
 ): Promise<AdminOrderListDto> {
   return apiFetch<AdminOrderListDto>("/admin/orders", {
     params: {
@@ -461,6 +527,7 @@ export async function getAdminOrders(
       limit: filter.limit,
       offset: filter.offset,
     },
+    signal,
   });
 }
 
@@ -483,8 +550,8 @@ export async function cancelAdminOrder(orderId: string): Promise<{ message: stri
 }
 
 /** GET /api/admin/dead-letter */
-export async function getDeadLetterJobs(): Promise<DeadLetterJobDto[]> {
-  return apiFetch<DeadLetterJobDto[]>("/admin/dead-letter");
+export async function getDeadLetterJobs(signal?: AbortSignal): Promise<DeadLetterJobDto[]> {
+  return apiFetch<DeadLetterJobDto[]>("/admin/dead-letter", { signal });
 }
 
 /** POST /api/admin/dead-letter/:jobId/retry */
@@ -497,18 +564,21 @@ export async function retryDeadLetterJob(jobId: string): Promise<{ message: stri
 
 /** GET /api/admin/audit-logs */
 export async function getAuditLogs(
-  filter: Record<string, string | number | undefined> = {}
+  filter: Record<string, string | number | undefined> = {},
+  signal?: AbortSignal
 ): Promise<AdminAuditLogResponseDto> {
   return apiFetch<AdminAuditLogResponseDto>("/admin/audit-logs", {
     params: filter,
+    signal,
   });
 }
 
 /** GET /api/admin/trace/:correlationId */
 export async function getCorrelationTrace(
-  correlationId: string
+  correlationId: string,
+  signal?: AbortSignal
 ): Promise<AdminAuditLogResponseDto> {
-  return apiFetch<AdminAuditLogResponseDto>(`/admin/trace/${correlationId}`);
+  return apiFetch<AdminAuditLogResponseDto>(`/admin/trace/${correlationId}`, { signal });
 }
 
 /** POST /api/vendor-applications — submit a vendor application (public or with optional auth). */
@@ -525,12 +595,12 @@ export async function getMyVendorApplications(): Promise<Array<{ id: string; ema
 }
 
 /** GET /api/vendor-applications — admin list pending. */
-export async function getPendingVendorApplications(): Promise<Array<{ id: string; email: string; businessName: string; status: string; createdAt: string }>> {
-  return apiFetch<Array<{ id: string; email: string; businessName: string; status: string; createdAt: string }>>("/vendor-applications");
+export async function getPendingVendorApplications(signal?: AbortSignal): Promise<Array<{ id: string; email: string; businessName: string; status: string; createdAt: string }>> {
+  return apiFetch<Array<{ id: string; email: string; businessName: string; status: string; createdAt: string }>>("/vendor-applications", { signal });
 }
 
 /** POST /api/vendor-applications/:id/approve */
-export async function approveVendorApplication(id: string, payload: { decision: 'approve' | 'reject' }): Promise<{ id: string; status: string }> {
+export async function approveVendorApplication(id: string, payload: { decision: 'approve' | 'reject'; reason?: string }): Promise<{ id: string; status: string }> {
   return apiFetch<{ id: string; status: string }>(`/vendor-applications/${id}/approve`, {
     method: "POST",
     body: JSON.stringify(payload),
@@ -538,7 +608,7 @@ export async function approveVendorApplication(id: string, payload: { decision: 
 }
 
 /** POST /api/vendor-applications/:id/reject */
-export async function rejectVendorApplication(id: string, payload: { decision: 'approve' | 'reject' }): Promise<{ id: string; status: string }> {
+export async function rejectVendorApplication(id: string, payload: { decision: 'approve' | 'reject'; reason?: string }): Promise<{ id: string; status: string }> {
   return apiFetch<{ id: string; status: string }>(`/vendor-applications/${id}/reject`, {
     method: "POST",
     body: JSON.stringify(payload),
@@ -695,4 +765,10 @@ export async function verifyRazorpayPayment(
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export async function getAdminCustomers(opts?:{limit?:number;offset?:number;search?:string}): Promise<{total:number;customers:any[]}> {
+  const params = new URLSearchParams({ limit: String(opts?.limit ?? 20), offset: String(opts?.offset ?? 0) });
+  if (opts?.search) params.set("search", opts.search);
+  return apiFetch<{total:number;customers:any[]}>("/admin/customers?" + params.toString());
 }

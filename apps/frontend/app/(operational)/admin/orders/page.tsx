@@ -8,12 +8,12 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
-import { getAdminOrders } from "@/lib/api";
+import { useEffect, useState, useRef, useCallback } from "react";
+import { getAdminOrders, isAbortError } from "@/lib/api";
 import { useToast } from "@/components/ui/toast";
 import { FulfillmentDataTable, type FulfillmentColumnDef } from "@/components/operational/FulfillmentDataTable";
 import { ResolveLineItemDialog } from "@/components/admin/resolve-line-item-dialog";
-import type { AdminOrderDto, AdminOrderLineItemDto } from "@/lib/types";
+import type { AdminOrderDto } from "@/lib/types";
 import { formatRelativeTime, cn } from "@/lib/utils";
 import { AlertTriangle } from "lucide-react";
 
@@ -39,7 +39,32 @@ function AdminOrdersInner() {
 
   const PAGE_SIZE = 20;
 
-  const load = async (pageNum: number) => {
+  /**
+   * Request-race guards.
+   *
+   * - `requestIdRef`  — monotonic id; only the newest request may commit
+   *                     state, so a slow earlier response can never
+   *                     overwrite a newer one.
+   * - `abortControllerRef` — the in-flight fetch, so a new load (page /
+   *                     filter change) cancels the previous one instead of
+   *                     letting both compete.
+   * - `mountedRef`   — false after unmount, so a late response never calls
+   *                     setState on an unmounted component.
+   */
+  const requestIdRef = useRef(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef(true);
+
+  const load = useCallback(async (pageNum: number) => {
+    const requestId = ++requestIdRef.current;
+
+    // Cancel any in-flight fetch from a previous page / filter change.
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const ac = new AbortController();
+    abortControllerRef.current = ac;
+
     setLoading(true);
     try {
       const data = await getAdminOrders({
@@ -47,25 +72,47 @@ function AdminOrdersInner() {
         type: stuckFilter ? "stuck" : "all",
         limit: PAGE_SIZE,
         offset: (pageNum - 1) * PAGE_SIZE,
-      });
+      }, ac.signal);
+
+      // Drop stale responses: a newer filter/page change arrived first.
+      if (requestId !== requestIdRef.current || !mountedRef.current) return;
       setOrders(data.orders ?? []);
       setTotal(data.total ?? 0);
     } catch (err) {
+      // Silently swallow aborted requests (intentional cancellation
+      // during rapid navigation / filter changes). Only toast real errors.
+      if (isAbortError(err)) return;
+      if (requestId !== requestIdRef.current || !mountedRef.current) return;
       toast(err instanceof Error ? err.message : "Failed to load orders", "error");
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current && mountedRef.current) setLoading(false);
     }
-  };
+  }, [statusFilter, stuckFilter, toast]);
 
+  // Clean up: abort any remaining request on unmount so the fetch doesn't
+  // try to call setState on an unmounted component.
   useEffect(() => {
-    void load(1);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter, stuckFilter]);
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+    };
+  }, []);
 
+  /**
+   * ONE effect drives every load.
+   *
+   * Previously there were two effects (one for the filters, one for the
+   * page), both of which ran on mount — issuing two identical requests
+   * for page 1 and racing each other. A single effect keyed on all three
+   * inputs issues exactly one request per change.
+   */
   useEffect(() => {
     void load(page);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
+  }, [load, page]);
 
   const columns: FulfillmentColumnDef<AdminOrderDto>[] = [
     {

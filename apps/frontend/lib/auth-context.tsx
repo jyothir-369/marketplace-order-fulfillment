@@ -21,6 +21,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -74,12 +75,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserDto | null>(null);
   const [status, setStatus] = useState<AuthStatus>("idle");
 
+  /**
+   * Monotonic request counter for session restores.
+   *
+   * React 18 StrictMode double-invokes effects in development, and the
+   * RequireRole gate can call `refreshSession()` again while a restore is
+   * still in flight. Without a guard, two concurrent restores can interleave:
+   * the slower one can land AFTER the faster one and overwrite a fresh
+   * session with a stale identity (or sign the user out after a successful
+   * login). Each call captures its own id; only the newest call is allowed
+   * to mutate state.
+   */
+  const sessionRequestIdRef = useRef(0);
+
   const refreshSession = useCallback(async (): Promise<boolean> => {
+    const requestId = ++sessionRequestIdRef.current;
+    // True when a newer refresh has superseded this one.
+    const isStale = () => sessionRequestIdRef.current !== requestId;
+
     // Prevent stale hydration race: clear any previous in-memory user state
     // before resolving new identity; saved persist data stays intact (keyed by userId).
     const refreshToken = getRefreshToken();
     const accessToken = getAccessToken();
     if (!refreshToken && !accessToken) {
+      if (isStale()) return false;
       activateCartUser(null);
       activateWishlistUser(null);
       setUser(null);
@@ -91,6 +110,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (accessToken) {
       try {
         const me = await getMe();
+        // A newer restore (or a logout) landed first — drop this result.
+        if (isStale()) return false;
         activateCartUser(me.id);
         activateWishlistUser(me.id);
         setUser(me);
@@ -105,6 +126,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (refreshToken) {
       try {
         const tokens = await refreshAccessToken(refreshToken);
+        // The refresh token is single-use: if a concurrent call already
+        // rotated it, this one fails (and we must not sign the user out
+        // because a newer restore already established a session).
+        if (isStale()) return false;
         const freshUser = applyTokens(tokens);
         activateCartUser(freshUser.id);
         activateWishlistUser(freshUser.id);
@@ -112,6 +137,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setStatus("authenticated");
         return true;
       } catch {
+        // A newer restore superseded this one — its outcome wins.
+        if (isStale()) return false;
         // Refresh token invalid/revoked — full sign-out.
         clearTokens();
         activateCartUser(null);
@@ -122,6 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    if (isStale()) return false;
     activateCartUser(null);
     activateWishlistUser(null);
     setUser(null);
@@ -131,6 +159,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Session restore on first client render. refreshSession() owns the
   // status transitions; the effect just kicks it off once.
+  //
+  // The request-id ref inside refreshSession is what makes this safe: if a
+  // newer restore (StrictMode double-invoke, a re-render, or a sign-out)
+  // supersedes this one, this call's late result is discarded instead of
+  // overwriting the newer session.
   useEffect(() => {
     setStatus("loading");
     void refreshSession();

@@ -9,9 +9,9 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Search } from "lucide-react";
-import { getAuditLogs, getCorrelationTrace } from "@/lib/api";
+import { getAuditLogs, getCorrelationTrace, isAbortError } from "@/lib/api";
 import { AuditLogTimeline } from "@/components/operational/AuditLogTimeline";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -23,6 +23,7 @@ function AuditLogsInner() {
   const [logs, setLogs] = useState<AuditLogEntryDto[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Filters
   const [entityType, setEntityType] = useState("");
@@ -33,11 +34,36 @@ function AuditLogsInner() {
   const [traceCorrId, setTraceCorrId] = useState("");
   const [traceMode, setTraceMode] = useState(false);
 
-  const load = async () => {
+  /**
+   * Request-race guards.
+   *
+   * The filter inputs below are free-text and drive a server request on
+   * every keystroke, so several requests can be in flight at once. Without
+   * a guard the slowest response wins and the timeline can show results
+   * for a filter the user has already changed.
+   *
+   * - `requestIdRef`  — monotonic id; only the newest request may commit state.
+   * - `abortControllerRef` — the in-flight fetch, cancelled when a newer
+   *   load starts.
+   * - `mountedRef`   — false after unmount, so a late response never calls
+   *   setState on an unmounted component.
+   */
+  const requestIdRef = useRef(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef(true);
+
+  const load = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const ac = new AbortController();
+    abortControllerRef.current = ac;
     setLoading(true);
+    setError(null);
     try {
       if (traceMode && traceCorrId) {
-        const res = await getCorrelationTrace(traceCorrId);
+        const res = await getCorrelationTrace(traceCorrId, ac.signal);
         // Trace returns AdminAuditLogDto (no previous/new state); normalise
         // to AuditLogEntryDto shape so AuditLogTimeline can render it.
         const traceLogs: AuditLogEntryDto[] = (res.logs ?? []).map((l) => ({
@@ -53,6 +79,7 @@ function AuditLogsInner() {
           newState: undefined,
           createdAt: l.createdAt,
         }));
+        if (requestId !== requestIdRef.current || !mountedRef.current) return;
         setLogs(traceLogs);
         setTotal(res.total ?? traceLogs.length);
       } else {
@@ -61,22 +88,34 @@ function AuditLogsInner() {
           action: action || undefined,
           correlationId: correlationId || undefined,
           limit: 100,
-        });
+        }, ac.signal);
+        if (requestId !== requestIdRef.current || !mountedRef.current) return;
         setLogs(res.logs ?? []);
         setTotal(res.total ?? 0);
       }
-    } catch {
+    } catch (err) {
+      if (isAbortError(err)) return;
+      if (requestId !== requestIdRef.current || !mountedRef.current) return;
+      const msg = err instanceof Error ? err.message : "Failed to load audit logs";
+      setError(msg);
       setLogs([]);
       setTotal(0);
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current && mountedRef.current) setLoading(false);
     }
-  };
+  }, [traceMode, traceCorrId, entityType, action, correlationId]);
 
   useEffect(() => {
+    mountedRef.current = true;
     void load();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entityType, action, correlationId, traceMode, traceCorrId]);
+    return () => {
+      mountedRef.current = false;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+    };
+  }, [load]);
 
   return (
     <div className="space-y-6">
@@ -88,6 +127,9 @@ function AuditLogsInner() {
       </div>
 
       {/* Filters */}
+      {error && (
+        <div role="alert" className="rounded-md border border-[var(--color-destructive)] bg-[var(--color-destructive)]/10 text-[var(--color-destructive)] p-3 text-sm font-medium">{error}</div>
+      )}
       <div
         className={cn(
           "flex flex-wrap items-end gap-3 rounded-xl border px-4 py-3",
