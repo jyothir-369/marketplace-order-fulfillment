@@ -45,7 +45,7 @@
       })),
     }));
 
-    return require('../database/migrations/datasource')
+    return /* eslint-disable-line @typescript-eslint/no-var-requires */ require('../database/migrations/datasource')
       .parseMigrationTestDbUrl as () => {
         host: string;
         port: number;
@@ -148,6 +148,8 @@
         options,
       })),
     }));
+        // Dynamic load preserved for jest.doMock()-ordered require. Essential runtime behavior.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { migrationDataSource } = require('../database/migrations/datasource');
     expect(migrationDataSource.options.password).toBe('fromurl');
     expect(migrationDataSource.options.password).not.toBe('fromlegacy');
@@ -158,7 +160,7 @@
       'postgresql://user:pass@localhost:55439/marketplace_migration_test';
     process.env.DATABASE_URL = 'postgresql://evil:evil@evil:5432/db';
     jest.resetModules();
-    expect(() => require('../database/migrations/datasource'))
+    expect(() => require('../database/migrations/datasource') /* eslint-disable-next-line @typescript-eslint/no-var-requires */)
       .toThrow(/BLOCKED/);
   });
 });

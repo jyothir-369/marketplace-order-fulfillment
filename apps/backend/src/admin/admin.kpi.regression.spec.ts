@@ -2,6 +2,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
+import { AuthGuard } from '../auth/auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
 
 describe('AdminController.getKPI regression', () => {
   let controller: AdminController;
@@ -20,8 +22,8 @@ describe('AdminController.getKPI regression', () => {
       controllers: [AdminController],
       providers: [{ provide: AdminService, useValue: mockService }],
     })
-      .overrideGuard(require('../auth/auth.guard').AuthGuard).useValue({ canActivate: () => true })
-      .overrideGuard(require('../auth/roles.guard').RolesGuard).useValue({ canActivate: () => true })
+      .overrideGuard(AuthGuard).useValue({ canActivate: () => true })
+      .overrideGuard(RolesGuard).useValue({ canActivate: () => true })
       .compile();
     controller = module.get(AdminController);
   });

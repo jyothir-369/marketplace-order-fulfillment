@@ -5,27 +5,64 @@
  * the correct behavior change.
  *
  * TDD cycle applied per loaded /test-driven-development skill.
+ *
+ * ISOLATION CONTRACT: never targets marketplace:5432 or defaults. Explicit
+ * isolated test configuration required; missing config = skip/block, not pass.
  */
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import { DataSource } from 'typeorm';
 import { User, UserRole } from '../../common/entities/user.entity';
 import { Vendor } from '../../common/entities/vendor.entity';
 import { Product } from '../../common/entities/product.entity';
+import { Category } from '../../common/entities/category.entity';
+import { OrderLineItem } from '../../common/entities/order-line-item.entity';
+import { Review } from '../../common/entities/review.entity';
+import * as fs from 'fs';
+import * as path from 'path';
+
+function requireIsolationEnv(): { host: string; port: number; database: string; username: string; password: string } {
+  const host = process.env.CATALOG_REGRESSION_DB_HOST || process.env.ISOLATED_TEST_DB_HOST;
+  const portRaw = process.env.CATALOG_REGRESSION_DB_PORT || process.env.ISOLATED_TEST_DB_PORT;
+  const database = process.env.CATALOG_REGRESSION_DB_NAME || process.env.ISOLATED_TEST_DB_NAME;
+  const username = process.env.CATALOG_REGRESSION_DB_USER || process.env.ISOLATED_TEST_DB_USER;
+  const password = process.env.CATALOG_REGRESSION_DB_PASSWORD || process.env.ISOLATED_TEST_DB_PASSWORD;
+  if (!host || !portRaw || !database || !username || !password) {
+    throw new Error('BLOCKED: isolated test DB config required (CATALOG_REGRESSION_DB_* or ISOLATED_TEST_DB_*); never default to marketplace:5432');
+  }
+  const port = parseInt(portRaw, 10);
+  if (!Number.isInteger(port) || port === 5432) {
+    throw new Error('BLOCKED: isolated test DB port must be non-default (not 5432)');
+  }
+  // Never allow production/default database names or hosts
+  if ((database || '').trim() === 'marketplace' && port === 5432) {
+    throw new Error('BLOCKED: default marketplace DB on 5432 prohibited');
+  }
+  return { host: host.trim(), port, database: database.trim(), username: username.trim(), password: password.trim() };
+}
 
 describe('REGRESSION — local-only catalog ownership + inventory + storefront + auth (RED before update)', () => {
   let ds: DataSource;
   let targetVendorId: string;
+  let isolatedConfig: ReturnType<typeof requireIsolationEnv>;
 
   beforeAll(async () => {
+    try {
+      isolatedConfig = requireIsolationEnv();
+    } catch (e) {
+      // Fail-closed: do not proceed with default/unsafe DB
+      console.error('SKIP/BLOCK: isolated DB config missing —', (e as Error).message);
+      throw e; // propagate so test suite reports block rather than false pass
+    }
+
     ds = new DataSource({
       type: 'postgres',
-      host: process.env.DB_HOST || '127.0.0.1',
-      port: parseInt(process.env.DB_PORT || '5432'),
-      username: process.env.DB_USERNAME || 'postgres',
-      password: process.env.DB_PASSWORD || 'postgres',
-      database: process.env.DB_DATABASE || 'marketplace',
+      host: isolatedConfig.host,
+      port: isolatedConfig.port,
+      username: isolatedConfig.username,
+      password: isolatedConfig.password,
+      database: isolatedConfig.database,
       ssl: false,
-      entities: [User, Vendor, Product],
+      entities: [User, Vendor, Product, Category, OrderLineItem, Review],
       synchronize: false,
       logging: false,
     });
@@ -33,7 +70,7 @@ describe('REGRESSION — local-only catalog ownership + inventory + storefront +
 
     const userRepo = ds.getRepository(User);
     const demoUser = await userRepo.findOne({ where: { email: 'vendor@marketplace.dev' } });
-    if (!demoUser || !demoUser.vendorId) throw new Error('Precondition: demo vendor not linked in DB');
+    if (!demoUser || !demoUser.vendorId) throw new Error('Precondition: demo vendor not linked in isolated DB');
     targetVendorId = demoUser.vendorId;
   });
 
@@ -70,8 +107,8 @@ describe('REGRESSION — local-only catalog ownership + inventory + storefront +
   });
 
   it('AUTHORIZATION: RBAC guard assertVendorOwnsProduct remains intact (vendor can only manage own products)', async () => {
-    const fs = require('fs');
-    const path = require('path');
+
+
     const content = fs.readFileSync(path.resolve(__dirname, '../../catalog/catalog.service.ts'), 'utf8');
     expect(content).toContain('assertVendorOwnsProduct');
     expect(content).toContain('currentUser.vendorId !== vendorId');

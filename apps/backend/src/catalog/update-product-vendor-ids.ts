@@ -12,9 +12,17 @@
  * - Do NOT stage, commit, push, deploy.
  */
 
+// Dynamic DB module load — script runtime; behavior must stay identical.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const { DataSource } = require('typeorm');
+// Essential runtime module load for child-process backup.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const { execSync } = require('child_process');
+// Essential file-system module load for CSV backup/write.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const fs = require('fs');
+// Essential path module load.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const path = require('path');
 
 const BACKUP_DIR = path.resolve(__dirname, '../../../backups');
@@ -29,6 +37,8 @@ async function main() {
   }
 
   // Load DB connection from .env (same logic as seed)
+  // Dynamic env loader — script-specific.
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const dotenv = require('dotenv');
   dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
@@ -48,8 +58,15 @@ async function main() {
   const AppDataSource = new DataSource({
     ...dsConfig,
     entities: [
+      /* eslint-disable @typescript-eslint/no-var-requires */
+      // Dynamic entity load — runtime TypeORM initialization; preserved intentionally.
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       require('../common/entities/vendor.entity').Vendor,
+      // Dynamic entity load — runtime TypeORM initialization; preserved intentionally.
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       require('../common/entities/product.entity').Product,
+      // Dynamic entity load — runtime TypeORM initialization; preserved intentionally.
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       require('../common/entities/user.entity').User,
     ],
     synchronize: false,
@@ -60,8 +77,15 @@ async function main() {
   console.log('DB connected.');
 
   // 1. Verify vendor from user record (NOT from login screen / print credentials)
+      // Dynamic entity load — runtime TypeORM initialization; preserved intentionally.
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
   const userRepo = AppDataSource.getRepository(require('../common/entities/user.entity').User);
-  const vendorRepo = AppDataSource.getRepository(require('../common/entities/vendor.entity').Vendor);
+  const vendorRepo = AppDataSource.getRepository(/* eslint-disable @typescript-eslint/no-var-requires */
+      // Dynamic entity load — runtime TypeORM initialization; preserved intentionally.
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      require('../common/entities/vendor.entity').Vendor);
+      // Dynamic entity load — runtime TypeORM initialization; preserved intentionally.
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
   const productRepo = AppDataSource.getRepository(require('../common/entities/product.entity').Product);
 
   const demoVendorUser = await userRepo.findOne({ where: { email: 'vendor@marketplace.dev' } });
@@ -128,6 +152,8 @@ async function main() {
   console.log('Updating', resultBeforeUpdateRows.length, 'product rows transactionally...');
 
   await AppDataSource.manager.transaction(async (manager) => {
+      // Dynamic entity load — runtime TypeORM initialization; preserved intentionally.
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
     const prodRepo = manager.getRepository(require('../common/entities/product.entity').Product);
     for (const p of resultBeforeUpdateRows) {
       await prodRepo.update(p.id, { vendorId: targetVendorId });

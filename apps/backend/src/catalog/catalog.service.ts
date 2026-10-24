@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException, ForbiddenException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, ForbiddenException, InternalServerErrorException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, SelectQueryBuilder, OptimisticLockVersionMismatchError, In } from 'typeorm';
 import { Product } from '../common/entities/product.entity';
@@ -236,7 +236,8 @@ export class CatalogService {
   // ---------------------------------------------------------------------------
 
   async query(dto: CatalogQueryDto): Promise<CatalogListResponseDto> {
-    const qb = this.productRepository.createQueryBuilder('product')
+    try {
+      const qb = this.productRepository.createQueryBuilder('product')
       .leftJoinAndSelect('product.vendor', 'vendor')
       .leftJoinAndSelect('product.categoryRelation', 'cat');
     if (!dto.includeInactive) qb.andWhere('product.isActive = :isActive', { isActive: true });
@@ -261,6 +262,10 @@ export class CatalogService {
       totalPages,
       facets: facets ?? { categories: [], totalProducts: 0, minPrice: 0, maxPrice: 0 },
     };
+    } catch (err: any) {
+      this.logger.error('Catalog query error (safe log, no secrets): ' + (err instanceof Error ? err.message : String(err)));
+      throw new InternalServerErrorException('Catalog query failed');
+    }
   }
 
   private applySort(qb: SelectQueryBuilder<Product>, sort?: CatalogSort): void {

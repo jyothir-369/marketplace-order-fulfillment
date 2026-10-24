@@ -337,7 +337,22 @@ export class AuthService {
         expiresAt: expires,
       }),
     );
-    await this.emailService.sendResetLink(user.email, tokenHash);
+    let delivered = false;
+    try {
+      const result = await this.emailService.sendResetLink(user.email, tokenRaw);
+      delivered = !!(result && result.delivered === true);
+    } catch (err: any) {
+      delivered = false;
+      this.logger.error('Reset delivery exception (classified, no secrets): provider error');
+    }
+    if (!delivered) {
+      try {
+        await this.passwordResetTokenRepository.delete({ tokenHash });
+      } catch (cleanupErr: any) {
+        this.logger.error('Reset token cleanup failed (safe log, no token/raw URL): cleanup error');
+      }
+    }
+    // Public response stays generic — does not reveal delivery status or account existence
     this.logger.log('Reset requested (generic): ' + email.toLowerCase(), AuthService.name);
   }
 
