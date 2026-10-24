@@ -2,7 +2,6 @@ import { AddFulfillmentOperationRecord1710000000005 } from './1710000000005-AddF
 import { CustomerAddressesMigration2026101000000 } from './20261010-customer-addresses';
 import { VendorLinkSafeguards2026101200000 } from './20261012-vendor-link-safeguards';
 import { FixProductVendorIdColumn2026101400000 } from './20261014-FixProductVendorIdColumn';
-import { FixProductVendorIdReconcile2026102400000 } from './20261024-FixProductVendorIdReconcile';
 import { AddBuyerIdempotencyKeyConstraint2026101500000 } from './20261015-AddBuyerIdempotencyKeyConstraint';
 import { AddOAuthIdentityTable2026101500001 } from './20261015-AddOAuthIdentityTable';
 import { AddPromotionsTable2026101700000 } from './20261017-AddPromotionsTable';
@@ -118,7 +117,6 @@ export const migrationDataSource = new DataSource({
     AddOAuthIdentityTable2026101500001,
     AddPasswordResetTokens2026101600000,
     AddPromotionsTable2026101700000,
-    FixProductVendorIdReconcile2026102400000,
   ],
   synchronize: false,
   logging: true,
