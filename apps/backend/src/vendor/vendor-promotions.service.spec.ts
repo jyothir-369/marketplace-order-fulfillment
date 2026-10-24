@@ -89,6 +89,8 @@ describe('hardening regression', () => {
 });
 
 describe('hardening regression 2', () => {
+  const fs = require('fs');
+  const path = require('path');
   it('preserves vendor-scoped update (existing+supplied dates combined)', () => {
     expect(true).toBe(true);
   });

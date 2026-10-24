@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import { DataSource } from 'typeorm';
-import { initializeTestDataSource } from './harness';
+import { initializeTestDataSource, getCanonicalClasses } from './harness';
 import { MIGRATION_REGISTRY } from '../registry';
 
 describe('Migration integration harness (canonical registry)', () => {
@@ -42,9 +42,9 @@ describe('Migration integration harness (canonical registry)', () => {
 
   it('config block when isolated credentials missing', () => {
     if (!canRun) {
-      console.log('SKIP: MIGRATION_TEST_DATABASE_URL isolated credentials unavailable');
+      throw new Error('FAIL-CLOSED: isolated credentials unavailable — MIGRATION_TEST_DATABASE_URL not configured');
     }
-    expect(true).toBe(true);
+    expect(canRun).toBe(true);
   });
 
   it('MIGRATION_TEST_DATABASE_URL set explicitly', () => {
@@ -52,13 +52,13 @@ describe('Migration integration harness (canonical registry)', () => {
   });
 
   it('points to loopback port 55439', () => {
-    if (!canRun) { console.log("SKIP: isolated credentials unavailable"); expect(true).toBe(true); return; }
+    if (!canRun) throw new Error('FAIL-CLOSED: isolated credentials unavailable');
     const parsed = new URL(process.env.MIGRATION_TEST_DATABASE_URL!);
     expect(parsed.port).toBe('55439');
   });
 
   it('canonical registry has 26 migrations', () => {
-    if (!canRun) { console.log('SKIP: isolated credentials unavailable'); expect(true).toBe(true); return; }
+    if (!canRun) throw new Error('FAIL-CLOSED: isolated credentials unavailable');
     expect(MIGRATION_REGISTRY).toHaveLength(26);
   });
 
@@ -74,7 +74,7 @@ describe('Migration integration harness (canonical registry)', () => {
               type: 'postgres',
               url,
               entities: [],
-              migrations: [], // see migration-runner.ts for actual canonical classes
+              migrations: require('../canonical-migrations').loadCanonicalMigrationClasses ? require('../canonical-migrations').loadCanonicalMigrationClasses() : (require('../datasource').migrationDataSource.options.migrations || []),
               synchronize: false,
               logging: false,
             }),
@@ -86,11 +86,7 @@ describe('Migration integration harness (canonical registry)', () => {
     });
 
     it('connects to loopback 55439 and database marketplace_migration_test', async () => {
-      if (skipTests) {
-        console.log('SKIP: isolated migration test DB unavailable');
-        expect(true).toBe(true);
-        return;
-      }
+      if (skipTests) throw new Error('FAIL-CLOSED: isolated migration test DB unavailable');
       const res = await ds.query("SELECT current_database() AS db, inet_server_port() AS port");
       expect(res[0].db).toBe('marketplace_migration_test');
       // server-side port (5432) differs from host-mapped loopback port (55439)

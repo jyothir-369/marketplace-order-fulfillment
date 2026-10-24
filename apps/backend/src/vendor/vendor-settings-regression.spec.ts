@@ -1,15 +1,35 @@
-import { Test, TestingModule } from '@nestjs/testing';
+﻿import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { AuthGuard } from '../auth/auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
 import request = require('supertest');
-import { VendorSettingsController } from '../vendor/vendor-settings.controller';
-import { VendorSettingsService } from '../vendor/vendor-settings.service';
+import { VendorSettingsController } from './vendor-settings.controller';
+import { Vendor } from '../common/entities/vendor.entity';
+
 
 describe('VendorSettingsRegression (RED -> GREEN)', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
-    const moduleRef: TestingModule = await Test.createTestingModule({ controllers: [VendorSettingsController],
-    providers: [{ provide: VendorSettingsService, useValue: { getSettings: () => ({ name: 'Test Store' }), updateSettings: () => ({ name: 'Updated Store' }) } }], }).compile();
+    const moduleRef: TestingModule = await Test.createTestingModule({
+      controllers: [VendorSettingsController],
+      providers: [
+        {
+          provide: getRepositoryToken(Vendor),
+          useValue: {
+            findOne: jest.fn().mockResolvedValue({
+              id: 'v-1',
+              name: 'Test Store',
+            }),
+            update: jest.fn().mockResolvedValue({ affected: 1 }),
+          },
+        },
+      ],
+    })
+      .overrideGuard(AuthGuard).useValue({ canActivate: () => false })
+      .overrideGuard(RolesGuard).useValue({ canActivate: () => false })
+      .compile();
     app = moduleRef.createNestApplication();
     await app.init();
   });

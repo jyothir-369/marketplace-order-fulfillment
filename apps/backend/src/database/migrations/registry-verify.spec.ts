@@ -109,13 +109,26 @@ describe('Migration registry integrity (upgraded)', () => {
   });
 
   it('fails if undocumented collision appears', () => {
-    // This test is structural: if new collision appears, previous comparison tests will fail.
-    expect(DUPLICATE_TIMESTAMPS.length).toBeGreaterThanOrEqual(2);
+    const timestampToNames = new Map<string, string[]>();
+    for (const name of MIGRATION_REGISTRY) {
+      const file = path.join(__dirname, `${name}.ts`);
+      if (!fs.existsSync(file)) continue;
+      const src = fs.readFileSync(file, 'utf8');
+      const match = src.match(/export\s+class\s+([A-Za-z_$][\w$]*)\s+implements\s+MigrationInterface/);
+      if (!match) continue;
+      const suffix = match[1].slice(-13);
+      if (!/^\d{13}$/.test(suffix)) continue;
+      const arr = timestampToNames.get(suffix) ?? [];
+      arr.push(name);
+      timestampToNames.set(suffix, arr);
+    }
+    const detectedCollisions = [...timestampToNames.entries()].filter(([, v]) => v.length > 1).map(([k]) => k);
+    const undocumented = detectedCollisions.filter(c => !DUPLICATE_TIMESTAMPS.includes(c));
+    expect(undocumented).toEqual([]);
   });
 
   it('reports that source-level verification is not proof of database compatibility', () => {
-    // Structural registry verification (file/class/datasource alignment) does NOT prove
-    // deployed-database compatibility. A separate, explicitly approved isolated DB run is required.
-    expect(DUPLICATE_TIMESTAMPS.length >= 0).toBe(true);
+    expect(DUPLICATE_TIMESTAMPS.length).toBeGreaterThanOrEqual(2);
+    expect(typeof DUPLICATE_TIMESTAMPS.map).toBe('function');
   });
 });

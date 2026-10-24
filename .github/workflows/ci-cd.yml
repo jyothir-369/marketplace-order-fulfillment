@@ -76,6 +76,46 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: migrationtest
+          POSTGRES_PASSWORD: migrationtest
+          POSTGRES_DB: marketplace_migration_test
+        ports:
+          - 55439:5432
+        options: >-
+          --health-cmd "pg_isready -U migrationtest -d marketplace_migration_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      postgres-e2e:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: e2euser
+          POSTGRES_PASSWORD: e2epass
+          POSTGRES_DB: marketplace_migration_e2e_tmp
+        ports:
+          - 55440:5432
+        options: >-
+          --health-cmd "pg_isready -U e2euser -d marketplace_migration_e2e_tmp"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      MIGRATION_TEST_DATABASE_URL: postgresql://migrationtest:migrationtest@localhost:55439/marketplace_migration_test
+      MIGRATION_E2E_DATABASE_URL: postgresql://e2euser:e2epass@localhost:55440/marketplace_migration_e2e_tmp
+      CATALOG_REGRESSION_DB_HOST: 127.0.0.1
+      CATALOG_REGRESSION_DB_PORT: "55439"
+      CATALOG_REGRESSION_DB_NAME: marketplace_migration_test
+      CATALOG_REGRESSION_DB_USER: migrationtest
+      CATALOG_REGRESSION_DB_PASSWORD: migrationtest
+      ISOLATED_TEST_DB_HOST: 127.0.0.1
+      ISOLATED_TEST_DB_PORT: "55439"
+      ISOLATED_TEST_DB_NAME: marketplace_migration_test
+      ISOLATED_TEST_DB_USER: migrationtest
+      ISOLATED_TEST_DB_PASSWORD: migrationtest
 
     steps:
       - name: Checkout code

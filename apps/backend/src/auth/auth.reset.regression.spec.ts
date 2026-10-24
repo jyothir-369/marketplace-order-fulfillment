@@ -27,19 +27,19 @@ describe('Password reset regression', () => {
 
   it('backend does not disclose account existence (silent return when user missing)', async () => {
     // Verified in auth.service.ts source: if (!user) return; before token creation
-    const src = fs.readFileSync(path.resolve(__dirname, '../../auth/auth.service.ts'), 'utf8');
+    const src = fs.readFileSync(path.resolve(__dirname, '../auth/auth.service.ts'), 'utf8');
     expect(src).toContain('if (!user) return;');
   });
 
   it('token is cryptographically secure and single-use', async () => {
-    const src = fs.readFileSync(path.resolve(__dirname, '../../auth/auth.service.ts'), 'utf8');
+    const src = fs.readFileSync(path.resolve(__dirname, '../auth/auth.service.ts'), 'utf8');
     expect(src).toContain('crypto.randomBytes(48)');
     expect(src).toContain('sha256');
     expect(src).toContain('usedAt');
   });
 
   it('expired / used token rejected; password hashed with bcrypt', async () => {
-    const src = fs.readFileSync(path.resolve(__dirname, '../../auth/auth.service.ts'), 'utf8');
+    const src = fs.readFileSync(path.resolve(__dirname, '../auth/auth.service.ts'), 'utf8');
     expect(src).toContain('new Date(resetToken.expiresAt) < new Date()');
     expect(src).toContain('bcrypt.hash');
     expect(src).toContain('revokeSessionsAfterReset');
