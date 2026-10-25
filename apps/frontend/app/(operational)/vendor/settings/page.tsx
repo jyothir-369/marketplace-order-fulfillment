@@ -21,7 +21,7 @@ export default function VendorSettingsPage() {
       return;
     }
     apiFetch<{ name: string }>("/vendor/settings")
-      .then((data) => setName(data.name || ""))
+      .then((data: { name: string }) => setName(data.name || ""))
       .catch((e: any) => {
         console.error("Settings load error:", e);
         setError("Failed to load settings");
