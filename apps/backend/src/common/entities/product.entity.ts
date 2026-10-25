@@ -1,4 +1,4 @@
-import {
+﻿import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
@@ -18,11 +18,11 @@ export class Product {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'uuid', name: 'vendor_id' })
+  @Column({ type: 'uuid', name: 'vendorId' })
   vendorId: string;
 
   @ManyToOne(() => Vendor, (vendor) => vendor.products)
-  @JoinColumn({ name: 'vendor_id' })
+  @JoinColumn({ name: 'vendorId' })
   vendor: Vendor;
 
   @Column({ type: 'varchar', length: 255 })

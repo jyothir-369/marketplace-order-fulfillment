@@ -3,8 +3,8 @@
 export const CATALOG_REGRESSION_CONF = {
   allowedHosts: ['127.0.0.1', 'localhost'],
   allowedPorts: [55432, 55439],
-  allowedDBs: new Set(['marketplace_reconcile_test', 'marketplace_migration_test']),
-  allowedUsers: new Set(['reconcile_test', 'postgres']),
+  allowedDBs: new Set(['marketplace_reconcile_test', 'marketplace_migration_test', 'catalog_red_test']),
+  allowedUsers: new Set(['reconcile_test', 'postgres', 'migrationtest']),
 };
 
 export function assertCatalogRegressionDB(cfg: { host?: string; port?: number; database?: string; username?: string }): void {

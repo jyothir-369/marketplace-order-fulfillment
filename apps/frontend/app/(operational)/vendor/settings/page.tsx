@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Settings } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { getAccessToken } from "@/lib/auth-token";
+import { apiFetch } from "@/lib/api";
 
 export default function VendorSettingsPage() {
   const { user } = useAuth();
@@ -19,13 +20,7 @@ export default function VendorSettingsPage() {
       setError("Not authenticated");
       return;
     }
-    fetch("http://localhost:3001/api/vendor/settings", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(async (r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      })
+    apiFetch<{ name: string }>("/vendor/settings")
       .then((data) => setName(data.name || ""))
       .catch((e: any) => {
         console.error("Settings load error:", e);
@@ -40,18 +35,10 @@ export default function VendorSettingsPage() {
     try {
       const token = getAccessToken();
       if (!token) throw new Error("No auth token");
-      const res = await fetch("http://localhost:3001/api/vendor/settings", {
+      await apiFetch<{ message: string }>("/vendor/settings", {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({ name }),
       });
-      if (!res.ok) {
-        const errBody = await res.json().catch(() => ({}));
-        throw new Error(errBody?.message || `HTTP ${res.status}`);
-      }
       setSaved(true);
     } catch (e: any) {
       console.error("Settings save error:", e);

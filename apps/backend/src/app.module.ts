@@ -51,8 +51,47 @@ import { PaymentsModule } from './payments/payments.module';
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => {
+        // Explicit mode selection — the single source of truth for which
+        // database configuration wins. Local mode always forces the local
+        // compose DB; Supabase mode requires DATABASE_URL and never falls
+        // back to local PostgreSQL.
+        const dbMode = (configService.get<string>('DATABASE_MODE') || 'local').trim();
+        if (dbMode !== 'local' && dbMode !== 'supabase') {
+          throw new Error(
+            'BLOCKED: invalid DATABASE_MODE (' + dbMode + '). Expected "local" or "supabase".'
+          );
+        }
+
         const dbUrl = (configService.get<string>('DATABASE_URL') || '').trim();
-        const isCloudDb = dbUrl !== '' && (dbUrl.includes('supabase') || dbUrl.includes('pooler') || dbUrl.includes('sslmode=require') || dbUrl.includes('.co'));
+        const isCloudDb =
+          dbUrl !== '' &&
+          (dbUrl.includes('supabase') || dbUrl.includes('pooler') || dbUrl.includes('sslmode=require') || dbUrl.includes('.co'));
+
+        if (dbMode === 'supabase') {
+          if (!dbUrl || !isCloudDb) {
+            throw new Error(
+              'BLOCKED: DATABASE_MODE=supabase selected but DATABASE_URL is missing or invalid. ' +
+                'Provide DATABASE_URL with supabase/pooler/sslmode or switch to DATABASE_MODE=local.'
+            );
+          }
+          // Never fall back to local PostgreSQL when Supabase mode is selected.
+          return {
+            type: 'postgres',
+            url: dbUrl,
+            entities: [Vendor, Category, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken, PasswordResetToken, PaymentAuthorization, Review, WebhookEvent, CustomerAddress, VendorApplication, Promotion],
+            synchronize: false,
+            logging: configService.get('NODE_ENV') === 'development',
+            ssl: isCloudDb ? { rejectUnauthorized: false } : false,
+          };
+        }
+
+        // Local mode: never fall back to a Supabase URL from another file.
+        if (dbUrl && isCloudDb && dbMode === 'local') {
+          throw new Error(
+            'BLOCKED: DATABASE_MODE=local selected but DATABASE_URL contains a cloud endpoint. ' +
+              'Clear DATABASE_URL or set DATABASE_MODE=supabase.'
+          );
+        }
 
         if (dbUrl && dbUrl.trim() !== '' && isCloudDb) {
           return {
@@ -66,9 +105,22 @@ import { PaymentsModule } from './payments/payments.module';
           };
         }
 
+        // Guard: if DATABASE_URL is empty but DB_HOST points at a production
+        // cloud endpoint, refuse to silently fall back to localhost defaults.
+        const dbHost = configService.get('DB_HOST') || 'localhost';
+        const isCloudHost =
+          dbHost.includes('supabase') || dbHost.includes('pooler') || dbHost.includes('.supabase.co') || /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(dbHost);
+        if (!dbUrl && isCloudHost) {
+          throw new Error(
+            'BLOCKED: DATABASE_URL is empty but DB_HOST points at a cloud/remote endpoint (' +
+            dbHost +
+            '). Either set DATABASE_URL for cloud or keep DB_HOST=localhost for local development.'
+          );
+        }
+
         return {
           type: 'postgres',
-          host: configService.get('DB_HOST', 'localhost'),
+          host: dbHost,
           port: configService.get('DB_PORT', 5432),
           username: configService.get('DB_USERNAME', 'postgres'),
           password: configService.get('DB_PASSWORD', 'postgres'),

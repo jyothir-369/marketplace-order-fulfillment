@@ -41,14 +41,18 @@ import { getAccessToken } from "@/lib/auth-token";
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ??
-  process.env.NEXT_PUBLIC_API_URL ??
-  (process.env.NODE_ENV === 'production'
-    ? 'https://marketplace-backend-api-7cqo.onrender.com/api'
-    : 'http://localhost:3001/api');
+  process.env.NEXT_PUBLIC_API_URL;
+
+if (!BASE_URL) {
+  throw new Error(
+    'FATAL: NEXT_PUBLIC_API_BASE_URL or NEXT_PUBLIC_API_URL is not set. ' +
+    'No hardcoded localhost fallback is permitted — set the env var for every environment.'
+  );
+}
 
 // Safety guard: in browser, never silently fall back to localhost when loaded
 // from production. Log which endpoint is being used for diagnostics.
-if (typeof window !== 'undefined' && !process.env.NEXT_PUBLIC_API_BASE_URL && !process.env.NEXT_PUBLIC_API_URL) {
+if (typeof window !== 'undefined') {
   console.info('[api] BASE_URL resolved to:', BASE_URL);
 }
 
