@@ -19,14 +19,14 @@ import { VendorApplication } from '../../vendor/vendor-application.entity';
 import { assertCatalogRegressionDB } from './catalog-regression-db-guard';
 
 describe('Catalog entity mapping regression', () => {
-  const dbReady = !!(process.env.CATALOG_REGRESSION_HOST && process.env.CATALOG_REGRESSION_PORT && process.env.CATALOG_REGRESSION_DB && process.env.CATALOG_REGRESSION_USER);
+  const dbReady = !!((process.env.CATALOG_REGRESSION_DB_HOST || process.env.CATALOG_REGRESSION_HOST) && (process.env.CATALOG_REGRESSION_DB_PORT || process.env.CATALOG_REGRESSION_PORT) && (process.env.CATALOG_REGRESSION_DB_NAME || process.env.CATALOG_REGRESSION_DB) && (process.env.CATALOG_REGRESSION_DB_USER || process.env.CATALOG_REGRESSION_USER));
 
-  test('Product vendorId column and relation map to vendorId', async () => {
+  test('Product vendorId property maps to the vendor_id column', async () => {
     const cfg = {
-      host: process.env.CATALOG_REGRESSION_HOST || 'localhost',
-      port: Number(process.env.CATALOG_REGRESSION_PORT || '55432'),
-      database: process.env.CATALOG_REGRESSION_DB || 'marketplace_reconcile_test',
-      username: process.env.CATALOG_REGRESSION_USER || 'reconcile_test',
+      host: process.env.CATALOG_REGRESSION_DB_HOST || process.env.CATALOG_REGRESSION_HOST || 'localhost',
+      port: Number(process.env.CATALOG_REGRESSION_DB_PORT || process.env.CATALOG_REGRESSION_PORT || '55432'),
+      database: process.env.CATALOG_REGRESSION_DB_NAME || process.env.CATALOG_REGRESSION_DB || 'marketplace_reconcile_test',
+      username: process.env.CATALOG_REGRESSION_DB_USER || process.env.CATALOG_REGRESSION_USER || 'reconcile_test',
     };
     assertCatalogRegressionDB(cfg);
 
@@ -36,6 +36,7 @@ describe('Catalog entity mapping regression', () => {
       port: cfg.port,
       database: cfg.database,
       username: cfg.username,
+      password: process.env.CATALOG_REGRESSION_DB_PASSWORD || process.env.CATALOG_REGRESSION_PASSWORD,
       entities: [
         Vendor,
         Category,
@@ -56,7 +57,7 @@ describe('Catalog entity mapping regression', () => {
       synchronize: false,
     });
 
-    if (!dbReady) { console.log('SKIP: catalog regression DB unavailable'); expect(true).toBe(true); return; }
+    if (!dbReady) { if (process.env.CI === 'true') throw new Error('CI requires the isolated catalog regression database; refusing to skip the live mapping test.'); console.log('SKIP: catalog regression DB unavailable (local run only)'); expect(true).toBe(true); return; }
     await dataSource.initialize();
 
     const metadata = dataSource.getMetadata(Product);

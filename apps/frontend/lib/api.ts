@@ -75,7 +75,7 @@ export function isAbortError(err: unknown): boolean {
   );
 }
 
-async function apiFetch<T>(
+export async function apiFetch<T>(
   path: string,
   init?: RequestInit & { params?: Record<string, string | number | undefined> }
 ): Promise<T> {
