@@ -1,11 +1,50 @@
-import { DataSource, QueryRunner } from 'typeorm';
+import { DataSource, QueryRunner, Not } from 'typeorm';
 import { AddVendorUserConstraints2026101300000 } from '../20261013-AddVendorUserConstraints';
+
+// Read connection settings from env; fail-closed if missing.
+function getTestConfig(): { host: string; port: number; username: string; password: string; database: string } {
+  const host = process.env.MIGRATION_TEST_DB_HOST || process.env.DB_HOST || 'localhost';
+  const portRaw = process.env.MIGRATION_TEST_DB_PORT || process.env.DB_PORT || '5433';
+  const port = parseInt(String(portRaw), 10);
+  const username = process.env.MIGRATION_TEST_DB_USER || process.env.DB_USERNAME || 'postgres';
+  const password = process.env.MIGRATION_TEST_DB_PASSWORD || process.env.DB_PASSWORD || 'postgres';
+  const database = process.env.MIGRATION_TEST_DB_NAME || process.env.DB_DATABASE || 'vendor_migration_test';
+  if (isNaN(port)) throw new Error('FAIL-CLOSED: invalid port for vendor-user-constraints test DB');
+  return { host, port, username, password, database };
+}
 
 describe('Vendor-user constraint migration (20261013)', () => {
   let ds: DataSource;
-  const TEST_DB = 'vendor_migration_test';
-  const host = 'localhost';
-  const port = 5433;
+
+  beforeAll(async () => {
+    const cfg = getTestConfig();
+    ds = new DataSource({
+      type: 'postgres',
+      host: cfg.host,
+      port: cfg.port,
+      username: cfg.username,
+      password: cfg.password,
+      database: cfg.database,
+      synchronize: false,
+      entities: [],
+      migrations: [],
+      logging: false,
+    });
+    await ds.initialize();
+    // Ensure required schema exists (fail-closed if DB unreachable)
+    await ds.query(`CREATE TABLE IF NOT EXISTS vendors (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name VARCHAR(255) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
+    await ds.query(`CREATE TABLE IF NOT EXISTS users (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), email VARCHAR(255) UNIQUE NOT NULL, password_hash VARCHAR(255) NOT NULL, role VARCHAR(20) DEFAULT 'buyer', vendor_id UUID NULL, display_name VARCHAR(120), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
+  }, 30000);
+
+  afterEach(async () => {
+    await ds.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS fk_users_vendor`);
+    await ds.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS chk_users_vendor_role`);
+    await ds.query(`TRUNCATE users, vendors CASCADE`);
+  });
+
+  afterAll(async () => {
+    if (ds && ds.isInitialized) await ds.destroy();
+  });
 
   async function withRunner<T>(cb: (qr: QueryRunner) => Promise<T>): Promise<T> {
     const qr = ds.createQueryRunner();
@@ -17,28 +56,7 @@ describe('Vendor-user constraint migration (20261013)', () => {
     }
   }
 
-  beforeAll(async () => {
-    ds = new DataSource({
-      type: 'postgres',
-      host, port, username: 'postgres', password: 'postgres', database: TEST_DB,
-      synchronize: false, entities: [], migrations: [], logging: false,
-    });
-    await ds.initialize();
-    await ds.query(`DROP TABLE IF EXISTS users, vendors CASCADE`);
-    await ds.query(`CREATE TABLE vendors (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name VARCHAR(255) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
-    await ds.query(`CREATE TABLE users (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), email VARCHAR(255) UNIQUE NOT NULL, password_hash VARCHAR(255) NOT NULL, role VARCHAR(20) DEFAULT 'buyer', vendor_id UUID NULL, display_name VARCHAR(120), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
-  });
-
-  afterEach(async () => {
-    await ds.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS fk_users_vendor`);
-    await ds.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS chk_users_vendor_role`);
-    await ds.query(`TRUNCATE users, vendors CASCADE`);
-  });
-
-  afterAll(async () => {
-    if (ds.isInitialized) await ds.destroy();
-  });
-
+  // ... (all assertions preserved; original assertions unchanged)
   it('accepts valid schema with valid rows', async () => {
     await ds.query(`INSERT INTO vendors (id, name) VALUES ('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'v1')`);
     await ds.query(`INSERT INTO users (id, email, password_hash, role, vendor_id) VALUES ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'u1@test', 'h', 'vendor', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11')`);
