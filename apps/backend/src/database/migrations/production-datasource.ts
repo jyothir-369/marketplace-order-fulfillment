@@ -7,8 +7,8 @@ import { MIGRATION_REGISTRY } from './registry';
 import { loadCanonicalMigrationClasses } from './canonical-migrations';
 
 // Load root .env first (before any other env initialization)
-const rootEnvPath = path.resolve(__dirname, '../../../..', '.env');
-const rootEnvLocalPath = path.resolve(__dirname, '../../../..', '.env.local');
+const rootEnvPath = path.resolve(__dirname, '../../../../..', '.env');
+const rootEnvLocalPath = path.resolve(__dirname, '../../../../..', '.env.local');
 if (fs.existsSync(rootEnvPath)) {
   dotenv.config({ path: rootEnvPath });
 }
@@ -54,8 +54,8 @@ export function validateProductionTarget(requireWriteConfirmation = false): void
 
 export function getProductionMigrationDataSource(requireConfirm = true): DataSource {
   // Load root .env fresh for production runs (before any env initialization)
-  const rootEnvPath = path.resolve(process.cwd(), '.env');
-  const rootEnvLocalPath = path.resolve(process.cwd(), '.env.local');
+  const rootEnvPath = path.resolve(__dirname, '../../../../..', '.env');
+  const rootEnvLocalPath = path.resolve(__dirname, '../../../../..', '.env.local');
   if (fs.existsSync(rootEnvPath)) {
     dotenv.config({ path: rootEnvPath, override: true });
   }
@@ -82,3 +82,4 @@ export function getProductionMigrationDataSource(requireConfirm = true): DataSou
     migrations: loadCanonicalMigrationClasses(),
   });
 }
+
