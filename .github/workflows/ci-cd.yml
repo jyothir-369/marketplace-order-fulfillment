@@ -237,6 +237,8 @@ jobs:
   build-frontend:
     name: Build Frontend
     runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_API_BASE_URL: https://marketplace-backend-api-7cqo.onrender.com/api
     needs:
       - lint-and-typecheck
 
