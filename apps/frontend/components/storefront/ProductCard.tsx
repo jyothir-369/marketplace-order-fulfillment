@@ -41,7 +41,7 @@ export function ProductCard({ product, quantity, onQuantityChange, onAdd, justAd
   const isWishlisted = useWishlistStore((s) => s.items.includes(product.id));
   const toggleWishlist = useWishlistStore((s) => s.toggleWishlist);
   const [quickViewOpen, setQuickViewOpen] = useState(false);
-  const imageUrl = product.images && product.images[0] ? product.images[0] : undefined;
+  const imageUrl = product.images && Array.isArray(product.images) && product.images[0] ? product.images[0] : (product as any).image || undefined;
 
   return (
     <>
@@ -103,7 +103,18 @@ export function ProductCard({ product, quantity, onQuantityChange, onAdd, justAd
                 alt={product.name}
                 className="max-h-[110px] max-w-[85%] object-contain drop-shadow-sm transition-transform duration-300 group-hover:scale-[1.03]"
                 loading="lazy"
-                onError={(e) => { const img = e.currentTarget; img.style.display = 'none'; }}
+                onError={(e) => {
+                  const img = e.currentTarget;
+                  img.style.display = 'none';
+                  const container = img.parentElement;
+                  if (container && !container.querySelector('.img-fallback')) {
+                    const fb = document.createElement('div');
+                    fb.className = 'img-fallback flex flex-col items-center justify-center text-[#777777]';
+                    fb.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg><span class="text-[10px] font-medium">Image unavailable</span>';
+                    container.insertBefore(fb, img.nextSibling);
+                    img.remove();
+                  }
+                }}
               />
             ) : (
               <div className="flex flex-col items-center justify-center text-[#777777]">
