@@ -95,12 +95,10 @@ export function LoginForm({ redirectTo = "/products", portal = "customer" }: { r
       </div>
 
       {/* 8. Sign in with Google */}
-      <div style={{ marginTop: 22 }}>
-        <div style={{ width: "100%", height: 52, borderRadius: 10, background: "#fff", border: "1px solid #D9DEE6", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-          <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}>
-            <GoogleSignInButton portal={portal} />
-          </GoogleOAuthProvider>
-        </div>
+      <div style={{ marginTop: 22, display: "flex", justifyContent: "center" }}>
+        <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}>
+          <GoogleSignInButton portal={portal} />
+        </GoogleOAuthProvider>
       </div>
 
       {/* 9. New here */}

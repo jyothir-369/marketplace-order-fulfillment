@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { GoogleLogin } from "@react-oauth/google";
 import { googleSignIn } from "@/lib/api";
 import { setTokens } from "@/lib/auth-token";
@@ -8,6 +8,9 @@ export function GoogleSignInButton({ portal = "customer" }: { portal?: "customer
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cancelled, setCancelled] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
 
   const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
   const missingConfig = !clientId || clientId.includes("your-client-id") || clientId.includes("replace") || clientId.trim() === "";
@@ -32,6 +35,17 @@ export function GoogleSignInButton({ portal = "customer" }: { portal?: "customer
     } finally {
       setLoading(false);
     }
+  }
+
+  if (!mounted) {
+    // Render a stable skeleton matching the Google button's box so SSR and
+    // first client render align, avoiding hydration mismatch from the
+    // script-injected iframe and dynamic theme/styles.
+    return (
+      <div className="w-full" aria-label="Google sign-in loading" role="status">
+        <div className="w-full h-[48px] rounded-[4px] border border-[#D9DEE6] bg-[#FFFFFF] flex items-center justify-center gap-2 opacity-60" />
+      </div>
+    );
   }
 
   if (missingConfig) {
