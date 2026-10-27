@@ -17,9 +17,11 @@ import { OrdersModule } from './orders/orders.module';
 import { FulfillmentModule } from './fulfillment/fulfillment.module';
 import { AdminModule } from './admin/admin.module';
 import { VendorMockModule } from './integrations/vendor-mock/vendor-mock.module';
+import { VendorPaymentAccountsModule } from './vendor/payment-accounts/module/vendor-payment-accounts.module';
 import { AuditModule } from './common/audit/audit.module';
 import { AuditLog } from './common/audit/audit-log.entity';
 import { HealthModule } from './health/health.module';
+import { VendorPaymentAccount } from './common/entities/vendor-payment-account.entity';
 import { Vendor } from './common/entities/vendor.entity';
 import { Category } from './common/entities/category.entity';
 import { Product } from './common/entities/product.entity';
@@ -44,6 +46,7 @@ import { PaymentsModule } from './payments/payments.module';
       isGlobal: true,
       envFilePath: [
         path.resolve(process.cwd(), '.env'),
+        path.resolve(process.cwd(), '.env.local'),
         path.resolve(__dirname, '../../../.env'),
         '.env',
       ],
@@ -78,7 +81,7 @@ import { PaymentsModule } from './payments/payments.module';
           return {
             type: 'postgres',
             url: dbUrl,
-            entities: [Vendor, Category, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken, PasswordResetToken, PaymentAuthorization, Review, WebhookEvent, CustomerAddress, VendorApplication, Promotion],
+            entities: [Vendor, VendorPaymentAccount, Category, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken, PasswordResetToken, PaymentAuthorization, Review, WebhookEvent, CustomerAddress, VendorApplication, Promotion],
             synchronize: false,
             logging: configService.get('NODE_ENV') === 'development',
             ssl: isCloudDb ? { rejectUnauthorized: false } : false,
@@ -97,7 +100,7 @@ import { PaymentsModule } from './payments/payments.module';
           return {
             type: 'postgres',
             url: dbUrl,
-            entities: [Vendor, Category, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken, PasswordResetToken, PaymentAuthorization, Review, WebhookEvent, CustomerAddress, VendorApplication, Promotion],
+            entities: [Vendor, VendorPaymentAccount, Category, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken, PasswordResetToken, PaymentAuthorization, Review, WebhookEvent, CustomerAddress, VendorApplication, Promotion],
             // Phase 2.1: migrations own the schema — no more synchronize in any env.
             synchronize: false,
             logging: configService.get('NODE_ENV') === 'development',
@@ -173,6 +176,7 @@ import { PaymentsModule } from './payments/payments.module';
     VendorMockModule,
     CatalogModule,
     VendorApplicationModule,
+    VendorPaymentAccountsModule,
     VendorPromotionsModule,
     VendorSettingsModule,
     InventoryModule,
