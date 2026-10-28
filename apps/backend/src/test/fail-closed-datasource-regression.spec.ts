@@ -1,4 +1,4 @@
-﻿describe('datasource fail-closed URL validation', () => {
+describe('datasource fail-closed URL validation', () => {
   const originalUrl = process.env.MIGRATION_TEST_DATABASE_URL;
   const originalLegacyPassword = process.env.MIGRATION_TEST_DB_PASSWORD;
   const originalGeneric = {
@@ -59,47 +59,39 @@
   }
 
   it('throws when the dedicated URL is missing', () => {
-    expect(() => loadParser(undefined)).toThrow(/MIGRATION_TEST_DATABASE_URL/);
+    expect(() => loadParser(undefined)()).toThrow(/MIGRATION_TEST_DATABASE_URL/);
   });
 
   it('rejects an invalid protocol', () => {
-    expect(() => loadParser('http://user:pass@localhost:55439/marketplace_migration_test'))
-      .toThrow(/protocol/i);
+    expect(() => loadParser('http://user:pass@localhost:55439/marketplace_migration_test')()).toThrow(/protocol/i);
   });
 
   it('rejects a non-loopback host', () => {
-    expect(() => loadParser('postgresql://user:pass@example.com:55439/marketplace_migration_test'))
-      .toThrow(/host/i);
+    expect(() => loadParser('postgresql://user:pass@example.com:55439/marketplace_migration_test')()).toThrow(/host/i);
   });
 
   it('rejects the wrong port', () => {
-    expect(() => loadParser('postgresql://user:pass@localhost:5432/marketplace_migration_test'))
-      .toThrow(/port/i);
+    expect(() => loadParser('postgresql://user:pass@localhost:5432/marketplace_migration_test')()).toThrow(/port/i);
   });
 
   it('rejects the wrong database', () => {
-    expect(() => loadParser('postgresql://user:pass@localhost:55439/other_database'))
-      .toThrow(/database/i);
+    expect(() => loadParser('postgresql://user:pass@localhost:55439/other_database')()).toThrow(/database/i);
   });
 
   it('rejects extra database path segments', () => {
-    expect(() => loadParser('postgresql://user:pass@localhost:55439/marketplace_migration_test/extra'))
-      .toThrow(/database/i);
+    expect(() => loadParser('postgresql://user:pass@localhost:55439/marketplace_migration_test/extra')()).toThrow(/database/i);
   });
 
   it('rejects an empty database path', () => {
-    expect(() => loadParser('postgresql://user:pass@localhost:55439/'))
-      .toThrow(/database/i);
+    expect(() => loadParser('postgresql://user:pass@localhost:55439/')()).toThrow(/database/i);
   });
 
   it('rejects query parameters', () => {
-    expect(() => loadParser('postgresql://user:pass@localhost:55439/marketplace_migration_test?sslmode=require'))
-      .toThrow(/query/i);
+    expect(() => loadParser('postgresql://user:pass@localhost:55439/marketplace_migration_test?sslmode=require')()).toThrow(/query/i);
   });
 
   it('rejects fragments', () => {
-    expect(() => loadParser('postgresql://user:pass@localhost:55439/marketplace_migration_test#unexpected'))
-      .toThrow(/fragment/i);
+    expect(() => loadParser('postgresql://user:pass@localhost:55439/marketplace_migration_test#unexpected')()).toThrow(/fragment/i);
   });
 
   it('accepts a valid local PostgreSQL URL', () => {
@@ -150,7 +142,8 @@
     }));
         // Dynamic load preserved for jest.doMock()-ordered require. Essential runtime behavior.
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { migrationDataSource } = require('../database/migrations/datasource');
+    const { getMigrationDataSourceLazy } = require('../database/migrations/datasource');
+    const migrationDataSource = getMigrationDataSourceLazy();
     expect(migrationDataSource.options.password).toBe('fromurl');
     expect(migrationDataSource.options.password).not.toBe('fromlegacy');
   });
@@ -160,7 +153,7 @@
       'postgresql://user:pass@localhost:55439/marketplace_migration_test';
     process.env.DATABASE_URL = 'postgresql://evil:evil@evil:5432/db';
     jest.resetModules();
-    expect(() => require('../database/migrations/datasource') /* eslint-disable-next-line @typescript-eslint/no-var-requires */)
+    expect(() => require('../database/migrations/datasource').getMigrationDataSourceLazy() /* eslint-disable-next-line @typescript-eslint/no-var-requires */)
       .toThrow(/BLOCKED/);
   });
 });
