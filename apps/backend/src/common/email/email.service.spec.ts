@@ -34,7 +34,7 @@ describe('EmailService sendResetLink', () => {
   });
 
   it('should return delivered true when Resend accepts', async () => {
-    const mockSend = jest.fn().mockResolvedValue({ id: 'resend-id-123' });
+    const mockSend = jest.fn().mockResolvedValue({ data: { id: 'resend-id-123' }, error: null });
     // Preserved: dynamic reload of mocked Resend for per-test mockImplementationOnce (jest.mock + reset).
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { Resend } = require('resend');
