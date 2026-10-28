@@ -4,6 +4,19 @@ import { RazorpayProviderService } from './razorpay-provider.service';
 
 describe('Phase 1 — Payment lifecycle safety (regression, evidence-backed)', () => {
   let provider: RazorpayProviderService;
+  const originalModeForSuite = process.env.RAZORPAY_MODE;
+
+  beforeEach(() => {
+    process.env.RAZORPAY_MODE = 'test';
+  });
+
+  afterAll(() => {
+    if (originalModeForSuite === undefined) {
+      delete process.env.RAZORPAY_MODE;
+    } else {
+      process.env.RAZORPAY_MODE = originalModeForSuite;
+    }
+  });
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -18,7 +31,7 @@ describe('Phase 1 — Payment lifecycle safety (regression, evidence-backed)', (
     const originalMode = process.env.RAZORPAY_MODE;
     process.env.RAZORPAY_MODE = 'live';
     expect(() => provider.getPublicKeyId()).toThrow(ServiceUnavailableException);
-    process.env.RAZORPAY_MODE = originalMode;
+    process.env.RAZORPAY_MODE = 'test';
   });
 
   it('rejects invalid webhook HMAC (signature design verified)', () => {

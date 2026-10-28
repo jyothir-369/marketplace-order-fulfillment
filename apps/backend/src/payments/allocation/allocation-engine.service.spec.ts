@@ -115,9 +115,23 @@ describe('AllocationEngine', () => {
   });
 
   it('policy snapshot consistency (same version -> same result)', () => {
-    const r1 = calculateVendorAllocation({ ...baseInput, rulesVersion: 'v1' }, validatePolicy({ ...approvedPolicy, rulesVersion: 'v1' }));
-    const r2 = calculateVendorAllocation({ ...baseInput, rulesVersion: 'v1' }, validatePolicy({ ...approvedPolicy, rulesVersion: 'v1' }));
-    expect(r1.snapshot).toBe(r2.snapshot); // deterministic JSON (same inputs, same order)
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+
+    try {
+      const r1 = calculateVendorAllocation(
+        { ...baseInput, rulesVersion: 'v1' },
+        validatePolicy({ ...approvedPolicy, rulesVersion: 'v1' }),
+      );
+      const r2 = calculateVendorAllocation(
+        { ...baseInput, rulesVersion: 'v1' },
+        validatePolicy({ ...approvedPolicy, rulesVersion: 'v1' }),
+      );
+
+      expect(r1.snapshot).toBe(r2.snapshot);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('order ownership not enforced by engine (separate guard)', () => {
