@@ -1,4 +1,4 @@
-﻿describe('TypeORM PostgreSQL UUID driver config', () => {
+describe('TypeORM PostgreSQL UUID driver config', () => {
   const originalUrl = process.env.MIGRATION_TEST_DATABASE_URL;
   const originalGeneric = {
     DATABASE_URL: process.env.DATABASE_URL,
@@ -33,7 +33,8 @@
       })),
     }));
 
-    ({ migrationDataSource } = require('../datasource'));
+    const { getMigrationDataSourceLazy } = require('../datasource');
+    migrationDataSource = getMigrationDataSourceLazy();
   });
 
   afterAll(() => {

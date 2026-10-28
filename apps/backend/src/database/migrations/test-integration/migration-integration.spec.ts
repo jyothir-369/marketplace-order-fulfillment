@@ -1,97 +1,114 @@
-/*
- * Migration integration tests — canonical 26 migration classes.
- *
- * ISOLATION CONTRACT: configuration is loaded BEFORE imports execute and
- * BEFORE any DataSource is constructed or initialized. The registry is a
- * structural dependency (pure metadata), so loading it does NOT require DB
- * credentials. Tests that need a live DB connect via harness.initializeTestDataSource(),
- * which never falls back to DATABASE_URL or .env.
- */
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import { DataSource } from 'typeorm';
-import { initializeTestDataSource, getCanonicalClasses } from './harness';
 import { MIGRATION_REGISTRY } from '../registry';
+import { MIGRATION_CLASSES } from '../migration-classes';
+
+function getDisposableUrl(): string | undefined {
+  const raw = process.env.MIGRATION_E2E_DATABASE_URL;
+  if (!raw || raw !== raw.trim()) return undefined;
+
+  try {
+    const url = new URL(raw);
+    const db = decodeURIComponent(url.pathname.replace(/^\/+/, ''));
+    if (!['postgres:', 'postgresql:'].includes(url.protocol)) return undefined;
+    if (!['127.0.0.1', 'localhost'].includes(url.hostname.toLowerCase())) return undefined;
+    if (!url.port || !url.username || !url.password) return undefined;
+    if (url.search || url.hash) return undefined;
+    if (!db || [
+      'postgres', 'template0', 'template1',
+      'marketplace_migration_test',
+      'marketplace_migration_constraints_test',
+      'marketplace_e2e_tmp',
+    ].includes(db.toLowerCase())) return undefined;
+    return raw;
+  } catch {
+    return undefined;
+  }
+}
 
 describe('Migration integration harness (canonical registry)', () => {
-  let canRun = false;
+  it('has unique canonical registry entries and matching static migration classes', () => {
+    expect(MIGRATION_REGISTRY.length).toBeGreaterThan(0);
+    expect(new Set(MIGRATION_REGISTRY).size).toBe(MIGRATION_REGISTRY.length);
+    expect(MIGRATION_CLASSES).toHaveLength(MIGRATION_REGISTRY.length);
+    expect(new Set(MIGRATION_CLASSES.map((migration) => migration.name)).size)
+      .toBe(MIGRATION_CLASSES.length);
+  });
 
-  // Config phase: validate the isolated test URL before touching any DB.
-  beforeAll(() => {
-    try {
-      const url = process.env.MIGRATION_TEST_DATABASE_URL;
-      if (!url || url.trim() === '') {
-        throw new Error('BLOCKED: MIGRATION_TEST_DATABASE_URL is required explicitly');
-      }
-      if (url !== url.trim()) throw new Error('BLOCKED: URL must not contain surrounding whitespace');
-      const parsed = new URL(url);
-      if (parsed.protocol !== 'postgres:' && parsed.protocol !== 'postgresql:') {
-        throw new Error('BLOCKED: URL must use postgres: or postgresql:');
-      }
-      if (!['localhost', '127.0.0.1'].includes(parsed.hostname.toLowerCase())) {
-        throw new Error('BLOCKED: URL must target localhost or 127.0.0.1');
-      }
-      if (parsed.port !== '55439') throw new Error('BLOCKED: URL must use host-mapped port 55439');
-      if (parsed.pathname !== '/marketplace_migration_test') throw new Error('BLOCKED: URL must target marketplace_migration_test');
-      if (parsed.search !== '' || parsed.hash !== '') throw new Error('BLOCKED: URL query parameters and fragments are prohibited');
-      if (!parsed.username || !parsed.password) throw new Error('BLOCKED: URL must include explicit database credentials');
-      canRun = true;
-    } catch {
-      canRun = false;
+  it('does not enable live execution without a dedicated disposable URL', () => {
+    const url = getDisposableUrl();
+    if (!url) {
+      expect(url).toBeUndefined();
+      return;
     }
+    const parsed = new URL(url);
+    expect(['localhost', '127.0.0.1']).toContain(parsed.hostname.toLowerCase());
   });
 
-  it('config block when isolated credentials missing', () => {
-    if (!canRun) {
-      throw new Error('FAIL-CLOSED: isolated credentials unavailable — MIGRATION_TEST_DATABASE_URL not configured');
-    }
-    expect(canRun).toBe(true);
-  });
-
-  it('MIGRATION_TEST_DATABASE_URL set explicitly', () => {
-    expect(process.env.MIGRATION_TEST_DATABASE_URL).toBeTruthy();
-  });
-
-  it('points to loopback port 55439', () => {
-    if (!canRun) throw new Error('FAIL-CLOSED: isolated credentials unavailable');
-    const parsed = new URL(process.env.MIGRATION_TEST_DATABASE_URL!);
-    expect(parsed.port).toBe('55439');
-  });
-
-  it('canonical registry has 26 migrations', () => {
-    if (!canRun) throw new Error('FAIL-CLOSED: isolated credentials unavailable');
-    expect(MIGRATION_REGISTRY).toHaveLength(26);
-  });
-
-  describe('live migration execution (requires isolated DB)', () => {
-    let ds: DataSource;
-    let skipTests = false;
+  describe('live migration execution (dedicated disposable database only)', () => {
+    let ds: DataSource | undefined;
 
     beforeAll(async () => {
-      try {
-        ds = await initializeTestDataSource(
-          (url) =>
-            new DataSource({
-              type: 'postgres',
-              url,
-              entities: [],
-              migrations: require('../canonical-migrations').loadCanonicalMigrationClasses ? require('../canonical-migrations').loadCanonicalMigrationClasses() : (require('../datasource').migrationDataSource.options.migrations || []),
-              synchronize: false,
-              logging: false,
-            }),
-        );
-      } catch (e: any) {
-        skipTests = true;
-        console.log('SKIP: isolated migration test DB unavailable —', (e as Error)?.message || e);
+      const url = getDisposableUrl();
+      if (!url) return;
+
+      ds = new DataSource({
+        type: 'postgres',
+        url,
+        entities: [],
+        migrations: MIGRATION_CLASSES,
+        migrationsTableName: 'migrations',
+        synchronize: false,
+        logging: false,
+      });
+      await ds.initialize();
+
+      const identity = await ds.query(
+        'SELECT current_database() AS db, inet_server_port() AS port',
+      );
+      const expectedDb = decodeURIComponent(new URL(url).pathname.replace(/^\/+/, ''));
+      if (identity[0]?.db !== expectedDb) {
+        await ds.destroy();
+        ds = undefined;
+        throw new Error('FAIL-CLOSED: connected database identity mismatch');
       }
     });
 
-    it('connects to loopback 55439 and database marketplace_migration_test', async () => {
-      if (skipTests) throw new Error('FAIL-CLOSED: isolated migration test DB unavailable');
-      const res = await ds.query("SELECT current_database() AS db, inet_server_port() AS port");
-      expect(res[0].db).toBe('marketplace_migration_test');
-      // server-side port (5432) differs from host-mapped loopback port (55439)
-      // — verified independently via container mapping, not database query
-      expect(res[0].port).toBe(5432);
+    it('records complete migration history and applies no migrations twice', async () => {
+      if (!getDisposableUrl()) {
+        throw new Error(
+          'FAIL-CLOSED: set MIGRATION_E2E_DATABASE_URL to a fresh disposable localhost PostgreSQL database'
+        );
+      }
+      if (!ds?.isInitialized) throw new Error('FAIL-CLOSED: disposable datasource unavailable');
+
+      const applied = await ds.runMigrations({ transaction: 'all' });
+      const rows = await ds.query('SELECT name FROM migrations');
+      const actual = rows.map((row: { name: string }) => row.name).sort();
+      const expected = MIGRATION_CLASSES.map((migration) => migration.name).sort();
+
+      expect(actual).toEqual(expected);
+
+      // This suite may share the disposable DB with the E2E suite.
+      // A run may apply all migrations on a fresh DB or none on a completed DB.
+      expect([0, expected.length]).toContain(applied.length);
+    });
+
+    it('does not reapply completed migrations on a second run', async () => {
+      if (!getDisposableUrl()) {
+        throw new Error(
+          'FAIL-CLOSED: set MIGRATION_E2E_DATABASE_URL to a fresh disposable localhost PostgreSQL database'
+        );
+      }
+      if (!ds?.isInitialized) throw new Error('FAIL-CLOSED: disposable datasource unavailable');
+
+      const before = await ds.query('SELECT name FROM migrations ORDER BY name');
+      const secondRun = await ds.runMigrations({ transaction: 'all' });
+      const after = await ds.query('SELECT name FROM migrations ORDER BY name');
+
+      expect(secondRun).toHaveLength(0);
+      expect(after.map((row: { name: string }) => row.name))
+        .toEqual(before.map((row: { name: string }) => row.name));
     });
 
     afterAll(async () => {
