@@ -22,7 +22,8 @@ if (command === 'up') {
 }
 
 async function runMigrations(): Promise<void> {
-  const { migrationDataSource } = await import('./datasource');
+  const { getMigrationDataSourceLazy } = await import('./datasource');
+  const migrationDataSource = getMigrationDataSourceLazy();
   try {
     await migrationDataSource.initialize();
     if (command === 'status') {
