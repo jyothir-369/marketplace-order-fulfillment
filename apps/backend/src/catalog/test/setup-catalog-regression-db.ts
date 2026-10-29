@@ -24,11 +24,11 @@ async function main() {
 
   if (
     cfg.host !== '127.0.0.1' ||
-    cfg.port !== 60920 ||
+    cfg.port !== 55432 ||
     cfg.database !== 'catalog_category6_test' ||
     cfg.username !== 'catalogtest'
   ) {
-    throw new Error('Refusing setup: expected only the isolated catalog_category6_test database on loopback port 60920.');
+    throw new Error('Refusing setup: expected only the isolated catalog_category6_test database on loopback port 55432.');
   }
 
   const ds = new DataSource({
@@ -137,3 +137,4 @@ main().catch((error) => {
   console.error('Catalog regression setup failed:', error.message);
   process.exitCode = 1;
 });
+

@@ -22,6 +22,8 @@ import { AuditModule } from './common/audit/audit.module';
 import { AuditLog } from './common/audit/audit-log.entity';
 import { HealthModule } from './health/health.module';
 import { VendorPaymentAccount } from './common/entities/vendor-payment-account.entity';
+import { VendorPaymentAllocation } from './common/entities/vendor-payment-allocation.entity';
+import { PaymentTransfer } from './common/entities/payment-transfer.entity';
 import { Vendor } from './common/entities/vendor.entity';
 import { Category } from './common/entities/category.entity';
 import { Product } from './common/entities/product.entity';
@@ -37,6 +39,8 @@ import { WebhookEvent } from './common/entities/webhook-event.entity';
 import { CustomerAddress } from './customer/customer-address.entity';
 import { VendorApplication } from './vendor/vendor-application.entity';
 import { Promotion } from './common/entities/promotion.entity';
+import { Refund } from './common/entities/refund.entity';
+import { Dispute } from './common/entities/dispute.entity';
 import { AuthModule } from './auth/auth.module';
 import { PaymentsModule } from './payments/payments.module';
 
@@ -81,7 +85,7 @@ import { PaymentsModule } from './payments/payments.module';
           return {
             type: 'postgres',
             url: dbUrl,
-            entities: [Vendor, VendorPaymentAccount, Category, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken, PasswordResetToken, PaymentAuthorization, Review, WebhookEvent, CustomerAddress, VendorApplication, Promotion],
+            entities: [Vendor, VendorPaymentAccount, VendorPaymentAllocation, PaymentTransfer, Category, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken, PasswordResetToken, PaymentAuthorization, Review, WebhookEvent, CustomerAddress, VendorApplication, Promotion, Refund, Dispute],
             synchronize: false,
             logging: configService.get('NODE_ENV') === 'development',
             ssl: isCloudDb ? { rejectUnauthorized: false } : false,
@@ -100,7 +104,7 @@ import { PaymentsModule } from './payments/payments.module';
           return {
             type: 'postgres',
             url: dbUrl,
-            entities: [Vendor, VendorPaymentAccount, Category, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken, PasswordResetToken, PaymentAuthorization, Review, WebhookEvent, CustomerAddress, VendorApplication, Promotion],
+            entities: [Vendor, VendorPaymentAccount, VendorPaymentAllocation, PaymentTransfer, Category, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken, PasswordResetToken, PaymentAuthorization, Review, WebhookEvent, CustomerAddress, VendorApplication, Promotion, Refund, Dispute],
             // Phase 2.1: migrations own the schema — no more synchronize in any env.
             synchronize: false,
             logging: configService.get('NODE_ENV') === 'development',
@@ -130,7 +134,7 @@ import { PaymentsModule } from './payments/payments.module';
           database: configService.get('DB_DATABASE', 'marketplace'),
           // Fixed a latent drift: the fallback branch was missing Category from
           // entities, so `sync:true` would have silently dropped categories.
-          entities: [Vendor, Category, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken, PasswordResetToken, PaymentAuthorization, Review, WebhookEvent, CustomerAddress, VendorApplication, Promotion],
+          entities: [Vendor, VendorPaymentAccount, VendorPaymentAllocation, PaymentTransfer, Category, Order, Product, OrderLineItem, VendorSyncJob, AuditLog, User, RefreshToken, PasswordResetToken, PaymentAuthorization, Review, WebhookEvent, CustomerAddress, VendorApplication, Promotion, Refund, Dispute],
           synchronize: false,
           logging: configService.get('NODE_ENV') === 'development',
           ssl: false,
