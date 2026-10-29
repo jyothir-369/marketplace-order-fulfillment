@@ -46,7 +46,7 @@ describe('Migration registry/datasource reconciliation', () => {
   });
 
   it('retains all registered date-based migrations (10, including 20261027)', () => {
-    expect(MIGRATION_REGISTRY.filter((name) => /^2026/.test(name))).toHaveLength(10);
+    expect(MIGRATION_REGISTRY.filter((name) => /^2026/.test(name))).toHaveLength(12);
   });
 
   it('fails for unregistered migration files (nonzero on missing registry)', () => {
@@ -112,3 +112,4 @@ describe('Migration registry/datasource reconciliation', () => {
     }
   });
 });
+
