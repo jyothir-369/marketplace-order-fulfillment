@@ -27,6 +27,8 @@ export class PaymentsService {
     private readonly mockPaymentService: MockPaymentService,
     private readonly auditService: AuditService,
     private readonly razorpayProvider: RazorpayProviderService,
+    // Allocation bridge: recovery after capture requires approved policy + DB (Req 3/5).
+    // Fail-closed: injection happens at module level when approved; service never invents rates.
   ) {}
 
   /**
