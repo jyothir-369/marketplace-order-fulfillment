@@ -1,4 +1,4 @@
-﻿module.exports = {
+module.exports = {
   testEnvironment: 'jsdom',
   setupFilesAfterEnv: ['<rootDir>/test/setupTests.ts', '<rootDir>/test/setupEnv.ts'],
   transform: {
@@ -8,8 +8,10 @@
   testMatch: [
     '**/__tests__/**/*.spec.[tj]s?(x)',
     '**/test/**/*.spec.[tj]s?(x)',
+    '**/app/**/*.test.[tj]s?(x)',
   ],
 };
+
 
 
 
