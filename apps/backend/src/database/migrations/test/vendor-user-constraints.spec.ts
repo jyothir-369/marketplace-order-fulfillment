@@ -5,7 +5,6 @@ import { AddVendorUserConstraints2026101300000 } from '../20261013-AddVendorUser
 function getTestConfig(): {
   host: string;
   port: number;
-  url?: string;
   username: string;
   password: string;
   database: string;
@@ -16,18 +15,20 @@ function getTestConfig(): {
   const password = process.env.MIGRATION_TEST_DB_PASSWORD;
   const database = process.env.MIGRATION_TEST_DB_NAME;
 
-  const url = (process.env.MIGRATION_CONSTRAINTS_TEST_DATABASE_URL || '').trim();
-  if (!url) throw new Error('FAIL-CLOSED: MIGRATION_CONSTRAINTS_TEST_DATABASE_URL required explicitly');
-  let parsed; try { parsed = new URL(url); } catch { throw new Error('BLOCKED: invalid URL'); }
-  if (parsed.protocol !== 'postgres:' && parsed.protocol !== 'postgresql:') throw new Error('BLOCKED: bad protocol');
-  if (parsed.hostname !== '127.0.0.1' && parsed.hostname !== 'localhost') throw new Error('BLOCKED: non-loopback');
-  if (!parsed.username || !parsed.password) throw new Error('BLOCKED: missing credentials');
-  if (parsed.search || parsed.hash) throw new Error('BLOCKED: query/fragment');
-  const portNum = parseInt(parsed.port || '0', 10);
-  if (!portNum || portNum < 1024) throw new Error('BLOCKED: bad port');
-  const dbName = parsed.pathname.replace(/^\//, '');
-  if (!dbName || dbName === 'postgres' || dbName === 'template1' || dbName === 'template0') throw new Error('BLOCKED: protected DB');
-  return { host: parsed.hostname, port: portNum, username: parsed.username, password: parsed.password, database: dbName, url };
+  if (
+    host !== '127.0.0.1' ||
+    portRaw !== '55439' ||
+    username !== 'migrationtest' ||
+    !password ||
+    database !== 'marketplace_migration_constraints_test'
+  ) {
+    throw new Error(
+      'FAIL-CLOSED: set explicit MIGRATION_TEST_DB_* credentials for ' +
+      '127.0.0.1:55439/marketplace_migration_constraints_test as migrationtest.',
+    );
+  }
+
+  return { host, port: 55439, username, password, database };
 }
 describe('Vendor-user constraint migration (20261013)', () => {
   let ds: DataSource;
@@ -36,7 +37,11 @@ describe('Vendor-user constraint migration (20261013)', () => {
     const cfg = getTestConfig();
     ds = new DataSource({
       type: 'postgres',
-      url: (cfg as any).url || ('postgres://' + cfg.username + ':' + cfg.password + '@' + cfg.host + ':' + cfg.port + '/' + cfg.database),
+      host: cfg.host,
+      port: cfg.port,
+      username: cfg.username,
+      password: cfg.password,
+      database: cfg.database,
       synchronize: false,
       entities: [],
       migrations: [],
@@ -46,49 +51,42 @@ describe('Vendor-user constraint migration (20261013)', () => {
 
     // Verify the actual database before creating tables or running destructive test cleanup.
     const identity = await ds.query(
-      'SELECT current_database() AS database',
+      'SELECT current_database() AS database, current_user AS username, inet_server_port() AS server_port',
     );
 
-    const expectedDb = cfg.database;
-    if (identity[0]?.database !== expectedDb) {
+    if (
+      identity[0]?.database !== 'marketplace_migration_constraints_test' ||
+      identity[0]?.username !== 'migrationtest' ||
+      Number(identity[0]?.server_port) !== 5432
+    ) {
       await ds.destroy();
-      throw new Error('FAIL-CLOSED: connected to unexpected DB: ' + (identity[0]?.database || 'none') + ' (expected ' + expectedDb + ')');
-    }
-
-    // The URL port is the host-published port; PostgreSQL reports its
-    // internal listening port, commonly 5432 inside a Docker container.
-    const serverPortRes = await ds.query("SELECT inet_server_port() AS port");
-    const serverPort = serverPortRes[0]?.port
-      ? parseInt(String(serverPortRes[0].port), 10)
-      : null;
-
-    if (!serverPort || serverPort < 1 || serverPort > 65535) {
       throw new Error(
-        'FAIL-CLOSED: PostgreSQL server port could not be verified',
+        'FAIL-CLOSED: connected to an unexpected database; refusing to modify schema.',
       );
     }
-
-    const parsedUrl = new URL(cfg.url || '');
-    const urlPort = parseInt(parsedUrl.port || '5432', 10);
-
-    if (urlPort !== cfg.port) {
-      throw new Error(
-        'FAIL-CLOSED: configured port does not match the database URL port',
-      );
-    }
-    // Fail-closed: teardown must not touch protected DBs
-    const protectedCheck = await ds.query("SELECT current_database() AS db");
-    const dbNow = protectedCheck[0]?.db;
-    if (dbNow === 'postgres' || dbNow === 'template1' || dbNow === 'template0') throw new Error('FAIL-CLOSED: protected DB detected before setup');
-
     // Ensure required schema exists (fail-closed if DB unreachable)
     await ds.query(`CREATE TABLE IF NOT EXISTS vendors (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name VARCHAR(255) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
     await ds.query(`CREATE TABLE IF NOT EXISTS users (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), email VARCHAR(255) UNIQUE NOT NULL, password_hash VARCHAR(255) NOT NULL, role VARCHAR(20) DEFAULT 'buyer', vendor_id UUID NULL, display_name VARCHAR(120), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
   }, 30000);
 
   afterEach(async () => {
-    if (!ds || !ds.isInitialized) return;
-    // Drop both the named constraint (migration) and TypeORM-generated FK name.
+    // Setup may fail before the datasource is initialized.
+    // Preserve cleanup after successful setup.
+    if (!ds?.isInitialized) return;
+
+    const cleanupIdentity = await ds.query(
+      'SELECT current_database() AS database, current_user AS username',
+    );
+
+    if (
+      cleanupIdentity[0]?.database !== 'marketplace_migration_constraints_test' ||
+      cleanupIdentity[0]?.username !== 'migrationtest'
+    ) {
+      throw new Error(
+        'FAIL-CLOSED: refusing migration-test cleanup on an unexpected database or role.',
+      );
+    }
+
     await ds.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS fk_users_vendor`);
     await ds.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_vendor_id_fkey`);
     await ds.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS chk_users_vendor_role`);
@@ -96,15 +94,7 @@ describe('Vendor-user constraint migration (20261013)', () => {
   });
 
   afterAll(async () => {
-if (ds && ds.isInitialized) {
-        const protect = await ds.query("SELECT current_database() AS db");
-        const dbName = protect[0]?.db;
-        if (dbName === 'postgres' || dbName === 'template1' || dbName === 'template0') {
-          await ds.destroy(); // just disconnect, do not drop
-          throw new Error('FAIL-CLOSED: teardown blocked on protected DB: '+dbName);
-        }
-        await ds.destroy();
-      }
+    if (ds && ds.isInitialized) await ds.destroy();
   });
 
   async function withRunner<T>(cb: (qr: QueryRunner) => Promise<T>): Promise<T> {
