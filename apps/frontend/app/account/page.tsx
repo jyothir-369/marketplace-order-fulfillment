@@ -9,6 +9,11 @@ import { UserDto, Uuid, type ApiErrorBody } from "@/lib/types";
 import { useCartStore } from "@/context/CartStore";
 import { cn } from "@/lib/utils";
 
+function capitalizeRole(role: string | null | undefined): string {
+  if (!role) return "Customer";
+  return role.charAt(0).toUpperCase() + role.slice(1);
+}
+
 interface AddressDto {
   id: Uuid;
   label: string;
@@ -30,18 +35,63 @@ export default function AccountPage() {
   const [addresses, setAddresses] = useState<AddressDto[]>([]);
   const [addressLoading, setAddressLoading] = useState(true);
 
-  // Profile editing state
-  const [profileEditing, setProfileEditing] = useState(false);
+  // Profile editing state (single shared state, no toggle)
+  const [editingProfile, setEditingProfile] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
   const [profileError, setProfileError] = useState<string | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
 
+  // Sync editing trigger + edits with the persisted auth user so the editor
+  // always opens against the latest committed value from the backend.
+  useEffect(() => {
+    if (!user) return;
+    setDisplayName(String(user.displayName ?? ""));
+    setBio(String(user.bio ?? ""));
+  }, [user?.id]);
+
+  async function startEditProfile() {
+    if (!user) return;
+    setEditingProfile(true);
+    // Open editor against the saved profile (not just the auth context user)
+    // so details that were loaded from /customer/profile are preserved.
+    setDisplayName(profile?.displayName ?? user.displayName ?? "");
+    setBio(profile?.bio ?? user.bio ?? "");
+    setProfileError(null);
+  }
+
+  function cancelEditProfile() {
+    setEditingProfile(false);
+    setProfileError(null);
+    // Revert to last saved profile details so edits don't leak
+    setDisplayName(profile?.displayName ?? user?.displayName ?? "");
+    setBio(profile?.bio ?? user?.bio ?? "");
+  }
+
+  async function submitProfile(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingProfile(true);
+    setProfileError(null);
+    try {
+      const updated = await apiFetch<UserDto>("/customer/profile", { method: "PATCH", body: JSON.stringify({ displayName, bio }) });
+      setProfile(updated);
+      setDisplayName(updated.displayName ?? "");
+      setBio(updated.bio ?? "");
+      setEditingProfile(false);
+      try { await apiFetch<UserDto>("/auth/me"); } catch {}
+    } catch (err) {
+      const e2 = err as Error & { statusCode?: number; body?: ApiErrorBody };
+      setProfileError(`${e2.statusCode ? `HTTP ${e2.statusCode}` : "Failed to save"}: ${e2.message}`);
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
   // Address form
-  const [addressFormOpen, setAddressFormOpen] = useState(false);
+  const [addressFormOpen, setAddressFormOpen] = useState(true);
   const [editAddressId, setEditAddressId] = useState<Uuid | null>(null);
   const [addrFields, setAddrFields] = useState({
-    label: "", street: "", city: "", state: "", zip: "", country: "", isDefault: false,
+    label: "Home", street: "", city: "", state: "", zip: "", country: "India", isDefault: false,
   });
   const [addressError, setAddressError] = useState<string | null>(null);
   const [addressesLoading, setAddressesLoading] = useState(true);
@@ -139,42 +189,12 @@ export default function AccountPage() {
     }
   }
 
-  async function submitProfile(e: React.FormEvent) {
-    e.preventDefault();
-    if (!profile) return;
-    setSavingProfile(true);
-    setProfileError(null);
-    try {
-      await apiFetch<UserDto>("/customer/profile", { method: "PATCH", body: JSON.stringify({ displayName, bio }) });
-      setProfileEditing(false);
-      const fresh = await apiFetch<UserDto>("/customer/profile");
-      setProfile(fresh);
-      localStorage.setItem("user", JSON.stringify(fresh));
-    } catch (err) {
-      const e2 = err as Error & { statusCode?: number; body?: ApiErrorBody };
-      setProfileError(`${e2.statusCode ? `HTTP ${e2.statusCode}` : "Failed to save"}: ${e2.message}`);
-    } finally {
-      setSavingProfile(false);
-    }
-  }
-
-  function cancelProfileEdit() {
-    setProfileEditing(false);
-    setProfileError(null);
-    if (profile) {
-      setDisplayName(profile.displayName ?? "");
-      setBio(profile.bio ?? "");
-    }
-  }
-
   const currentTab = user && !loadingProfile ? (tab === "profile" ? profile ?? user : tab) : (user ?? null);
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-10">
       <div className="flex gap-3 mb-4 text-sm">
         <Link href="/" className="text-[var(--color-primary)] hover:underline font-medium">Storefront</Link>
-        <span className="text-[var(--color-border)]">|</span>
-        <Link href="/dashboard" className="text-[var(--color-primary)] hover:underline font-medium">Dashboard</Link>
       </div>
       <h1 className="font-display text-3xl font-bold text-[var(--color-foreground)] mb-2">Account</h1>
 
@@ -200,18 +220,26 @@ export default function AccountPage() {
           </>
         ) : tab === "profile" ? (
           <div className="space-y-4">
-            {!profileEditing ? (
+            {!editingProfile ? (
               <>
                 <h2 className="font-display text-xl font-bold">Profile</h2>
                 <p className="text-sm text-[var(--color-warm-muted)]">Manage your name and bio.</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-cream)] px-3 py-2 text-sm"><span className="text-[var(--color-warm-muted)]">Display name</span><p className="font-medium">{profile?.displayName ?? "—"}</p></div>
                   <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-cream)] px-3 py-2 text-sm"><span className="text-[var(--color-warm-muted)]">Email</span><p className="font-medium">{profile?.email ?? "—"}</p></div>
-                  <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-cream)] px-3 py-2 text-sm"><span className="text-[var(--color-warm-muted)]">Role</span><p className="font-medium capitalize">{profile?.role ?? "customer"}</p></div>
+                  <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-cream)] px-3 py-2 text-sm"><span className="text-[var(--color-warm-muted)]">Role</span><p className="font-medium capitalize">{capitalizeRole(profile?.role ?? user?.role)}</p></div>
                   <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-cream)] px-3 py-2 text-sm"><span className="text-[var(--color-warm-muted)]">Bio</span><p className="font-medium">{profile?.bio ?? "—"}</p></div>
                 </div>
                 <div className="mt-6 flex gap-3">
-                  {!roleIsReadonly && <button onClick={() => { setDisplayName(profile?.displayName ?? ""); setBio(profile?.bio ?? ""); setProfileEditing(true); }} className="px-4 py-2 rounded-lg bg-[var(--color-primary)] text-white text-sm font-semibold">Edit</button>}
+                  {!roleIsReadonly && (
+                    <button
+                      onClick={startEditProfile}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[var(--color-ink-navy)] text-white text-sm font-semibold shadow hover:brightness-110 transition focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                      aria-label="Edit profile"
+                    >
+                      <Edit className="h-4 w-4" /> Edit
+                    </button>
+                  )}
                   {roleIsReadonly && <span className="self-center text-xs text-[var(--color-ink-navy)] font-medium">View-only — admin access</span>}
                 </div>
               </>
@@ -230,9 +258,9 @@ export default function AccountPage() {
                     className={cn("w-full rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm focus:ring-[var(--color-primary)] focus:outline-none disabled:opacity-70", profileError && "border-red-400")} />
                 </div>
                 <div className="flex gap-3">
-                  <button type="submit" disabled={savingProfile || roleIsReadonly} className="px-4 py-2 rounded-lg bg-[var(--color-primary)] text-white text-sm font-semibold disabled:opacity-70">Save</button>
+                  <button type="submit" disabled={savingProfile || roleIsReadonly} className="px-4 py-2 rounded-lg bg-blue-700 text-white text-sm font-bold shadow-sm hover:bg-blue-800 disabled:opacity-50">Save</button>
                   {profileError && <span className="self-center text-xs text-red-500">{profileError}</span>}
-                  <button type="button" onClick={cancelProfileEdit} className="px-4 py-2 rounded-lg border border-[var(--color-ink-navy)] text-[var(--color-ink-navy)] text-sm font-semibold">Cancel</button>
+                  <button type="button" onClick={cancelEditProfile} className="px-4 py-2 rounded-lg border border-[var(--color-ink-navy)] text-[var(--color-ink-navy)] text-sm font-semibold">Cancel</button>
                 </div>
               </form>
             )}
@@ -268,8 +296,8 @@ export default function AccountPage() {
                       </div>
                       <p className="text-xs text-[var(--color-warm-muted)] mt-1">{a.country}{a.isDefault ? " · Default" : ""}</p>
                     </div>
-                    <div className="flex gap-1 shrink-0">
-                      <button onClick={() => startEditAddress(a)} className="text-[var(--color-ink-navy)] hover:underline text-xs px-1" aria-label="Edit"><Edit className="inline h-4 w-4" /></button>
+                    <div className="flex gap-2 shrink-0">
+                      <button onClick={() => startEditAddress(a)} className="inline-flex items-center gap-1 rounded-md bg-[var(--color-ink-navy)] text-white text-xs font-semibold px-2 py-1 hover:brightness-110" aria-label="Edit address"><Edit className="h-3.5 w-3.5" /> Edit</button>
                       {!a.isDefault && <button onClick={async () => { await apiFetch(`/customer/addresses/${a.id}`, { method: "PATCH", body: JSON.stringify({ isDefault: true }) }); await loadAddresses(); }} className="text-[var(--color-primary)] hover:underline text-xs px-1" aria-label="Set default">Set default</button>}
                       <button onClick={() => deleteAddress(a)} className="text-red-500 hover:underline text-xs px-1" aria-label="Delete"><Trash2 className="inline h-4 w-4" /></button>
                     </div>
@@ -288,12 +316,12 @@ export default function AccountPage() {
                   <div><label className="block text-xs">Street</label><input value={addrFields.street} onChange={e => setAddrFields(f => ({ ...f, street: e.target.value }))} required className="w-full rounded border border-[var(--color-border)] px-2 py-1 text-sm" /></div>
                   <div><label className="block text-xs">City</label><input value={addrFields.city} onChange={e => setAddrFields(f => ({ ...f, city: e.target.value }))} required className="w-full rounded border border-[var(--color-border)] px-2 py-1 text-sm" /></div>
                   <div><label className="block text-xs">State</label><input value={addrFields.state} onChange={e => setAddrFields(f => ({ ...f, state: e.target.value }))} className="w-full rounded border border-[var(--color-border)] px-2 py-1 text-sm" /></div>
-                  <div><label className="block text-xs">ZIP</label><input value={addrFields.zip} onChange={e => setAddrFields(f => ({ ...f, zip: e.target.value }))} className="w-full rounded border border-[var(--color-border)] px-2 py-1 text-sm" /></div>
+                  <div><label className="block text-xs">Postal code (ZIP)</label><input value={addrFields.zip} onChange={e => setAddrFields(f => ({ ...f, zip: e.target.value }))} className="w-full rounded border border-[var(--color-border)] px-2 py-1 text-sm" /></div>
                   <div><label className="block text-xs">Country</label><input value={addrFields.country} onChange={e => setAddrFields(f => ({ ...f, country: e.target.value }))} required className="w-full rounded border border-[var(--color-border)] px-2 py-1 text-sm" /></div>
                 </div>
                 <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={!!addrFields.isDefault} onChange={e => setAddrFields(f => ({ ...f, isDefault: e.target.checked }))} /> Set as default</label>
                 <div className="flex gap-2">
-                  <button type="submit" disabled={addressSaving} className="px-3 py-1 rounded bg-[var(--color-primary)] text-white text-xs font-semibold">Save</button>
+                  <button type="submit" disabled={addressSaving} className="px-4 py-2 rounded-lg bg-blue-700 text-white text-sm font-bold shadow-sm hover:bg-blue-800 disabled:opacity-50">Save</button>
                   <button type="button" onClick={() => setAddressFormOpen(false)} className="px-3 py-1 rounded border border-[var(--color-ink-navy)] text-[var(--color-ink-navy)] text-xs font-semibold">Cancel</button>
                 </div>
                 {addressError && <div className="text-xs text-red-600">{addressError}</div>}
@@ -317,10 +345,6 @@ export default function AccountPage() {
             <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-cream)] p-4 space-y-2 text-sm">
               <p><span className="font-semibold">Password change:</span> Not yet implemented (requires auth provider integration).</p>
               <p><span className="font-semibold">Active sessions:</span> Not yet tracked locally.</p>
-            </div>
-            <div className="flex gap-3">
-              <Link href="/" className="px-4 py-2 rounded-lg bg-[var(--color-primary)] text-white text-sm font-semibold">Back to storefront</Link>
-              <Link href="/dashboard" className="px-4 py-2 rounded-lg border border-[var(--color-ink-navy)] text-[var(--color-ink-navy)] text-sm font-semibold">Dashboard</Link>
             </div>
             <button onClick={() => { logout(); window.location.href = "/products"; }} className="flex items-center gap-2 px-4 py-2 rounded-lg border border-red-400 text-red-600 text-sm font-semibold hover:bg-red-50"><LogOut className="h-4 w-4" /> Sign out</button>
           </div>

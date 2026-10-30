@@ -43,6 +43,7 @@ import { Refund } from './common/entities/refund.entity';
 import { Dispute } from './common/entities/dispute.entity';
 import { AuthModule } from './auth/auth.module';
 import { PaymentsModule } from './payments/payments.module';
+import { CustomerModule } from './customer/customer.module';
 
 @Module({
   imports: [
@@ -189,6 +190,7 @@ import { PaymentsModule } from './payments/payments.module';
     PaymentsModule,
     AdminModule,
     HealthModule,
+    CustomerModule,
     // Phase 6.1: global rate limiting. The default 100 req/60s covers every
     // route; the abuse-sensitive auth + checkout routes get a tighter
     // per-method limit via @Throttle on the controller methods.

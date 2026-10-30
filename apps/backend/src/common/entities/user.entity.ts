@@ -40,6 +40,8 @@ export class User {
 
   @Column({ type: 'varchar', length: 120, nullable: true, name: 'display_name' })
   displayName: string | null;
+  @Column({ type: 'varchar', length: 280, nullable: true, name: 'bio' })
+  bio: string | null;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
