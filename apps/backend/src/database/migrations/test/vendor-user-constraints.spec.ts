@@ -66,7 +66,10 @@ describe('Vendor-user constraint migration (20261013)', () => {
   }, 30000);
 
   afterEach(async () => {
-    // Drop both the named constraint (migration) and TypeORM-generated FK name.
+    // Setup may fail before the datasource is initialized.
+    // Preserve cleanup after successful setup.
+    if (!ds?.isInitialized) return;
+
     await ds.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS fk_users_vendor`);
     await ds.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_vendor_id_fkey`);
     await ds.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS chk_users_vendor_role`);

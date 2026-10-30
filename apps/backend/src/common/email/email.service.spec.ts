@@ -34,7 +34,7 @@ describe('EmailService sendResetLink', () => {
   });
 
   it('should return delivered true when Resend accepts', async () => {
-    const mockSend = jest.fn().mockResolvedValue({ id: 'resend-id-123' });
+    const mockSend = jest.fn().mockResolvedValue({ data: { id: 'resend-id-123' }, error: null });
     // Preserved: dynamic reload of mocked Resend for per-test mockImplementationOnce (jest.mock + reset).
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { Resend } = require('resend');
@@ -48,6 +48,35 @@ describe('EmailService sendResetLink', () => {
     expect(call.to).toBe('user@test.local');
     expect(call.subject).toContain('Reset');
     expect(call.html).toContain('reset-password');
+  });
+
+  it('should reject a Resend success response without a message id', async () => {
+    const mockSend = jest.fn().mockResolvedValue({ data: {}, error: null });
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { Resend } = require('resend');
+    (Resend as any).mockImplementationOnce(() => ({ emails: { send: mockSend } }));
+
+    const result = await service.sendResetLink('user@test.local', 't');
+
+    expect(result.delivered).toBe(false);
+    expect(result.providerRequestId).toBeUndefined();
+    expect(result.blockedReason).toMatch(/no message id/i);
+  });
+
+  it('should reject a Resend SDK error response', async () => {
+    const mockSend = jest.fn().mockResolvedValue({
+      data: null,
+      error: { message: 'Invalid API key' },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { Resend } = require('resend');
+    (Resend as any).mockImplementationOnce(() => ({ emails: { send: mockSend } }));
+
+    const result = await service.sendResetLink('user@test.local', 't');
+
+    expect(result.delivered).toBe(false);
+    expect(result.providerRequestId).toBeUndefined();
+    expect(result.blockedReason).toMatch(/Resend rejected/i);
   });
 
   it('should return blocked when provider missing', async () => {
@@ -88,7 +117,7 @@ describe('EmailService sendResetLink', () => {
 
   it('should never log token or URL (verified by spy absence)', async () => {
     const spy = jest.spyOn((service as any).logger, 'log');
-    const mockSend = jest.fn().mockResolvedValue({ id: 'x' });
+    const mockSend = jest.fn().mockResolvedValue({ data: { id: 'resend-log-test-id' }, error: null });
     // Preserved: per-test Resend reload with mockImplementationOnce.
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { Resend } = require('resend');
