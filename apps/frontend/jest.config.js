@@ -1,6 +1,6 @@
 module.exports = {
   testEnvironment: 'jsdom',
-  setupFilesAfterEnv: ['<rootDir>/test/setupTests.ts', '<rootDir>/test/setupEnv.ts'],
+  setupFilesAfterEnv: ['<rootDir>/test/setupTests.ts'],
   transform: {
     '^.+\\.(ts|tsx)$': ['babel-jest', { configFile: require('path').resolve(__dirname, 'babel.jest.config.cjs') }],
   },
