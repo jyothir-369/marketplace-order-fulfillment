@@ -9,25 +9,9 @@ export function assertFailClosedDatabase(config: {
   database?: string;
   url?: string;
 }): void {
-  // Reject DATABASE_URL entirely — only the dedicated local config is allowed
-  if (config.url && config.url.trim() !== '') {
-    throw new Error('BLOCKED: DATABASE_URL is not allowed by the local migration runner');
-  }
-
   const host = config.host?.trim();
-  if (!host || !ALLOWED_HOSTS.has(host)) {
-    throw new Error('BLOCKED: migration database must use a loopback host');
-  }
 
-  if (config.port !== ALLOWED_PORT) {
-    throw new Error(`BLOCKED: migration database port must be ${ALLOWED_PORT}`);
-  }
-
-  if (config.database !== ALLOWED_DATABASE) {
-    throw new Error(`BLOCKED: migration database must be ${ALLOWED_DATABASE}`);
-  }
-
-  // Reject missing credentials
+  // Reject missing credentials first (before DB checks)
   if (!config.host || !config.port || !config.database) {
     throw new Error('BLOCKED: missing required connection parameters');
   }
@@ -41,6 +25,23 @@ export function assertFailClosedDatabase(config: {
   // Reject malformed URLs embedded in database field
   if (config.database && malformedUrlPattern.test(config.database)) {
     throw new Error('BLOCKED: database contains malformed URL');
+  }
+
+  // Reject DATABASE_URL entirely — only the dedicated local config is allowed
+  if (config.url && config.url.trim() !== '') {
+    throw new Error('BLOCKED: DATABASE_URL is not allowed by the local migration runner');
+  }
+
+  if (!host || !ALLOWED_HOSTS.has(host)) {
+    throw new Error('BLOCKED: migration database must use a loopback host');
+  }
+
+  if (config.port !== ALLOWED_PORT) {
+    throw new Error(`BLOCKED: migration database port must be ${ALLOWED_PORT}`);
+  }
+
+  if (config.database !== ALLOWED_DATABASE) {
+    throw new Error(`BLOCKED: migration database must be ${ALLOWED_DATABASE}`);
   }
 }
 

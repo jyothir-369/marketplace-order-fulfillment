@@ -18,6 +18,7 @@ const mockUser: User = {
   role: UserRole.BUYER,
   vendorId: null,
   displayName: 'Test Buyer',
+  bio: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 };

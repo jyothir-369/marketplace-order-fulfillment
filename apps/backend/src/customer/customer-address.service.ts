@@ -19,6 +19,10 @@ export class CustomerAddressService {
       const dup = await this.repo.findOne({ where: { userId, label: body.label } });
       if (dup) throw new BadRequestException('Address label already exists');
     }
+    // Default-address enforcement: if isDefault is true, unset existing defaults for this user
+    if (body.isDefault) {
+      await this.repo.update({ userId, isDefault: true }, { isDefault: false });
+    }
     const addr = this.repo.create({ ...body, userId });
     return this.repo.save(addr);
   }
@@ -34,6 +38,9 @@ export class CustomerAddressService {
     if (body.label && body.label !== addr.label) {
       const dup = await this.repo.findOne({ where: { userId, label: body.label } });
       if (dup) throw new BadRequestException('Address label already exists');
+    }
+    if (body.isDefault === true && !addr.isDefault) {
+      await this.repo.update({ userId, isDefault: true }, { isDefault: false });
     }
     Object.assign(addr, body);
     return this.repo.save(addr);

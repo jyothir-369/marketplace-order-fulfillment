@@ -1,4 +1,4 @@
-﻿import * as fs from 'fs';
+import * as fs from 'fs';
 import * as path from 'path';
 import { MIGRATION_REGISTRY, DUPLICATE_TIMESTAMPS } from './registry';
 
@@ -125,8 +125,10 @@ describe('Migration registry datasource import (explicit opt-in, fail-closed)', 
       // Essential: require after jest.resetModules() to re-evaluate datasource with isolated env.
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const datasourceModule = require('./datasource');
-      expect(datasourceModule.migrationDataSource).toBeDefined();
-      expect(typeof datasourceModule.migrationDataSource.options).toBe('object');
+      expect(typeof datasourceModule.getMigrationDataSourceLazy).toBe('function');
+      const dataSource = datasourceModule.getMigrationDataSourceLazy();
+      expect(dataSource).toBeDefined();
+      expect(typeof dataSource.options).toBe('object');
     } finally {
       if (originalUrl !== undefined) process.env.MIGRATION_TEST_DATABASE_URL = originalUrl;
       else delete (process.env as any).MIGRATION_TEST_DATABASE_URL;
@@ -139,17 +141,58 @@ describe('Migration registry datasource import (explicit opt-in, fail-closed)', 
 
   it('blocks import when generic DB overrides are present (fail-closed)', () => {
     const originalDB = process.env.DATABASE_URL;
-    process.env.DATABASE_URL = 'postgresql://fake';
-    process.env.MIGRATION_TEST_DATABASE_URL = '';
+    const originalTestUrl = process.env.MIGRATION_TEST_DATABASE_URL;
+    const originalDbFields = {
+      host: process.env.DB_HOST,
+      port: process.env.DB_PORT,
+      database: process.env.DB_DATABASE,
+      username: process.env.DB_USERNAME,
+      password: process.env.DB_PASSWORD,
+    };
+
     try {
-      jest.resetModules();
-      // Essential: dynamic require after resetModules to test fail-closed guard with fresh module.
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      expect(() => require('./datasource')).toThrow();
+      // A valid dedicated URL ensures the generic-override guard is the reason for rejection.
+      process.env.MIGRATION_TEST_DATABASE_URL =
+        'postgresql://tester:tester@127.0.0.1:55439/marketplace_migration_test';
+      process.env.DATABASE_URL = 'postgresql://fake';
+
+      delete (process.env as any).DB_HOST;
+      delete (process.env as any).DB_PORT;
+      delete (process.env as any).DB_DATABASE;
+      delete (process.env as any).DB_USERNAME;
+      delete (process.env as any).DB_PASSWORD;
+
+      let rejected = false;
+      jest.isolateModules(() => {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const datasource = require('./datasource');
+        try {
+          // The datasource is intentionally lazy: exercise the guard at its
+          // actual boundary, before a DataSource or DB connection is created.
+          datasource.getMigrationDataSourceLazy();
+        } catch (error) {
+          rejected = true;
+          expect(String(error)).toContain('generic database overrides are forbidden');
+        }
+      });
+      expect(rejected).toBe(true);
     } finally {
-      if (originalDB !== undefined) process.env.DATABASE_URL = originalDB;
-      else if (process.env.DATABASE_URL) delete (process.env as any).DATABASE_URL;
-      if (process.env.MIGRATION_TEST_DATABASE_URL === '') delete (process.env as any).MIGRATION_TEST_DATABASE_URL;
+      if (originalDB === undefined) delete (process.env as any).DATABASE_URL;
+      else process.env.DATABASE_URL = originalDB;
+
+      if (originalTestUrl === undefined) delete (process.env as any).MIGRATION_TEST_DATABASE_URL;
+      else process.env.MIGRATION_TEST_DATABASE_URL = originalTestUrl;
+
+      for (const [key, value] of Object.entries({
+        DB_HOST: originalDbFields.host,
+        DB_PORT: originalDbFields.port,
+        DB_DATABASE: originalDbFields.database,
+        DB_USERNAME: originalDbFields.username,
+        DB_PASSWORD: originalDbFields.password,
+      })) {
+        if (value === undefined) delete (process.env as any)[key];
+        else process.env[key] = value;
+      }
     }
   });
 });

@@ -1,34 +1,12 @@
 import { MIGRATION_REGISTRY, DUPLICATE_TIMESTAMPS } from './registry';
-import { migrationDataSource } from './datasource';
+import { MIGRATION_CLASSES } from './migration-classes';
 import * as fs from 'fs';
 import * as path from 'path';
 
 function getConfiguredMigrationNames(): string[] {
-  const configured: unknown = migrationDataSource.options.migrations;
-  let entries: unknown[];
-
-  if (Array.isArray(configured)) {
-    entries = configured;
-  } else if (
-    configured !== null &&
-    typeof configured === 'object'
-  ) {
-    entries = Object.values(configured);
-  } else if (
-    typeof configured === 'string' ||
-    typeof configured === 'function'
-  ) {
-    entries = [configured];
-  } else {
-    entries = [];
-  }
-
-  return entries.map((entry, index) => {
-    if (typeof entry === 'function') return entry.name;
-    if (typeof entry === 'string') return entry;
-    throw new Error(`Unexpected datasource migration entry at index ${index}`);
-  });
+  return MIGRATION_CLASSES.map(m => typeof m === 'function' ? (m as { name?: string }).name || '' : String(m)).filter(n => !!n);
 }
+
 describe('Migration registry integrity (upgraded)', () => {
   it('every registry entry has file', () => {
     const missing = MIGRATION_REGISTRY.filter(name => !fs.existsSync(path.join(__dirname, `${name}.ts`)));
@@ -63,14 +41,11 @@ describe('Migration registry integrity (upgraded)', () => {
       timestampToNames.set(suffix, names);
     }
     const collisions = [...timestampToNames.entries()].filter(([, v]) => v.length > 1).map(([ts, n]) => `${ts}: ${n.join(', ')}`);
-    // Documented collisions should be exactly the allowlist; no extra undocumented collisions.
     expect(invalid).toEqual([]);
-    // Collisions must match allowlist exactly (no missing, no extra, no changed)
     expect(collisions.sort()).toEqual(DUPLICATE_TIMESTAMPS.map(ts => {
       const namesForTs = timestampToNames.get(ts) || [];
       return namesForTs.length > 0 ? `${ts}: ${namesForTs.join(', ')}` : '';
     }).filter(s => s).sort());
-    // Fail if undocumented collision appears: length of detected collisions equals allowlist
     expect(collisions.length).toBe(DUPLICATE_TIMESTAMPS.length);
   });
 
@@ -91,7 +66,6 @@ describe('Migration registry integrity (upgraded)', () => {
     }
     const detectedCollisions = new Set([...timestampToNames.entries()].filter(([, v]) => v.length > 1).map(([k]) => k));
     const allowSet = new Set(DUPLICATE_TIMESTAMPS);
-    // Every detected collision must be documented; every documented must still exist.
     for (const c of detectedCollisions) expect(allowSet.has(c)).toBe(true);
     for (const a of allowSet) expect(detectedCollisions.has(a)).toBe(true);
   });

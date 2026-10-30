@@ -51,10 +51,14 @@ describe('Vendor-user constraint migration (20261013)', () => {
 
     // Verify the actual database before creating tables or running destructive test cleanup.
     const identity = await ds.query(
-      'SELECT current_database() AS database',
+      'SELECT current_database() AS database, current_user AS username, inet_server_port() AS server_port',
     );
 
-    if (identity[0]?.database !== 'marketplace_migration_constraints_test') {
+    if (
+      identity[0]?.database !== 'marketplace_migration_constraints_test' ||
+      identity[0]?.username !== 'migrationtest' ||
+      Number(identity[0]?.server_port) !== 5432
+    ) {
       await ds.destroy();
       throw new Error(
         'FAIL-CLOSED: connected to an unexpected database; refusing to modify schema.',
@@ -69,6 +73,19 @@ describe('Vendor-user constraint migration (20261013)', () => {
     // Setup may fail before the datasource is initialized.
     // Preserve cleanup after successful setup.
     if (!ds?.isInitialized) return;
+
+    const cleanupIdentity = await ds.query(
+      'SELECT current_database() AS database, current_user AS username',
+    );
+
+    if (
+      cleanupIdentity[0]?.database !== 'marketplace_migration_constraints_test' ||
+      cleanupIdentity[0]?.username !== 'migrationtest'
+    ) {
+      throw new Error(
+        'FAIL-CLOSED: refusing migration-test cleanup on an unexpected database or role.',
+      );
+    }
 
     await ds.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS fk_users_vendor`);
     await ds.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_vendor_id_fkey`);

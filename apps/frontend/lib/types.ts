@@ -425,6 +425,7 @@ export interface UserDto {
   role: UserRole;
   displayName: string | null;
   vendorId: Uuid | null;
+  bio?: string | null;
 }
 
 export interface AuthTokensDto {

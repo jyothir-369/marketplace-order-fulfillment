@@ -1,5 +1,13 @@
 import * as path from 'path';
 import * as fs from 'fs';
+// Use CommonJS require for meta/classes to avoid ts-node ESM resolution issues
+const metaModule = require('./migration-meta');
+const MIGRATION_REGISTRY: string[] = metaModule.MIGRATION_REGISTRY || metaModule.default || metaModule;
+const DUPLICATE_TIMESTAMPS: string[] = metaModule.DUPLICATE_TIMESTAMPS || metaModule.default?.DUPLICATE_TIMESTAMPS || [];
+const DEPLOYED_AUDIT_NOTE: string = metaModule.DEPLOYED_AUDIT_NOTE || metaModule.default?.DEPLOYED_AUDIT_NOTE || '';
+const classesModule = require('./migration-classes');
+const MIGRATION_CLASSES = (classesModule.MIGRATION_CLASSES || classesModule.default || []);
+// Note: pure static verification — no datasource/DataSource import at init; no DB writes without MIGRATION_VERIFY_AUTH.
 let __dirname = (() => { try { return path.dirname(require.main?.filename || "."); } catch { return path.resolve(process.argv[1] ? path.dirname(process.argv[1]) : "."); } })();
 // Preserve fail-closed: if resolution collapses, fall back to the file's own directory.
 if (!__dirname || __dirname === '.' || __dirname === '/') {
@@ -19,21 +27,24 @@ if (!AUTH || AUTH.trim() !== 'yes') console.error('BLOCKED: MIGRATION_VERIFY_AUT
 if (process.env.DATABASE_URL && process.env.DATABASE_URL.trim() !== '') exitFail('DATABASE_URL must not be set');
 
 console.log('=== REGISTRY CHECK ===');
+// Pure source: read registry file for filesystem-level names; pure meta for canonical array.
 const reg = fs.readFileSync(path.join(__dirname, 'registry.ts'), 'utf8');
-if (!reg.includes('export const MIGRATION_REGISTRY')) exitFail('No MIGRATION_REGISTRY');
-if (!reg.includes('export const DUPLICATE_TIMESTAMPS')) exitFail('No DUPLICATE_TIMESTAMPS');
+const regMeta = require('./migration-meta');
+const registryNames: string[] = (regMeta.MIGRATION_REGISTRY || []);
+console.log('Registry entries (pure meta):', registryNames.length);
+if (!Array.isArray(registryNames) || registryNames.length === 0) exitFail('No MIGRATION_REGISTRY from meta');
+if (registryNames.length !== (regMeta.MIGRATION_REGISTRY || []).length) exitFail('Registry meta count mismatch');
 
-// Parse MIGRATION_REGISTRY array literal ONLY (between '[' and the matching ']')
-// so DUPLICATE_TIMESTAMPS strings in the comments / allowlist are NOT captured.
 const regMatch = reg.match(/export const MIGRATION_REGISTRY = \[([\s\S]*?)\];/);
 if (!regMatch) exitFail('Could not parse MIGRATION_REGISTRY array literal');
 const registryRawString = regMatch[1];
-const registryNames: string[] = (registryRawString.match(/'([0-9a-zA-Z_-]+)'/g) || [])
+const registryNamesFromFile: string[] = (registryRawString.match(/'([0-9a-zA-Z_-]+)'/g) || [])
   .map(m => m.replace(/'/g, ''))
   // Filter out any timestamp-only strings that might appear inside array comments
   // Real registry entries always contain both timestamp and description.
   .filter(s => s.includes('-') && s.length > 13);
-console.log('Registry entries:', registryNames.length);
+console.log('Registry entries (from file parse):', registryNamesFromFile.length);
+if (JSON.stringify(registryNamesFromFile.sort()) !== JSON.stringify(registryNames.sort())) exitFail('Registry file parse does not match pure meta');
 
 const allowlistStr = (reg.match(/DUPLICATE_TIMESTAMPS.*?=\s*\[([\s\S]*?)\];/) || [])[1];
 const allowlist = (allowlistStr || '').split('\n').map(l => { const m = l.match(/'([0-9]+)'/); return m ? m[1] : null; }).filter((x): x is string => !!x);
@@ -89,13 +100,24 @@ console.log('PASS: All 4 collision migration classes verified independently');
 const allFiles = fs.readdirSync(dir).filter(f => /^\d+.*\.ts$/.test(f) && !f.includes('.spec.') && !f.includes('.bak') && !f.includes('.backup'));
 const registeredBasenames = new Set(registryNames);
 const unregistered = allFiles.map(f => f.replace(/\.ts$/,'')).filter(b => !registeredBasenames.has(b));
-if (unregistered.length > 0) console.log('WARNING: Unregistered migration files:', unregistered.join(', '));
-else console.log('PASS: No unregistered migration files');
+if (unregistered.length > 0) exitFail('Unregistered migration files: ' + unregistered.join(', '));
+console.log('PASS: No unregistered migration files');
 
 // Check duplicate timestamp groups against allowlist exactly
 const detectedCollisions = [...timestampToNames.entries()].filter(([,v]) => v.length > 1).map(([k]) => k).sort();
 if (JSON.stringify(detectedCollisions) !== JSON.stringify(allowlist.sort())) exitFail('Detected collisions do not match allowlist exactly');
 console.log('PASS: Detected collisions match allowlist exactly');
+
+// Registry/datasource parity: declared migration classes must cover registry exactly
+const regSources = registryNames.map(name => fs.readFileSync(path.join(dir, name + '.ts'), 'utf8').match(/export\s+class\s+([A-Za-z_$][\w$]*)\s+implements\s+MigrationInterface/)?.[1]).filter(Boolean);
+const dsClasses: string[] = (MIGRATION_CLASSES as (((...args: never[]) => unknown) | string)[]).map((m: unknown) => typeof m === 'function' ? (m as { name?: string }).name || '' : String(m)).filter((n: string) => !!n);
+const regSet = new Set(regSources);
+const dsSet = new Set(dsClasses);
+const missingInDs = [...regSet].filter(c => !dsSet.has(c));
+const extraInDs = [...dsSet].filter(c => !regSet.has(c));
+if (missingInDs.length > 0) exitFail('Registry migrations missing in datasource: ' + missingInDs.join(', '));
+if (extraInDs.length > 0) exitFail('Datasource migrations not in registry: ' + extraInDs.join(', '));
+console.log('PASS: Registry/datasource parity verified');
 
 console.log('=== AUDIT ===');
 console.log('Registry entries:', registryNames.length);

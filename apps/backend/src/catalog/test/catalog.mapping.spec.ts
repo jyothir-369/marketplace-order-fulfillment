@@ -58,7 +58,9 @@ describe('Catalog entity mapping regression', () => {
     });
 
     if (!dbReady) { if (process.env.CI === 'true') throw new Error('CI requires the isolated catalog regression database; refusing to skip the live mapping test.'); console.log('SKIP: catalog regression DB unavailable (local run only)'); expect(true).toBe(true); return; }
-    await dataSource.initialize();
+    try {
+      await dataSource.initialize();
+
 
     const metadata = dataSource.getMetadata(Product);
 
@@ -77,6 +79,11 @@ describe('Catalog entity mapping regression', () => {
     expect(
       vendorRelation?.joinColumns.map((column) => column.databaseName),
     ).toContain('vendor_id');
+    } finally {
+      if (dataSource.isInitialized) {
+        await dataSource.destroy();
+      }
+    }
   });
 
   test('buildFacets/getCategories must use cat alias not category for join/group', () => {

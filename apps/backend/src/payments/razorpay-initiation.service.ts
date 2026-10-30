@@ -186,11 +186,17 @@ export class RazorpayInitiationService {
           );
         }
 
-        amountPaise += unitPaise * item.quantity;
+        const lineAmountPaise = unitPaise * item.quantity;
 
-        if (!Number.isSafeInteger(amountPaise)) {
-          throw new BadRequestException('Cart total is too large.');
+        if (!Number.isSafeInteger(lineAmountPaise) || lineAmountPaise < 0) {
+          throw new BadRequestException('Cart line amount overflow or invalid.');
         }
+
+        if (amountPaise > Number.MAX_SAFE_INTEGER - lineAmountPaise) {
+          throw new BadRequestException('Cart total overflow or invalid.');
+        }
+
+        amountPaise += lineAmountPaise;
       }
 
       if (amountPaise <= 0) {
