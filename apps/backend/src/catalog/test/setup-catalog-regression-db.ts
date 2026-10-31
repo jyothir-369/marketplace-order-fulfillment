@@ -137,4 +137,3 @@ main().catch((error) => {
   console.error('Catalog regression setup failed:', error.message);
   process.exitCode = 1;
 });
-
