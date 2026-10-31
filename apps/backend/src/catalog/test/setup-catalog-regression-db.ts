@@ -22,14 +22,6 @@ async function main() {
 
   assertCatalogRegressionDB(cfg);
 
-  if (
-    cfg.host !== '127.0.0.1' ||
-    cfg.port !== 55432 ||
-    cfg.database !== 'catalog_category6_test' ||
-    cfg.username !== 'catalogtest'
-  ) {
-    throw new Error('Refusing setup: expected only the isolated catalog_category6_test database on loopback port 55432.');
-  }
 
   const ds = new DataSource({
     type: 'postgres',
