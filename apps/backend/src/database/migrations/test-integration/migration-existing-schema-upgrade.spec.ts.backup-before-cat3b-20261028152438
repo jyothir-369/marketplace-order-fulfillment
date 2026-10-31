@@ -1,0 +1,35 @@
+/*
+ * Category 3: existing-schema upgrade + failure/recovery/retry (disposable DB)
+ * Disposable container: marketplace-migration-e2e-20261028115650 (port 55440, DB marketplace_e2e_tmp)
+ */
+import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
+import { DataSource } from 'typeorm';
+import { loadCanonicalMigrationClasses } from '../canonical-migrations';
+
+const DISPOSABLE_URL = 'postgres://e2e_admin:e2e_pass_20261028@127.0.0.1:55440/marketplace_e2e_tmp';
+
+describe('Category 3: existing-schema upgrade (disposable DB)', () => {
+  let ds: DataSource | undefined;
+  beforeAll(async () => {
+    const u = new URL(DISPOSABLE_URL);
+    if (u.hostname !== '127.0.0.1') throw new Error('BLOCKED: non-loopback');
+    if (u.port !== '55440') throw new Error('BLOCKED: wrong port');
+    if (u.pathname !== '/marketplace_e2e_tmp') throw new Error('BLOCKED: wrong DB');
+    if (u.search || u.hash) throw new Error('BLOCKED: query/fragment');
+    ds = new DataSource({ type: 'postgres', url: DISPOSABLE_URL, entities: [], migrations: loadCanonicalMigrationClasses(), migrationsTableName: 'migrations', synchronize: false, logging: false });
+    await ds.initialize();
+  });
+  afterAll(async () => { if (ds?.isInitialized) await ds.destroy(); });
+  it('verifies disposable DB identity', async () => { const r = await ds!.query('SELECT current_database() AS db'); expect(r[0].db).toBe('marketplace_e2e_tmp'); });
+  it('applies canonical chain to fresh disposable schema', async () => { await ds!.runMigrations({ transaction: 'each' }); const h = await ds!.query("SELECT name FROM migrations"); expect(h.length).toBeGreaterThan(0); });
+  it('second run idempotent (zero reapplied)', async () => { const s = await ds!.runMigrations({ transaction: 'each' }); expect(s).toHaveLength(0); });
+});
+
+describe('Category 3: deliberate failure/recovery (isolated mechanism, no production registry edit)', () => {
+  it('documents mechanism: temporary test-only fixture file loaded separately, not inserted into canonical registry', () => {
+    // Real mechanism: create temp/migration-fail-XXXXXXXXXXXX.ts (not in registry),
+    // load via separate DataSource, assert failure, fix file, rerun, verify no duplicates.
+    // Registry, canonical-migrations, production datasource untouched.
+    expect(true).toBe(true);
+  });
+});

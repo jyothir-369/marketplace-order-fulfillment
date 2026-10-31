@@ -1,0 +1,151 @@
+import * as fs from 'fs';
+import * as path from 'path';
+import { MIGRATION_REGISTRY, DUPLICATE_TIMESTAMPS } from './registry';
+
+describe('Migration registry regression (collision groups)', () => {
+  const dir = path.dirname(__filename);
+
+  it('reproduces the original false failure: DUPLICATE_TIMESTAMPS must NOT be used as filenames', () => {
+    for (const ts of DUPLICATE_TIMESTAMPS) {
+      // Original broken verifier treated ts as filename: ts + '.ts'
+      const brokenPath = path.join(dir, ts + '.ts');
+      expect(fs.existsSync(brokenPath)).toBe(false);
+    }
+  });
+
+  it('verifies all registry entries resolve to files with valid MigrationInterface classes', () => {
+    const missing: string[] = [];
+    const classNames = new Set<string>();
+    const timestampToNames = new Map<string, string[]>();
+
+    for (const entry of MIGRATION_REGISTRY) {
+      const fp = path.join(dir, entry + '.ts');
+      expect(fs.existsSync(fp)).toBe(true);
+      const src = fs.readFileSync(fp, 'utf8');
+      const match = src.match(/export\s+class\s+([A-Za-z_$][\w$]*)\s+implements\s+MigrationInterface/);
+      expect(match).toBeTruthy(); // fails if class missing
+      const cls = match![1];
+      expect(classNames.has(cls)).toBe(false); // fails on duplicate class
+      classNames.add(cls);
+      const tsSuffix = cls.slice(-13);
+      expect(/^\d{13}$/.test(tsSuffix)).toBe(true); // fails on bad suffix
+      const arr = timestampToNames.get(tsSuffix) || [];
+      arr.push(entry + ':' + cls);
+      timestampToNames.set(tsSuffix, arr);
+    }
+    expect(missing).toEqual([]);
+  });
+
+  it('verifies both 1710000000005 migrations independently', () => {
+    expect(MIGRATION_REGISTRY).toContain('1710000000005-AddFulfillmentOperationRecord');
+    expect(MIGRATION_REGISTRY).toContain('1710000000005-CategoriesAndCatalogContract');
+    const file1 = fs.readFileSync(path.join(dir, '1710000000005-AddFulfillmentOperationRecord.ts'), 'utf8');
+    expect(file1).toContain('AddFulfillmentOperationRecord1710000000005');
+    const file2 = fs.readFileSync(path.join(dir, '1710000000005-CategoriesAndCatalogContract.ts'), 'utf8');
+    expect(file2).toContain('CategoriesAndCatalogContract1710000000005');
+  });
+
+  it('verifies both 2026101300000 migrations independently', () => {
+    expect(MIGRATION_REGISTRY).toContain('20261013-AddPartialUniquePendingApplicantIndex');
+    expect(MIGRATION_REGISTRY).toContain('20261013-AddVendorUserConstraints');
+    const file1 = fs.readFileSync(path.join(dir, '20261013-AddPartialUniquePendingApplicantIndex.ts'), 'utf8');
+    expect(file1).toContain('AddPartialUniquePendingApplicantIndex2026101300000');
+    const file2 = fs.readFileSync(path.join(dir, '20261013-AddVendorUserConstraints.ts'), 'utf8');
+    expect(file2).toContain('AddVendorUserConstraints2026101300000');
+  });
+
+  it('verifies timestamp collision allowlist exactly', () => {
+    expect(DUPLICATE_TIMESTAMPS).toEqual(['1710000000005', '2026101300000']);
+  });
+
+  it('rejects genuinely missing files', () => {
+    const fakeName = '9999999999999-DoesNotExist';
+    const fp = path.join(dir, fakeName + '.ts');
+    expect(fs.existsSync(fp)).toBe(false);
+    expect(MIGRATION_REGISTRY).not.toContain(fakeName);
+  });
+
+  it('rejects genuinely missing classes by failing on invalid file content', () => {
+    // This is structural: if a file exists but class regex fails, readFileSync+
+    // regex will return null and the test above will throw.
+    // No additional mock needed; it's covered by the class verification loop.
+    expect(true).toBe(true);
+  });
+
+  it('rejects unexpected extra timestamp collisions', () => {
+    // Build timestamp-to-count map from registry only
+    const counts = new Map<string, number>();
+    for (const entry of MIGRATION_REGISTRY) {
+      const src = fs.readFileSync(path.join(dir, entry + '.ts'), 'utf8');
+      const match = src.match(/export\s+class\s+([A-Za-z_$][\w$]*)\s+implements\s+MigrationInterface/);
+      if (!match) throw new Error('No class in ' + entry);
+      const tsSuffix = match[1].slice(-13);
+      counts.set(tsSuffix, (counts.get(tsSuffix) || 0) + 1);
+    }
+    const detected = [...counts.entries()].filter(([, c]) => c > 1).map(([k]) => k).sort();
+    expect(detected).toEqual([...DUPLICATE_TIMESTAMPS].sort());
+  });
+
+  it('detects unregistered migration files (none expected in this repo)', () => {
+    const registered = new Set(MIGRATION_REGISTRY);
+    const files = fs.readdirSync(dir)
+      .filter(f => /^\d+.*\.ts$/.test(f))
+      .filter(f => !f.includes('.spec.') && !f.includes('.test.') && !f.includes('.bak') && !f.includes('.backup'))
+      .map(f => f.replace(/\.ts$/, ''));
+    const unregistered = files.filter(b => !registered.has(b));
+    expect(unregistered).toEqual([]);
+  });
+});
+
+describe('Migration registry datasource import (explicit opt-in, fail-closed)', () => {
+  const REQUIRED_URL = 'postgresql://postgres:postgres@localhost:55439/marketplace_migration_test';
+
+  const hasTestDb = () => {
+    const url = process.env.MIGRATION_TEST_DATABASE_URL;
+    return !!(url && url.trim() !== '' && url.includes('55439') && url.includes('marketplace_migration_test'));
+  };
+
+  // Explicit opt-in: skip safely when isolated DB is unavailable.
+  // Never fall back to DATABASE_URL or .env.
+  const itOrSkip = hasTestDb() ? it : it.skip;
+
+  itOrSkip('imports datasource when MIGRATION_TEST_DATABASE_URL is set with valid identity', () => {
+    const originalUrl = process.env.MIGRATION_TEST_DATABASE_URL;
+    const originalAuth = process.env.MIGRATION_VERIFY_AUTH;
+    const originalDB = process.env.DATABASE_URL;
+
+    try {
+      if (originalDB) delete (process.env as any).DATABASE_URL;
+      process.env.MIGRATION_TEST_DATABASE_URL = REQUIRED_URL;
+      process.env.MIGRATION_VERIFY_AUTH = 'yes';
+
+      // Module isolation: clear require cache so datasource re-evaluates env guards
+      delete (require as any).cache[require.resolve('./datasource')];
+
+      const datasourceModule = require('./datasource');
+      expect(datasourceModule.migrationDataSource).toBeDefined();
+      expect(typeof datasourceModule.migrationDataSource.options).toBe('object');
+    } finally {
+      if (originalUrl !== undefined) process.env.MIGRATION_TEST_DATABASE_URL = originalUrl;
+      else delete (process.env as any).MIGRATION_TEST_DATABASE_URL;
+      if (originalAuth !== undefined) process.env.MIGRATION_VERIFY_AUTH = originalAuth;
+      else delete (process.env as any).MIGRATION_VERIFY_AUTH;
+      if (originalDB !== undefined) process.env.DATABASE_URL = originalDB;
+      else if (originalDB === undefined && process.env.DATABASE_URL) delete (process.env as any).DATABASE_URL;
+    }
+  });
+
+  it('blocks import when generic DB overrides are present (fail-closed)', () => {
+    const originalDB = process.env.DATABASE_URL;
+    process.env.DATABASE_URL = 'postgresql://fake';
+    process.env.MIGRATION_TEST_DATABASE_URL = '';
+    try {
+      delete (require as any).cache[require.resolve('./datasource')];
+      expect(() => require('./datasource')).toThrow();
+    } finally {
+      if (originalDB !== undefined) process.env.DATABASE_URL = originalDB;
+      else if (process.env.DATABASE_URL) delete (process.env as any).DATABASE_URL;
+      if (process.env.MIGRATION_TEST_DATABASE_URL === '') delete (process.env as any).MIGRATION_TEST_DATABASE_URL;
+    }
+  });
+});

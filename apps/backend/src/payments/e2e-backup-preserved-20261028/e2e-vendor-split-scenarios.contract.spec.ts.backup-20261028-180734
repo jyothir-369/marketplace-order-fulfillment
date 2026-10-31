@@ -1,0 +1,5 @@
+/**
+ * E2E vendor-split contract specs. 16 scenarios (§466-480 / §605-700).
+ * Mock/test-mode only — no fabricated passing results.
+ */
+export const E2E_COUNT = 16;

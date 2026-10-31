@@ -1,0 +1,98 @@
+import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
+import { DataSource } from 'typeorm';
+import { initializeTestDataSource } from './harness';
+import { MIGRATION_REGISTRY } from '../registry';
+import { MIGRATION_CLASSES } from '../migration-classes';
+
+describe('Migration integration harness (canonical registry)', () => {
+  let canRun = false;
+
+  beforeAll(() => {
+    try {
+      const raw = process.env.MIGRATION_TEST_DATABASE_URL;
+      if (!raw || raw !== raw.trim()) return;
+
+      const url = new URL(raw);
+      canRun =
+        ['postgres:', 'postgresql:'].includes(url.protocol) &&
+        ['localhost', '127.0.0.1'].includes(url.hostname.toLowerCase()) &&
+        url.port === '55439' &&
+        url.pathname === '/marketplace_migration_test' &&
+        url.search === '' &&
+        url.hash === '' &&
+        Boolean(url.username && url.password);
+    } catch {
+      canRun = false;
+    }
+  });
+
+  it('requires the dedicated isolated database URL', () => {
+    expect(canRun).toBe(true);
+  });
+
+  it('registry and datasource migration counts match', () => {
+    expect(MIGRATION_REGISTRY).toHaveLength(30);
+    expect(MIGRATION_CLASSES).toHaveLength(MIGRATION_REGISTRY.length);
+    expect(new Set(MIGRATION_CLASSES.map((migration) => migration.name)).size)
+      .toBe(MIGRATION_CLASSES.length);
+  });
+
+  describe('live migration execution (isolated database only)', () => {
+    let ds: DataSource | undefined;
+
+    beforeAll(async () => {
+      if (!canRun) {
+        throw new Error('FAIL-CLOSED: refusing migration execution without the validated isolated DB URL');
+      }
+
+      ds = await initializeTestDataSource(
+        (url) =>
+          new DataSource({
+            type: 'postgres',
+            url,
+            entities: [],
+            migrations: MIGRATION_CLASSES,
+            migrationsTableName: 'migrations',
+            synchronize: false,
+            logging: false,
+          }),
+      );
+    });
+
+    it('executes the migration chain and records the complete migration history', async () => {
+      if (!ds?.isInitialized) throw new Error('FAIL-CLOSED: isolated datasource is not initialized');
+
+      const target = await ds.query(
+        'SELECT current_database() AS db, inet_server_port() AS port',
+      );
+
+      expect(target[0].db).toBe('marketplace_migration_test');
+      expect(Number(target[0].port)).toBe(5432);
+
+      const expectedNames = MIGRATION_CLASSES.map((migration) => migration.name).sort();
+
+      await ds.runMigrations({ transaction: 'all' });
+
+      const history = await ds.query('SELECT name FROM migrations');
+      const actualNames = history.map((row: { name: string }) => row.name).sort();
+
+      expect(actualNames).toEqual(expectedNames);
+    });
+
+    it('does not reapply migrations on a second run', async () => {
+      if (!ds?.isInitialized) throw new Error('FAIL-CLOSED: isolated datasource is not initialized');
+
+      const before = await ds.query('SELECT name FROM migrations');
+      const secondRun = await ds.runMigrations({ transaction: 'all' });
+      const after = await ds.query('SELECT name FROM migrations');
+
+      expect(secondRun).toHaveLength(0);
+      expect(after.map((row: { name: string }) => row.name).sort())
+        .toEqual(before.map((row: { name: string }) => row.name).sort());
+    });
+
+    afterAll(async () => {
+      if (ds?.isInitialized) await ds.destroy();
+    });
+  });
+});
