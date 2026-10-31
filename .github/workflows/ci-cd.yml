@@ -108,7 +108,7 @@ jobs:
       MIGRATION_E2E_DATABASE_URL: postgresql://e2euser:e2epass@localhost:55440/marketplace_migration_e2e_tmp
       CATALOG_REGRESSION_DB_HOST: 127.0.0.1
       CATALOG_REGRESSION_DB_PORT: "55439"
-      CATALOG_REGRESSION_DB_NAME: catalog_red_test
+      CATALOG_REGRESSION_DB_NAME: marketplace_catalog_regression_test
       CATALOG_REGRESSION_DB_USER: migrationtest
       CATALOG_REGRESSION_DB_PASSWORD: migrationtest
       ISOLATED_TEST_DB_HOST: 127.0.0.1
@@ -148,7 +148,7 @@ jobs:
             -c "CREATE DATABASE marketplace_migration_constraints_test"
           psql -h 127.0.0.1 -p 55439 -U migrationtest -d postgres \
             -v ON_ERROR_STOP=1 \
-            -c "CREATE DATABASE catalog_red_test"
+            -c "CREATE DATABASE marketplace_catalog_regression_test"
 
       - name: Provision catalog regression schema and fixtures
         working-directory: apps/backend

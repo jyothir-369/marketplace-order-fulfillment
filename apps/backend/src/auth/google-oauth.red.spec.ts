@@ -1,4 +1,4 @@
-﻿import { Test, TestingModule } from '@nestjs/testing';
+import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -26,6 +26,7 @@ describe('Google OAuth behavioral regression', () => {
     role: UserRole.BUYER,
     vendorId: null,
     displayName: 'Google Buyer',
+    bio: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

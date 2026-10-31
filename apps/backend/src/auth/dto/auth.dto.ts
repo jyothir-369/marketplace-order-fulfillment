@@ -48,6 +48,7 @@ export class AuthUserDto {
   role: UserRole;
   displayName: string | null;
   vendorId: string | null;
+  bio: string | null;
 }
 
 export class GoogleSignInDto {
@@ -58,6 +59,17 @@ export class GoogleSignInDto {
   @IsOptional()
   @IsIn(["customer", "vendor"])
   portal?: "customer" | "vendor";
+}
+
+export class ChangePasswordDto {
+  @IsString()
+  @IsNotEmpty()
+  currentPassword: string;
+
+  @IsString()
+  @MinLength(8)
+  @MaxLength(72)
+  newPassword: string;
 }
 
 export class AuthTokensDto extends AuthUserDto {

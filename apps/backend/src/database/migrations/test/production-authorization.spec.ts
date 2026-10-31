@@ -1,4 +1,5 @@
-import { getProductionMigrationDataSource, validateProductionTarget } from '../production-datasource';
+import { validateProductionTarget } from '../production-datasource';
+import { loadCanonicalMigrationClasses } from '../canonical-migrations';
 
 describe('Production datasource isolation and authorization (RED→GREEN)', () => {
   const originalEnv = process.env;
@@ -30,10 +31,9 @@ describe('Production datasource isolation and authorization (RED→GREEN)', () =
     expect(() => validateProductionTarget(true)).not.toThrow();
   });
 
-  it('production datasource has full canonical migrations', () => {
-    process.env.DATABASE_URL = 'postgresql://postgres.supabase.co:5432/postgres';
-    process.env.MIGRATION_CONFIRM_WRITE = 'yes';
-    const ds = getProductionMigrationDataSource();
-    expect((Array.isArray(ds.options.migrations) ? ds.options.migrations.length : 0)).toBeGreaterThanOrEqual(25);
+  it('canonical migration loader returns the full migration list', () => {
+    const migrations = loadCanonicalMigrationClasses();
+    expect(Array.isArray(migrations)).toBe(true);
+    expect(migrations.length).toBeGreaterThanOrEqual(25);
   });
 });

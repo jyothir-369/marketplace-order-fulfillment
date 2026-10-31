@@ -691,6 +691,10 @@ export class CatalogService {
             price: productSeed.price,
             stockCount: productSeed.stockCount,
             isActive: true,
+            images: [
+              'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&q=80',
+              'https://picsum.photos/seed/' + this.slugify(productSeed.name) + '/400/300',
+            ],
           }),
         );
         productsCreated++;

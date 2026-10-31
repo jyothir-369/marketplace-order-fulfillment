@@ -5,7 +5,7 @@ import { GoogleSignInDto } from './dto/auth.dto';
 import { AuthGuard } from './auth.guard';
 import { CurrentUser } from './current-user.decorator';
 import { AuthenticatedUser } from './auth.types';
-import { RegisterDto, LoginDto, RefreshTokenDto, LogoutDto, AuthUserDto, AuthTokensDto } from './dto/auth.dto';
+import { RegisterDto, LoginDto, RefreshTokenDto, LogoutDto, AuthUserDto, AuthTokensDto, ChangePasswordDto } from './dto/auth.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -55,5 +55,17 @@ export class AuthController {
   @UseGuards(AuthGuard)
   async me(@CurrentUser() user: AuthenticatedUser): Promise<AuthUserDto> {
     return this.authService.me(user);
+  }
+
+  /** POST /api/auth/change-password — secure password update. */
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthGuard)
+  async changePassword(
+    @Body() body: ChangePasswordDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<{ message: string }> {
+    await this.authService.changePassword(user.id, body.currentPassword, body.newPassword);
+    return { message: 'Password updated' };
   }
 }

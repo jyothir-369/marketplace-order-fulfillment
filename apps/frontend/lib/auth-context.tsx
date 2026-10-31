@@ -60,7 +60,7 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function applyTokens(tokens: { accessToken: string; refreshToken: string; id: string; email: string; role: UserDto["role"]; displayName: string | null; vendorId: string | null }): UserDto {
+function applyTokens(tokens: { accessToken: string; refreshToken: string; id: string; email: string; role: UserDto["role"]; displayName: string | null; vendorId: string | null; bio?: string | null }): UserDto {
   setTokens(tokens.accessToken, tokens.refreshToken);
   return {
     id: tokens.id,
@@ -68,6 +68,7 @@ function applyTokens(tokens: { accessToken: string; refreshToken: string; id: st
     role: tokens.role,
     displayName: tokens.displayName,
     vendorId: tokens.vendorId,
+    bio: tokens.bio ?? null,
   };
 }
 

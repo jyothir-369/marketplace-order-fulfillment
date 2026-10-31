@@ -2,9 +2,9 @@
 // Multi-endpoint support: reconcile (55432 / reconcile_test) OR migration (55439 / marketplace_migration_test).
 export const CATALOG_REGRESSION_CONF = {
   allowedHosts: ['127.0.0.1', 'localhost'],
-  allowedPorts: [55432, 55439],
-  allowedDBs: new Set(['marketplace_reconcile_test', 'marketplace_migration_test', 'catalog_red_test']),
-  allowedUsers: new Set(['reconcile_test', 'postgres', 'migrationtest']),
+  allowedPorts: [55432, 55439, 60920],
+  allowedDBs: new Set(['catalog_category6_test', 'marketplace_catalog_regression_test']),
+  allowedUsers: new Set(['catalogtest', 'migrationtest']),
 };
 
 export function assertCatalogRegressionDB(cfg: { host?: string; port?: number; database?: string; username?: string }): void {
@@ -12,7 +12,7 @@ export function assertCatalogRegressionDB(cfg: { host?: string; port?: number; d
     throw new Error('FAIL-CLOSED: catalog regression requires loopback host; got ' + cfg.host);
   }
   if (!cfg.port || !CATALOG_REGRESSION_CONF.allowedPorts.includes(cfg.port)) {
-    throw new Error('FAIL-CLOSED: catalog regression port must be 55432 or 55439; got ' + cfg.port);
+    throw new Error('FAIL-CLOSED: catalog regression port must be one of the explicitly allowed isolated-test ports; got ' + cfg.port);
   }
   if (!cfg.database || !CATALOG_REGRESSION_CONF.allowedDBs.has(cfg.database.trim())) {
     throw new Error('FAIL-CLOSED: catalog regression DB must be isolated test DB; got ' + cfg.database);

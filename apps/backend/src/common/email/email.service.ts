@@ -44,12 +44,16 @@ export class EmailService {
 <p>This link expires in 1 hour. If you did not request this, ignore this email.</p>`,
         text: `Reset your password: ${resetUrl}\nExpires in 1 hour. Ignore if not requested.`,
       });
-      if (result && (result as any).id) {
-        this.logger.log('Resend accepted email (provider request id present)');
-        return { delivered: true, providerRequestId: (result as any).id as string };
+      if (result.error) {
+        this.logger.error('Resend rejected email (provider error returned)');
+        return { delivered: false, blockedReason: 'Resend rejected the request' };
       }
-      this.logger.error('Resend rejected request (no id in response)');
-      return { delivered: false, blockedReason: 'Resend rejected the request' };
+      if (result.data?.id) {
+        this.logger.log('Resend accepted email (provider request id present)');
+        return { delivered: true, providerRequestId: result.data.id };
+      }
+      this.logger.error('Resend response contained no message id');
+      return { delivered: false, blockedReason: 'Resend returned no message id' };
     } catch (err: any) {
       const safeMsg = (err && err.message) ? err.message : 'Provider error';
       // Log only safe classification, never the URL/token/API key/response body

@@ -51,17 +51,21 @@ export class RazorpayWebhookController {
           if (eventType === 'payment.failed') {
             if (auth.status === PaymentStatus.CAPTURED) {
               // Late failed event must never downgrade captured payment
+              await eventRepo.update(eventId, { status: 'processed', processedAt: new Date() });
               return { received: true, duplicate: false, eventId, eventType, skipped: true, reason: 'captured-payment-immutable' };
             }
             if (auth.status !== PaymentStatus.PENDING) {
+              await eventRepo.update(eventId, { status: 'processed', processedAt: new Date() });
               return { received: true, duplicate: false, eventId, eventType, skipped: true, reason: 'not-pending' };
             }
           }
           if (eventType === 'payment.captured') {
             if (auth.status === PaymentStatus.CAPTURED && auth.providerReference === paymentEntity.id) {
+              await eventRepo.update(eventId, { status: 'processed', processedAt: new Date() });
               return { received: true, duplicate: true, eventId, eventType, alreadyProcessed: true };
             }
             if (auth.status === PaymentStatus.FAILED || auth.status === PaymentStatus.CAPTURED && auth.providerReference !== paymentEntity.id) {
+              await eventRepo.update(eventId, { status: 'processed', processedAt: new Date() });
               return { received: true, duplicate: false, eventId, eventType, skipped: true, reason: 'inconsistent-state' };
             }
           }

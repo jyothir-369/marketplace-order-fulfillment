@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { MIGRATION_REGISTRY, DUPLICATE_TIMESTAMPS } from './registry';
-import { migrationDataSource } from './datasource';
+import { MIGRATION_CLASSES } from './migration-classes';
 
 describe('migration completeness', () => {
   const dir = __dirname;
@@ -20,7 +20,7 @@ describe('migration completeness', () => {
   }
 
   function datasourceMigrationClasses(): string[] {
-    const configured = migrationDataSource.options.migrations;
+    const configured = MIGRATION_CLASSES;
     if (!Array.isArray(configured)) {
       throw new Error('Expected datasource migrations to be an array');
     }
@@ -105,5 +105,30 @@ describe('migration completeness', () => {
     expect(
       fs.existsSync(path.join(dir, '20261017-AddPromotionsTable.ts')),
     ).toBe(true);
+  });
+
+  it('includes 20261027-AddVendorPaymentAccounts in registry and datasource with 13-digit class', () => {
+    expect(MIGRATION_REGISTRY).toContain('20261027-AddVendorPaymentAccounts');
+    expect(datasourceMigrationClasses()).toContain('AddVendorPaymentAccounts2026102700000');
+    expect(
+      fs.existsSync(path.join(dir, '20261027-AddVendorPaymentAccounts.ts')),
+    ).toBe(true);
+  });
+
+  it('fails when registry and datasource migration sets differ', () => {
+    const registered = new Set(
+      (MIGRATION_CLASSES as unknown[]).map(
+        migration => { if (typeof migration === 'function') return migration.name; if (typeof migration === 'string') return migration; throw new Error('Unexpected datasource migration entry'); },
+      ),
+    );
+    const expected = MIGRATION_REGISTRY.map((entry) => {
+      const filePath = path.join(dir, entry + '.ts');
+      const source = fs.readFileSync(filePath, 'utf8');
+      const match = source.match(/export\s+class\s+([A-Za-z_$][\w$]*)\s+implements\s+MigrationInterface/);
+      if (!match) throw new Error('No class for ' + entry);
+      return match[1];
+    });
+    const missingInDatasource = expected.filter(c => !registered.has(c));
+    expect(missingInDatasource).toEqual([]);
   });
 });

@@ -3,6 +3,7 @@
   ConflictException,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
   Logger, } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -51,7 +52,7 @@ export class AuthService {
    * escalation.
    */
   async register(dto: RegisterDto): Promise<AuthUserDto> {
-    const existing = await this.userRepository.findOne({ where: { email: dto.email.toLowerCase() } });
+    const existing = await this.userRepository.findOne({ where: { email: dto.email.toLowerCase().trim() } });
     if (existing) {
       throw new ConflictException('An account with this email already exists');
     }
@@ -69,7 +70,7 @@ export class AuthService {
   }
 
   async login(dto: LoginDto): Promise<AuthTokensDto> {
-    const user = await this.userRepository.findOne({ where: { email: dto.email.toLowerCase() } });
+    const user = await this.userRepository.findOne({ where: { email: dto.email.toLowerCase().trim() } });
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -284,7 +285,7 @@ export class AuthService {
   async googleSignIn(idToken: string, portal?: "customer" | "vendor"): Promise<AuthTokensDto> {
     const verified = await this.verifyGoogleIdToken(idToken);
     if (!verified.emailVerified) throw new UnauthorizedException('Email not verified');
-    const email = verified.email.toLowerCase();
+    const email = verified.email.toLowerCase().trim();
     let user = await this.userRepository.findOne({ where: { email } });
     if (user) {
       // Existing user: prevent privilege escalation â€” role must stay BUYER.
@@ -318,6 +319,7 @@ export class AuthService {
       role: user.role,
       displayName: user.displayName,
       vendorId: user.vendorId,
+      bio: user.bio ?? null,
     };
   }
 
@@ -325,7 +327,7 @@ export class AuthService {
   // Forgot / Reset Password (Phase â€” secure, single-use, expiring)
   // ------------------------------------------------------------------
   async requestReset(email: string): Promise<void> {
-    const user = await this.userRepository.findOne({ where: { email: email.toLowerCase() } });
+    const user = await this.userRepository.findOne({ where: { email: email.toLowerCase().trim() } });
     if (!user) return;
     const tokenRaw = crypto.randomBytes(48).toString('base64url');
     const tokenHash = crypto.createHash('sha256').update(tokenRaw).digest('hex');
@@ -354,6 +356,16 @@ export class AuthService {
     }
     // Public response stays generic — does not reveal delivery status or account existence
     this.logger.log('Reset requested (generic): ' + email.toLowerCase(), AuthService.name);
+  }
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+    const matches = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!matches) throw new UnauthorizedException('Current password is incorrect');
+    if (newPassword.length < 8) throw new BadRequestException('New password must be at least 8 characters');
+    user.passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    await this.userRepository.save(user);
   }
 
   async resetPassword(token: string, newPassword: string): Promise<{ success: boolean }> {

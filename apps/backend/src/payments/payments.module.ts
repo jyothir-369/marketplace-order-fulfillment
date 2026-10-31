@@ -15,6 +15,16 @@ import { RazorpayInitiationController } from './razorpay-initiation.controller';
 import { RazorpayVerificationController } from './razorpay-verification.controller';
 import { CheckoutReconciliationService } from './checkout-reconciliation.service';
 import { RazorpayWebhookController } from './razorpay-webhook.controller';
+import { VendorPaymentsController } from './vendor-payments.controller';
+import { AdminPaymentsController } from './admin-payments.controller';
+import { VendorPaymentAllocation } from '../common/entities/vendor-payment-allocation.entity';
+import { PaymentTransfer } from '../common/entities/payment-transfer.entity';
+import { VendorPaymentAccount } from '../common/entities/vendor-payment-account.entity';
+import { Refund } from '../common/entities/refund.entity';
+import { Dispute } from '../common/entities/dispute.entity';
+import { RefundService } from './refund/refund.service';
+
+import { AllocationModule } from './allocation/allocation.module';
 import { InventoryModule } from '../inventory/inventory.module';
 
 @Module({
@@ -25,14 +35,22 @@ import { InventoryModule } from '../inventory/inventory.module';
       OrderLineItem,
       Product,
       WebhookEvent,
+      VendorPaymentAllocation,
+      PaymentTransfer,
+      VendorPaymentAccount,
+      Refund,
+      Dispute,
     ]),
     AuditModule,
+    AllocationModule,
     InventoryModule,
   ],
   controllers: [
     RazorpayInitiationController,
     RazorpayVerificationController,
     RazorpayWebhookController,
+    VendorPaymentsController,
+    AdminPaymentsController,
   ],
   providers: [
     PaymentsService,
@@ -41,6 +59,7 @@ import { InventoryModule } from '../inventory/inventory.module';
     RazorpayInitiationService,
     RazorpayVerificationService,
     CheckoutReconciliationService,
+    RefundService,
   ],
   exports: [
     PaymentsService,
