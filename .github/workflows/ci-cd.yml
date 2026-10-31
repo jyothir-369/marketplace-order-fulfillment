@@ -102,9 +102,22 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      postgres-migration-cat3:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: migrationtest
+          POSTGRES_PASSWORD: migrationtest
+          POSTGRES_DB: postgres
+        ports:
+          - 55441:5432
+        options: >-
+          --health-cmd "pg_isready -U migrationtest -d postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     env:
-      MIGRATION_TEST_DATABASE_URL: postgresql://migrationtest:migrationtest@localhost:55439/marketplace_migration_test
+
       MIGRATION_E2E_DATABASE_URL: postgresql://e2euser:e2epass@localhost:55440/marketplace_migration_e2e_tmp
       CATALOG_REGRESSION_DB_HOST: 127.0.0.1
       CATALOG_REGRESSION_DB_PORT: "55439"
@@ -149,6 +162,27 @@ jobs:
           psql -h 127.0.0.1 -p 55439 -U migrationtest -d postgres \
             -v ON_ERROR_STOP=1 \
             -c "CREATE DATABASE marketplace_catalog_regression_test"
+
+      - name: Create isolated Category 3A and 3B migration databases
+        shell: bash
+        env:
+          PGPASSWORD: migrationtest
+        run: |
+          set -euo pipefail
+
+          suffix="$(date -u +%Y%m%d%H%M%S)"
+          db_existing="cat3verify_${suffix}"
+          db_verified="cat3verify_$(date -u -d '+1 second' +%Y%m%d%H%M%S)"
+
+          psql -h 127.0.0.1 -p 55441 -U migrationtest -d postgres \
+            -v ON_ERROR_STOP=1 -c "CREATE DATABASE ${db_existing}"
+          psql -h 127.0.0.1 -p 55441 -U migrationtest -d postgres \
+            -v ON_ERROR_STOP=1 -c "CREATE DATABASE ${db_verified}"
+
+          echo "MIGRATION_TEST_DATABASE_URL=postgresql://migrationtest:migrationtest@127.0.0.1:55441/${db_existing}" >> "$GITHUB_ENV"
+          echo "MIGRATION_3A_TEST_DATABASE_URL=postgresql://migrationtest:migrationtest@127.0.0.1:55441/${db_verified}" >> "$GITHUB_ENV"
+
+          echo "Created isolated migration databases: ${db_existing}, ${db_verified}"
 
       - name: Provision catalog regression schema and fixtures
         working-directory: apps/backend

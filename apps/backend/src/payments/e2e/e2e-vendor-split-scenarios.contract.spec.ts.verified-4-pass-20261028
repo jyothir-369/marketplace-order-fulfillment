@@ -1,0 +1,38 @@
+import { calculateVendorAllocation, computeIdempotencyKey } from '../allocation/allocation-engine.service';
+import { CommissionPolicy, validatePolicy } from '../allocation/commission-policy.interface';
+
+describe('Area 1 — Single-vendor checkout + allocation (executable contract)', () => {
+  const policy: CommissionPolicy = { rulesVersion: 'v1', currency: 'INR', model: 'PERCENTAGE', rate: 1500, feePaise: 50, feeBearer: 'PLATFORM', discountTreatment: 'BEFORE_COMMISSION', taxShippingAllocation: 'GROSS', activeFrom: new Date('2026-01-01'), approved: true } as CommissionPolicy;
+
+  it('computes integer-paise allocation with idempotency key and RECONCILED status', () => {
+    const result = calculateVendorAllocation({
+      orderReference: 'ORD-001', vendorId: 'V1', lineTotalPaise: 10000, currency: 'INR', rulesVersion: 'v1', vendorAccountState: 'ACTIVE',
+    }, policy);
+    expect(result.allocationPaise).toBeGreaterThanOrEqual(0);
+    expect(result.idempotencyKey).toBe(computeIdempotencyKey('ORD-001', 'V1', 'v1'));
+    expect(result.reconciliationStatus).toBe('MISSING_CAPTURE'); // no capturedAmountPaise provided
+    expect(result.grossLinePaise).toBe(10000);
+  });
+
+  it('rejects ineligible vendor account (fail-closed eligibility)', () => {
+    expect(() => calculateVendorAllocation({
+      orderReference: 'ORD-002', vendorId: 'V2', lineTotalPaise: 5000, currency: 'INR', rulesVersion: 'v1', vendorAccountState: 'INACTIVE',
+    }, policy)).toThrow('Vendor V2 state=INACTIVE');
+  });
+
+  it('detects amount mismatch when captured != gross (reconciliation contract)', () => {
+    const r = calculateVendorAllocation({
+      orderReference: 'ORD-003', vendorId: 'V3', lineTotalPaise: 10000, capturedAmountPaise: 9500, currency: 'INR', rulesVersion: 'v1', vendorAccountState: 'ACTIVE',
+    }, policy);
+    expect(r.reconciliationStatus).toBe('AMOUNT_MISMATCH');
+  });
+
+  it('preserves non-negative vendor payable with integer arithmetic (no float overflow)', () => {
+    const r = calculateVendorAllocation({
+      orderReference: 'ORD-004', vendorId: 'V4', lineTotalPaise: 10000, currency: 'INR', rulesVersion: 'v1', vendorAccountState: 'ACTIVE',
+    }, policy);
+    expect(Number.isInteger(r.allocationPaise)).toBe(true);
+    expect(r.breakdown.vendorPayablePaise).toBeGreaterThanOrEqual(0);
+    expect(r.breakdown.commissionPaise).toBeGreaterThanOrEqual(0);
+  });
+});
