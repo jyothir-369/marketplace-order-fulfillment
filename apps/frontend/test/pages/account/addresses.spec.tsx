@@ -1,66 +1,227 @@
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import AddressPage from '../../../pages/account/addresses';
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import AddressesPage from "../../../app/account/addresses/page";
 
-describe('AddressPage', () => {
-  beforeEach(() => { (global as any).fetch = jest.fn() as jest.Mock; });
+jest.mock("@/lib/auth-context", () => ({
+  useAuth: () => ({
+    user: {
+      id: "user-1",
+      email: "buyer@example.com",
+      role: "buyer",
+      displayName: "Test Buyer",
+      vendorId: null,
+      bio: null,
+    },
+    status: "authenticated",
+    login: jest.fn(),
+    register: jest.fn(),
+    logout: jest.fn(),
+    refreshSession: jest.fn(),
+  }),
+}));
 
-  it('shows empty state', async () => {
-    (global as any).fetch.mockResolvedValue({ ok: true, json: async () => ({ addresses: [] }) });
-    render(<AddressPage />);
-    await waitFor(() => expect(screen.getByText(/No addresses saved/i)).toBeInTheDocument());
+const API = "http://localhost:3001/api";
+
+const address = {
+  id: "address-1",
+  label: "Home",
+  street: "123 Main Street",
+  city: "Ludhiana",
+  state: "Punjab",
+  zip: "141001",
+  country: "India",
+  isDefault: false,
+  createdAt: "2026-01-01T00:00:00.000Z",
+};
+
+function jsonResponse(data: unknown, status = 200) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => data,
+  };
+}
+
+describe("Saved Addresses page", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (global.fetch as jest.Mock) = jest.fn();
   });
 
-  it('handles API failure', async () => {
-    (global as any).fetch.mockRejectedValue(new Error('fail'));
-    render(<AddressPage />);
-    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+  it("shows the empty state when the user has no saved addresses", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(
+      jsonResponse({ addresses: [] }),
+    );
+
+    render(<AddressesPage />);
+
+    expect(await screen.findByText("No addresses saved.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /New address/i })).toBeInTheDocument();
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      `${API}/customer/addresses`,
+      expect.objectContaining({ method: "GET" }),
+    );
   });
 
-  it('submits create and shows success', async () => {
-    (global as any).fetch.mockImplementation((url: string, opts?: { method?: string }) => {
-      if (url === '/api/customer/addresses' && opts?.method === 'POST') return Promise.resolve({ ok: true, json: async () => ({}) }) as Promise<Response>;
-      return Promise.resolve({ ok: true, json: async () => ({ addresses: [{ id: 'a-1', label: 'Home', street: 'S', city: 'C' }] }) });
+  it("shows a useful error and allows retry when loading fails", async () => {
+    (global.fetch as jest.Mock)
+      .mockRejectedValueOnce(new Error("Network unavailable"))
+      .mockResolvedValueOnce(jsonResponse({ addresses: [] }));
+
+    render(<AddressesPage />);
+
+    expect(await screen.findByText("Failed to load addresses")).toBeInTheDocument();
+    expect(screen.getByText("Network unavailable")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Retry/i }));
+
+    expect(await screen.findByText("No addresses saved.")).toBeInTheDocument();
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("creates an address and reloads the saved address list", async () => {
+    (global.fetch as jest.Mock).mockImplementation(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const method = init?.method ?? "GET";
+
+        if (url === `${API}/customer/addresses` && method === "POST") {
+          return jsonResponse({ address });
+        }
+
+        if (url === `${API}/customer/addresses` && method === "GET") {
+          return jsonResponse({ addresses: [address] });
+        }
+
+        throw new Error(`Unexpected request: ${method} ${url}`);
+      },
+    );
+
+    render(<AddressesPage />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /New address/i }));
+
+    fireEvent.change(screen.getByLabelText("Label"), {
+      target: { value: "Home" },
     });
-    render(<AddressPage />);
-    await waitFor(() => expect(screen.queryByLabelText(/Street/i)).toBeInTheDocument());
-    fireEvent.change(screen.getByLabelText(/Street/i), { target: { value: '123 Main' } });
-    fireEvent.change(screen.getByLabelText(/City/i), { target: { value: 'NYC' } });
-    fireEvent.click(screen.getByRole('button', { name: /Add address/i }));
-    await waitFor(() => expect(screen.getByText(/Created/i)).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText("Street / Address"), {
+      target: { value: "123 Main Street" },
+    });
+    fireEvent.change(screen.getByLabelText("City"), {
+      target: { value: "Ludhiana" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Save Address/i }));
+
+    expect(await screen.findByText("123 Main Street, Ludhiana, Punjab 141001")).toBeInTheDocument();
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      `${API}/customer/addresses`,
+      expect.objectContaining({
+        method: "POST",
+        body: expect.stringContaining("123 Main Street"),
+      }),
+    );
   });
 
-  it('confirms and deletes', async () => {
-    (global as any).fetch.mockImplementation((url: string, opts?: { method?: string }) => {
-      if (url?.includes('/api/customer/addresses/')) return Promise.resolve({ ok: true, json: async () => ({}) }) as Promise<Response>;
-      return Promise.resolve({ ok: true, json: async () => ({ addresses: [{ id: 'd-1', label: 'X', street: 'S', city: 'C' }] }) });
+  it("confirms deletion and refreshes the list", async () => {
+    const confirmSpy = jest.spyOn(window, "confirm").mockReturnValue(true);
+
+    (global.fetch as jest.Mock).mockImplementation(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const method = init?.method ?? "GET";
+
+        if (url === `${API}/customer/addresses` && method === "GET") {
+          return jsonResponse({
+            addresses: global.fetch.mock.calls.filter(
+              (call: unknown[]) =>
+                String(call[0]) === `${API}/customer/addresses/address-1`,
+            ).length
+              ? []
+              : [address],
+          });
+        }
+
+        if (
+          url === `${API}/customer/addresses/address-1` &&
+          method === "DELETE"
+        ) {
+          return { ok: true, status: 204 };
+        }
+
+        throw new Error(`Unexpected request: ${method} ${url}`);
+      },
+    );
+
+    render(<AddressesPage />);
+
+    expect(await screen.findByText("123 Main Street, Ludhiana, Punjab 141001")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("123 Main Street, Ludhiana, Punjab 141001")).not.toBeInTheDocument();
     });
-    window.confirm = () => true;
-    render(<AddressPage />);
-    await waitFor(() => screen.getByText(/X/));
-    fireEvent.click(screen.getByRole('button', { name: /Delete X/i }));
-    await waitFor(() => expect(screen.getByText(/Deleted/i)).toBeInTheDocument());
+
+    expect(confirmSpy).toHaveBeenCalledWith("Delete this address?");
+    expect(global.fetch).toHaveBeenCalledWith(
+      `${API}/customer/addresses/address-1`,
+      expect.objectContaining({ method: "DELETE" }),
+    );
+
+    confirmSpy.mockRestore();
   });
 
-  it('disables submit while submitting', async () => {
-    let resolveFetch: ((v: any) => void) | undefined;
-    (global as any).fetch.mockImplementation((url: string, opts?: { method?: string }) => {
-      if (url === '/api/customer/addresses' && opts?.method === 'POST') return new Promise<any>((res) => { resolveFetch = res; });
-      return Promise.resolve({ ok: true, json: async () => ({ addresses: [{ id: 'v-1', label: 'V', street: 'S', city: 'C' }] }) });
+  it("disables the save button while the create request is pending", async () => {
+    let resolvePost: ((value: unknown) => void) | undefined;
+
+    (global.fetch as jest.Mock).mockImplementation(
+      (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const method = init?.method ?? "GET";
+
+        if (url === `${API}/customer/addresses` && method === "POST") {
+          return new Promise((resolve) => {
+            resolvePost = resolve;
+          });
+        }
+
+        if (url === `${API}/customer/addresses` && method === "GET") {
+          return Promise.resolve(jsonResponse({ addresses: [] }));
+        }
+
+        throw new Error(`Unexpected request: ${method} ${url}`);
+      },
+    );
+
+    render(<AddressesPage />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /New address/i }));
+
+    fireEvent.change(screen.getByLabelText("Street / Address"), {
+      target: { value: "123 Main Street" },
     });
-    render(<AddressPage />);
-    await waitFor(() => expect(screen.getByRole('button', { name: /Add address/i })).toBeInTheDocument());
-    fireEvent.change(screen.getByLabelText(/Street/i), { target: { value: 'S' } });
-    fireEvent.change(screen.getByLabelText(/City/i), { target: { value: 'C' } });
-    fireEvent.click(screen.getByRole('button', { name: /Add address/i }));
-    await waitFor(() => expect(screen.getByRole('button', { name: /Adding/i })).toBeDisabled());
-    if (!resolveFetch) throw new Error('POST request was not started');
+    fireEvent.change(screen.getByLabelText("City"), {
+      target: { value: "Ludhiana" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Save Address/i }));
+
+    expect(await screen.findByRole("button", { name: /Save Address/i })).toBeDisabled();
+
+    if (!resolvePost) {
+      throw new Error("The create request was not started.");
+    }
 
     await act(async () => {
-      resolveFetch!({ ok: true, json: async () => ({ addresses: [] }) });
+      resolvePost!(jsonResponse({ address }));
     });
 
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: /Add address/i })).toBeEnabled()
-    );
+    await waitFor(() => {
+      expect(screen.queryByRole("form", { name: "Address form" })).not.toBeInTheDocument();
+    });
+
+    expect(screen.getByRole("button", { name: /New address/i })).toBeEnabled();
   });
 });

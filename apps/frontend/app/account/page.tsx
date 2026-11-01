@@ -26,9 +26,9 @@ interface AddressDto {
   createdAt: string;
 }
 
-export default function AccountPage() {
+export default function AccountPage({ forceTab }: { forceTab?: "addresses" }) {
   const { user, status, logout } = useAuth();
-  const [tab, setTab] = useState<"profile" | "orders" | "addresses" | "notifications" | "security">("profile");
+  const [tab, setTab] = useState<"profile" | "orders" | "addresses" | "notifications" | "security">(forceTab ?? "profile");
   const addToCart = useCartStore((s: any) => s.addToCart);
   const loadingProfile = !user || status !== "authenticated";
   const [profile, setProfile] = useState<UserDto | null>(null);
@@ -258,7 +258,7 @@ export default function AccountPage() {
                     className={cn("w-full rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm focus:ring-[var(--color-primary)] focus:outline-none disabled:opacity-70", profileError && "border-red-400")} />
                 </div>
                 <div className="flex gap-3">
-                  <button type="submit" disabled={savingProfile || roleIsReadonly} className="px-4 py-2 rounded-lg bg-blue-700 text-white text-sm font-bold shadow-sm hover:bg-blue-800 disabled:opacity-50">Save</button>
+                  <button type="submit" disabled={savingProfile || roleIsReadonly} className="px-4 py-2 rounded-lg bg-[var(--color-ink-navy)] text-white text-sm font-bold shadow-sm hover:brightness-110 transition disabled:opacity-50">Save</button>
                   {profileError && <span className="self-center text-xs text-red-500">{profileError}</span>}
                   <button type="button" onClick={cancelEditProfile} className="px-4 py-2 rounded-lg border border-[var(--color-ink-navy)] text-[var(--color-ink-navy)] text-sm font-semibold">Cancel</button>
                 </div>
@@ -279,7 +279,13 @@ export default function AccountPage() {
           <div className="space-y-3">
             <h2 className="font-display text-xl font-bold">Addresses</h2>
             <p className="text-sm text-[var(--color-warm-muted)]">Saved shipping and billing addresses.</p>
-            {addressError && <div className="rounded-lg border border-red-400 bg-red-50 px-3 py-2 text-sm text-red-700 self-start">{addressError}</div>}
+            {addressError && (
+              <div className="rounded-lg border border-red-400 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-v2 flex flex-wrap items-center gap-3">
+                <span className="font-semibold">Failed to load addresses</span>
+                <span className="text-red-600">{addressError}</span>
+                <button onClick={() => { setAddressError(null); loadAddresses(); }} className="ml-auto px-3 py-1.5 rounded-md bg-[var(--color-ink-navy)] text-white text-xs font-bold hover:brightness-110 transition">Retry</button>
+              </div>
+            )}
             {addressesLoading ? (
               <div className="animate-pulse h-16 w-full bg-[var(--color-card)] rounded" />
             ) : addresses.length === 0 ? (
@@ -309,22 +315,43 @@ export default function AccountPage() {
               </div>
             )}
             {addressFormOpen && (
-              <form onSubmit={saveAddress} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-cream)] p-4 space-y-3 mt-2">
-                <h3 className="font-bold text-sm">{editAddressId ? "Edit" : "New"} Address</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div><label className="block text-xs">Label</label><input value={addrFields.label} onChange={e => setAddrFields(f => ({ ...f, label: e.target.value }))} required className="w-full rounded border border-[var(--color-border)] px-2 py-1 text-sm" /></div>
-                  <div><label className="block text-xs">Street</label><input value={addrFields.street} onChange={e => setAddrFields(f => ({ ...f, street: e.target.value }))} required className="w-full rounded border border-[var(--color-border)] px-2 py-1 text-sm" /></div>
-                  <div><label className="block text-xs">City</label><input value={addrFields.city} onChange={e => setAddrFields(f => ({ ...f, city: e.target.value }))} required className="w-full rounded border border-[var(--color-border)] px-2 py-1 text-sm" /></div>
-                  <div><label className="block text-xs">State</label><input value={addrFields.state} onChange={e => setAddrFields(f => ({ ...f, state: e.target.value }))} className="w-full rounded border border-[var(--color-border)] px-2 py-1 text-sm" /></div>
-                  <div><label className="block text-xs">Postal code (ZIP)</label><input value={addrFields.zip} onChange={e => setAddrFields(f => ({ ...f, zip: e.target.value }))} className="w-full rounded border border-[var(--color-border)] px-2 py-1 text-sm" /></div>
-                  <div><label className="block text-xs">Country</label><input value={addrFields.country} onChange={e => setAddrFields(f => ({ ...f, country: e.target.value }))} required className="w-full rounded border border-[var(--color-border)] px-2 py-1 text-sm" /></div>
+              <form onSubmit={saveAddress} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-5 space-y-4 mt-3 shadow-v2">
+                <h3 className="font-display text-lg font-bold text-[var(--color-ink-navy)]">{editAddressId ? "Edit" : "New"} Address</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="addr-label" className="block text-xs font-semibold text-[var(--color-warm-muted)] mb-1">Label</label>
+                    <input id="addr-label" value={addrFields.label} onChange={e => setAddrFields(f => ({ ...f, label: e.target.value }))} required className={cn("w-full rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm bg-[var(--color-cream)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brass)] focus:border-[var(--color-brass)] transition", addressError && "border-red-400")} />
+                  </div>
+                  <div>
+                    <label htmlFor="addr-street" className="block text-xs font-semibold text-[var(--color-warm-muted)] mb-1">Street / Address</label>
+                    <input id="addr-street" value={addrFields.street} onChange={e => setAddrFields(f => ({ ...f, street: e.target.value }))} required className={cn("w-full rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm bg-[var(--color-cream)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brass)] focus:border-[var(--color-brass)] transition", addressError && "border-red-400")} />
+                  </div>
+                  <div>
+                    <label htmlFor="addr-city" className="block text-xs font-semibold text-[var(--color-warm-muted)] mb-1">City</label>
+                    <input id="addr-city" value={addrFields.city} onChange={e => setAddrFields(f => ({ ...f, city: e.target.value }))} required className={cn("w-full rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm bg-[var(--color-cream)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brass)] focus:border-[var(--color-brass)] transition", addressError && "border-red-400")} />
+                  </div>
+                  <div>
+                    <label htmlFor="addr-state" className="block text-xs font-semibold text-[var(--color-warm-muted)] mb-1">State</label>
+                    <input id="addr-state" value={addrFields.state} onChange={e => setAddrFields(f => ({ ...f, state: e.target.value }))} className={cn("w-full rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm bg-[var(--color-cream)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brass)] focus:border-[var(--color-brass)] transition", addressError && "border-red-400")} />
+                  </div>
+                  <div>
+                    <label htmlFor="addr-zip" className="block text-xs font-semibold text-[var(--color-warm-muted)] mb-1">ZIP / Postal code</label>
+                    <input id="addr-zip" value={addrFields.zip} onChange={e => setAddrFields(f => ({ ...f, zip: e.target.value }))} className={cn("w-full rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm bg-[var(--color-cream)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brass)] focus:border-[var(--color-brass)] transition", addressError && "border-red-400")} />
+                  </div>
+                  <div>
+                    <label htmlFor="addr-country" className="block text-xs font-semibold text-[var(--color-warm-muted)] mb-1">Country</label>
+                    <input id="addr-country" value={addrFields.country} onChange={e => setAddrFields(f => ({ ...f, country: e.target.value }))} required className={cn("w-full rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm bg-[var(--color-cream)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brass)] focus:border-[var(--color-brass)] transition", addressError && "border-red-400")} />
+                  </div>
                 </div>
-                <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={!!addrFields.isDefault} onChange={e => setAddrFields(f => ({ ...f, isDefault: e.target.checked }))} /> Set as default</label>
-                <div className="flex gap-2">
-                  <button type="submit" disabled={addressSaving} className="px-4 py-2 rounded-lg bg-blue-700 text-white text-sm font-bold shadow-sm hover:bg-blue-800 disabled:opacity-50">Save</button>
-                  <button type="button" onClick={() => setAddressFormOpen(false)} className="px-3 py-1 rounded border border-[var(--color-ink-navy)] text-[var(--color-ink-navy)] text-xs font-semibold">Cancel</button>
+                <label htmlFor="addr-default" className="flex items-center gap-2 text-sm text-[var(--color-foreground)] cursor-pointer select-none">
+                  <input id="addr-default" type="checkbox" checked={!!addrFields.isDefault} onChange={e => setAddrFields(f => ({ ...f, isDefault: e.target.checked }))} className="h-4 w-4 rounded border-[var(--color-border)] text-[var(--color-ink-navy)] focus:ring-[var(--color-brass)]" />
+                  Set as default address
+                </label>
+                <div className="flex gap-3 pt-1">
+                  <button type="submit" disabled={addressSaving} className="px-5 py-2.5 rounded-lg bg-[var(--color-ink-navy)] text-white text-sm font-bold shadow hover:brightness-110 transition disabled:opacity-50">Save Address</button>
+                  <button type="button" onClick={() => setAddressFormOpen(false)} className="px-4 py-2.5 rounded-lg border border-[var(--color-ink-navy)] text-[var(--color-ink-navy)] text-sm font-semibold hover:bg-[var(--color-cream)] transition">Cancel</button>
                 </div>
-                {addressError && <div className="text-xs text-red-600">{addressError}</div>}
+                {addressError && <div className="text-sm text-red-600 font-medium">{addressError} <button onClick={() => { setAddressError(null); loadAddresses(); }} className="ml-2 underline text-xs">Retry</button></div>}
               </form>
             )}
           </div>
