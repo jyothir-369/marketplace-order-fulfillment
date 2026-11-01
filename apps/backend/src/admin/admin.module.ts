@@ -8,6 +8,8 @@ import { AdminCustomersController } from './admin.customers.controller';
 import { AdminService } from './admin.service';
 import { Order } from '../common/entities/order.entity';
 import { User } from '../common/entities/user.entity';
+import { Refund } from '../common/entities/refund.entity';
+import { Dispute } from '../common/entities/dispute.entity';
 import { Vendor } from '../common/entities/vendor.entity';
 import { OrderLineItem } from '../common/entities/order-line-item.entity';
 import { VendorSyncJob } from '../common/entities/vendor-sync-job.entity';
@@ -20,7 +22,7 @@ import { AdminPaymentsController } from './payments/admin-payments.controller';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Order, OrderLineItem, VendorSyncJob, AuditLog, User, Vendor, VendorApplication, Product]),
+    TypeOrmModule.forFeature([Order, OrderLineItem, VendorSyncJob, AuditLog, User, Vendor, VendorApplication, Product, Refund, Dispute]),
     AuditModule,
     AuthModule,
     OrdersModule,
