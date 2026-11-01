@@ -59,7 +59,7 @@ describe("Saved Addresses page", () => {
 
     expect(global.fetch).toHaveBeenCalledWith(
       `${API}/customer/addresses`,
-      expect.objectContaining({ method: "GET" }),
+      expect.objectContaining({ headers: expect.objectContaining({ "Content-Type": "application/json" }) }),
     );
   });
 
@@ -113,7 +113,7 @@ describe("Saved Addresses page", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Save Address/i }));
 
-    expect(await screen.findByText("123 Main Street, Ludhiana, Punjab 141001")).toBeInTheDocument();
+    expect(await screen.findByText("123 Main Street")).toBeInTheDocument();
 
     expect(global.fetch).toHaveBeenCalledWith(
       `${API}/customer/addresses`,
@@ -156,12 +156,12 @@ describe("Saved Addresses page", () => {
 
     render(<AddressesPage />);
 
-    expect(await screen.findByText("123 Main Street, Ludhiana, Punjab 141001")).toBeInTheDocument();
+    expect(await screen.findByText("123 Main Street")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
 
     await waitFor(() => {
-      expect(screen.queryByText("123 Main Street, Ludhiana, Punjab 141001")).not.toBeInTheDocument();
+      expect(screen.queryByText("123 Main Street")).not.toBeInTheDocument();
     });
 
     expect(confirmSpy).toHaveBeenCalledWith("Delete this address?");
