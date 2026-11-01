@@ -8,6 +8,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { CatalogModule } from './catalog/catalog.module';
 import { VendorApplicationModule } from './vendor/vendor-application.module';
+import { VendorModule } from './vendor/vendor.module';
 import { VendorPromotionsModule } from './vendor/vendor-promotions.module';
 import { VendorSettingsModule } from './vendor/vendor-settings.module';
 import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware';
@@ -181,6 +182,7 @@ import { CustomerModule } from './customer/customer.module';
     VendorMockModule,
     CatalogModule,
     VendorApplicationModule,
+    VendorModule,
     VendorPaymentAccountsModule,
     VendorPromotionsModule,
     VendorSettingsModule,

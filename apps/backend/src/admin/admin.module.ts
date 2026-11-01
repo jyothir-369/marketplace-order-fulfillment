@@ -15,6 +15,8 @@ import { AuditModule, AuditLog } from '../common/audit';
 import { OrdersModule } from '../orders/orders.module';
 import { FulfillmentModule } from '../fulfillment/fulfillment.module';
 import { AuthModule } from '../auth/auth.module';
+import { PaymentsModule } from '../payments/payments.module';
+import { AdminPaymentsController } from './payments/admin-payments.controller';
 
 @Module({
   imports: [
@@ -23,8 +25,9 @@ import { AuthModule } from '../auth/auth.module';
     AuthModule,
     OrdersModule,
     FulfillmentModule,
+    PaymentsModule,
   ],
-  controllers: [AdminController, AdminCustomersController],
+  controllers: [AdminController, AdminCustomersController, AdminPaymentsController],
   providers: [AdminService],
   exports: [AdminService],
 })
