@@ -443,7 +443,7 @@ function InventoryInner() {
 
       {modalOpen && (
         <div
-          className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4"
           onClick={() => setModalOpen(false)}
           role="dialog"
           aria-modal="true"
@@ -453,13 +453,13 @@ function InventoryInner() {
             onSubmit={submitNew}
             onClick={(e) => e.stopPropagation()}
             className={cn(
-              "w-full max-w-md rounded-xl border p-6 shadow-xl",
-              "border-[var(--color-border)] bg-[var(--color-card)]",
-              "space-y-4"
+              "relative z-[70] flex flex-col w-full max-w-md rounded-xl border shadow-xl",
+              "border-[var(--color-border)] bg-[var(--color-card)] opacity-100",
+              "p-6 space-y-5"
             )}
           >
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-[var(--color-foreground)]">New Product</h2>
+            <div className="flex items-center justify-between rounded-lg bg-[var(--color-muted)]/60 border border-[var(--color-border)] px-4 py-3 shadow-sm">
+              <h2 className="text-xl font-bold text-[var(--color-foreground)] tracking-tight">New Product</h2>
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
@@ -469,20 +469,20 @@ function InventoryInner() {
                 <X className="h-5 w-5" aria-hidden />
               </button>
             </div>
-            <div>
-              <label htmlFor="np-name" className="mb-1 block text-sm font-medium text-[var(--color-foreground)]">Name</label>
+            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-sm space-y-2">
+              <label htmlFor="np-name" className="block text-sm font-bold text-[var(--color-foreground)]">Name</label>
               <input
                 id="np-name"
                 type="text"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className={inputBase}
+                className={cn(inputBase, "w-full h-11 bg-white dark:bg-[var(--color-card)]")}
                 required
               />
             </div>
-            <div className="flex gap-3">
-              <div className="flex-1">
-                <label htmlFor="np-price" className="mb-1 block text-sm font-medium text-[var(--color-foreground)]">Price (USD)</label>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-sm space-y-2">
+                <label htmlFor="np-price" className="block text-sm font-bold text-[var(--color-foreground)]">Price (USD)</label>
                 <input
                   id="np-price"
                   type="number"
@@ -490,28 +490,28 @@ function InventoryInner() {
                   step={0.01}
                   value={form.price}
                   onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
-                  className={inputBase}
+                  className={cn(inputBase, "w-full h-11 bg-white dark:bg-[var(--color-card)]")}
                 />
               </div>
-              <div className="flex-1">
-                <label htmlFor="np-stock" className="mb-1 block text-sm font-medium text-[var(--color-foreground)]">Stock</label>
+              <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-sm space-y-2">
+                <label htmlFor="np-stock" className="block text-sm font-bold text-[var(--color-foreground)]">Stock</label>
                 <input
                   id="np-stock"
                   type="number"
                   min={0}
                   value={form.stockCount}
                   onChange={(e) => setForm({ ...form, stockCount: Number(e.target.value) })}
-                  className={inputBase}
+                  className={cn(inputBase, "w-full h-11 bg-white dark:bg-[var(--color-card)]")}
                 />
               </div>
             </div>
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex justify-end gap-3 pt-4 border-t border-[var(--color-border)] mt-1">
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
                 className={cn(
-                  "rounded px-4 py-2 text-sm",
-                  "border border-[var(--color-border)] bg-[var(--color-card)]",
+                  "rounded-lg px-5 py-2.5 text-sm font-medium",
+                  "border border-[var(--color-border)] bg-[var(--color-muted)]/50",
                   "text-[var(--color-foreground)] hover:bg-[var(--color-accent)]"
                 )}
               >
@@ -521,9 +521,9 @@ function InventoryInner() {
                 type="submit"
                 disabled={creating}
                 className={cn(
-                  "rounded px-4 py-2 text-sm font-medium",
+                  "rounded-lg px-5 py-2.5 text-sm font-bold shadow-sm",
                   "bg-[var(--color-primary)] text-[var(--color-primary-foreground)]",
-                  "hover:opacity-90 disabled:opacity-50"
+                  "hover:brightness-110 disabled:opacity-50"
                 )}
               >
                 {creating ? "Creating..." : "Create"}
