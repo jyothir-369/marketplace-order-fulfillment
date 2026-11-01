@@ -45,8 +45,9 @@ describe('Migration registry/datasource reconciliation', () => {
     expect(invalid).toEqual([]);
   });
 
-  it('retains all registered date-based migrations (10, including 20261027)', () => {
-    expect(MIGRATION_REGISTRY.filter((name) => /^2026/.test(name))).toHaveLength(13);
+  it('retains all registered date-based migrations, including the customer-address correction', () => {
+    expect(MIGRATION_REGISTRY.filter((name) => /^2026/.test(name))).toHaveLength(14);
+    expect(MIGRATION_REGISTRY).toContain('20261101-FixCustomerAddressDefaultColumn');
   });
 
   it('fails for unregistered migration files (nonzero on missing registry)', () => {
