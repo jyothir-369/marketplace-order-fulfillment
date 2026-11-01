@@ -15,14 +15,16 @@ import { RazorpayInitiationController } from './razorpay-initiation.controller';
 import { RazorpayVerificationController } from './razorpay-verification.controller';
 import { CheckoutReconciliationService } from './checkout-reconciliation.service';
 import { RazorpayWebhookController } from './razorpay-webhook.controller';
-import { VendorPaymentsController } from './vendor-payments.controller';
-import { AdminPaymentsController } from './admin-payments.controller';
+import { VendorPaymentsController } from '../vendor/payments/vendor-payments.controller';
+import { AdminPaymentsController } from '../admin/payments/admin-payments.controller';
 import { VendorPaymentAllocation } from '../common/entities/vendor-payment-allocation.entity';
 import { PaymentTransfer } from '../common/entities/payment-transfer.entity';
 import { VendorPaymentAccount } from '../common/entities/vendor-payment-account.entity';
 import { Refund } from '../common/entities/refund.entity';
 import { Dispute } from '../common/entities/dispute.entity';
 import { RefundService } from './refund/refund.service';
+import { AdminPaymentsService } from '../admin/payments/admin-payments.service';
+import { VendorPayoutsService } from '../vendor/payments/vendor-payouts.service';
 
 import { AllocationModule } from './allocation/allocation.module';
 import { InventoryModule } from '../inventory/inventory.module';
@@ -60,6 +62,8 @@ import { InventoryModule } from '../inventory/inventory.module';
     RazorpayVerificationService,
     CheckoutReconciliationService,
     RefundService,
+    AdminPaymentsService,
+    VendorPayoutsService,
   ],
   exports: [
     PaymentsService,
