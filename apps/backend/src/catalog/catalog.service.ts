@@ -23,6 +23,7 @@ import {
   VendorDashboardDto,
   CatalogSort,
 } from './dto/catalog.dto';
+import { Promotion } from '../common/entities/promotion.entity';
 import { Review } from '../common/entities/review.entity';
 import { CreateReviewDto, ReviewDto, ReviewListResponseDto } from './dto/review.dto';
 
@@ -60,6 +61,8 @@ export class CatalogService {
     private readonly lineItemRepository: Repository<OrderLineItem>,
     @InjectRepository(Order)
     private readonly orderRepository: Repository<Order>,
+    @InjectRepository(Promotion)
+    private readonly promotionRepository: Repository<Promotion>,
     @InjectRepository(Review)
     private readonly reviewRepository: Repository<Review>,
   ) {}
@@ -194,12 +197,10 @@ export class CatalogService {
       where: { id },
       relations: { vendor: true },
     });
-
     if (!product) {
       throw new NotFoundException('Product with ID ' + id + ' not found');
     }
-
-    return this.toResponseDto(product, product.vendor ? product.vendor.name : 'Unknown');
+    return this.toResponseDto(product, product.vendor ? product.vendor.name : 'Unknown', await this.getPromotionForProduct(product));
   }
 
   /** Unpaged array of a single vendor's products (vendor storefront / inventory). */
@@ -210,8 +211,8 @@ export class CatalogService {
       relations: { vendor: true },
       order: { createdAt: 'DESC' },
     });
-
-    return products.map((p) => this.toResponseDto(p, p.vendor ? p.vendor.name : 'Unknown'));
+    const withPromo = await Promise.all(products.map(async (p) => ({ p, promo: await this.getPromotionForProduct(p) })));
+    return withPromo.map(({ p, promo }) => this.toResponseDto(p, p.vendor ? p.vendor.name : 'Unknown', promo));
   }
 
   /** Unpaged array of all products (legacy callers: deals, vendor detail). */
@@ -223,11 +224,12 @@ export class CatalogService {
           relations: { vendor: true },
           order: { createdAt: 'DESC' },
         });
-    
-        return products.map((p) => this.toResponseDto(p, p.vendor ? p.vendor.name : 'Unknown'));
+        const withPromo = await Promise.all(products.map(async (p) => ({ p, promo: await this.getPromotionForProduct(p) })));
+        return withPromo.map(({ p, promo }) => this.toResponseDto(p, p.vendor ? p.vendor.name : 'Unknown', promo));
     } catch (e) {
       const fallback = await this.productRepository.find({ where: activeOnly ? { isActive: true } : {}, relations: { vendor: true }, order: { createdAt: 'DESC' } });
-      return fallback.map((p) => this.toResponseDto(p, p.vendor ? p.vendor.name : 'Unknown'));
+      const withPromo = await Promise.all(fallback.map(async (p) => ({ p, promo: await this.getPromotionForProduct(p) })));
+      return withPromo.map(({ p, promo }) => this.toResponseDto(p, p.vendor ? p.vendor.name : 'Unknown', promo));
     }
   }
 
@@ -253,9 +255,10 @@ export class CatalogService {
     const facets = await this.buildFacets(dto);
     const [items, total] = await qb.getManyAndCount();
     const totalPages = Math.ceil(total / pageSize);
+    const withPromo = await Promise.all(items.map(async (p) => ({ p, promo: await this.getPromotionForProduct(p) })));
     this.logger.log("DEBUG query: items=" + items.length + " total=" + total + " page=" + page);
     return {
-      items: items.map((p) => this.toResponseDto(p, p.vendor ? p.vendor.name : 'Unknown')),
+      items: withPromo.map(({ p, promo }) => this.toResponseDto(p, p.vendor ? p.vendor.name : 'Unknown', promo)),
       total,
       page,
       pageSize,
@@ -776,7 +779,87 @@ export class CatalogService {
   // Mapping helpers
   // ---------------------------------------------------------------------------
 
-  private toResponseDto(product: Product, vendorName: string): ProductResponseDto {
+  /** Phase 3: server-authoritative effective price with promotion (percent-off, UTC schedule, vendor isolation, no stacking). */
+  async getProductWithPromotion(id: string, correlationId?: string): Promise<ProductResponseDto & { effectivePrice?: number; promotionId?: string | null; discountPercent?: number | null; originalPrice?: number; savings?: number; promotionTitle?: string | null; promotionEndDate?: Date | null; promotionValid?: boolean }> {
+    const product = await this.productRepository.findOne({ where: { id, isActive: true }, relations: ["vendor"] });
+    if (!product) throw new NotFoundException("Product not found");
+    const now = new Date();
+    // Authoritative server-side promotion calc: vendor ownership enforced; UTC scheduling (start/end); expiry excluded; percent-off only; no stacking (one promo per vendor)
+    let promotionId: string | null = null;
+    let discountPercent: number | null = null;
+    let promotionTitle: string | null = null;
+    let promotionEndDate: Date | null = null;
+    let promotionValid = false;
+    if (product.vendorId) {
+      const promos = await this.promotionRepository.find({
+        where: { vendorId: product.vendorId, isActive: true },
+      });
+      const validPromo = promos
+        .filter((p) => {
+          const start = p.startDate ? new Date(p.startDate) : null;
+          const end = p.endDate ? new Date(p.endDate) : null;
+          return (!start || start <= now) && (!end || end >= now);
+        })
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] ?? null;
+      if (validPromo) {
+        promotionId = validPromo.id;
+        discountPercent = Number(validPromo.discountPercent);
+        promotionTitle = validPromo.title ?? null;
+        promotionEndDate = validPromo.endDate ? new Date(validPromo.endDate) : null;
+        promotionValid = true;
+      }
+    }
+    const originalPrice = parseFloat(Number(product.price).toFixed(2));
+    const effectivePrice = discountPercent !== null
+      ? parseFloat(Number(originalPrice * (1 - discountPercent / 100)).toFixed(2))
+      : originalPrice;
+    const savings = discountPercent !== null ? parseFloat(Number(originalPrice - effectivePrice).toFixed(2)) : 0;
+    return {
+      ...this.toResponseDto(product, product.vendor?.name ?? ""),
+      originalPrice,
+      price: effectivePrice,
+      effectivePrice,
+      promotionId,
+      discountPercent,
+      savings,
+      promotionTitle,
+      promotionEndDate,
+      promotionValid,
+    };
+  }
+
+  private async getPromotionForProduct(product: Product): Promise<{ promotionId: string | null; discountPercent: number | null; originalPrice: number; effectivePrice: number; savings: number; promotionTitle: string | null; promotionEndDate: Date | null; promotionValid: boolean }> {
+    const now = new Date();
+    let promotionId: string | null = null;
+    let discountPercent: number | null = null;
+    let promotionTitle: string | null = null;
+    let promotionEndDate: Date | null = null;
+    let promotionValid = false;
+    if (product.vendorId) {
+      const promos = await this.promotionRepository.find({ where: { vendorId: product.vendorId, isActive: true } });
+      const validPromo = promos
+        .filter((p) => {
+          const start = p.startDate ? new Date(p.startDate) : null;
+          const end = p.endDate ? new Date(p.endDate) : null;
+          return (!start || start <= now) && (!end || end >= now);
+        })
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] ?? null;
+      if (validPromo) {
+        promotionId = validPromo.id;
+        discountPercent = Number(validPromo.discountPercent);
+        promotionTitle = validPromo.title ?? null;
+        promotionEndDate = validPromo.endDate ? new Date(validPromo.endDate) : null;
+        promotionValid = true;
+      }
+    }
+    const originalPrice = parseFloat(Number(product.price).toFixed(2));
+    const effectivePrice = discountPercent !== null ? parseFloat(Number(originalPrice * (1 - discountPercent / 100)).toFixed(2)) : originalPrice;
+    return { promotionId, discountPercent, originalPrice, effectivePrice, savings: discountPercent !== null ? parseFloat(Number(originalPrice - effectivePrice).toFixed(2)) : 0, promotionTitle, promotionEndDate, promotionValid };
+  }
+
+  private toResponseDto(product: Product, vendorName: string, promo?: Partial<{ promotionId: string | null; discountPercent: number | null; originalPrice: number; effectivePrice: number; savings: number; promotionTitle: string | null; promotionEndDate: Date | null; promotionValid: boolean }>): ProductResponseDto {
+    const originalPrice = promo?.originalPrice ?? parseFloat(Number(product.price).toFixed(2));
+    const effectivePrice = promo?.effectivePrice ?? originalPrice;
     return {
       id: product.id,
       vendorId: product.vendorId,
@@ -784,13 +867,21 @@ export class CatalogService {
       name: product.name,
       slug: product.slug ?? null,
       category: product.category ?? null,
-      price: Number(product.price),
+      price: effectivePrice,
       stockCount: product.stockCount,
       isActive: product.isActive,
       createdAt: product.createdAt,
       updatedAt: product.updatedAt,
       description: product.description ?? null,
       images: product.images ?? null,
+      originalPrice: promo?.originalPrice ?? originalPrice,
+      effectivePrice: promo?.effectivePrice ?? effectivePrice,
+      promotionId: promo?.promotionId ?? null,
+      discountPercent: promo?.discountPercent ?? null,
+      savings: promo?.savings ?? 0,
+      promotionTitle: promo?.promotionTitle ?? null,
+      promotionEndDate: promo?.promotionEndDate ?? null,
+      promotionValid: promo?.promotionValid ?? false,
     };
   }
 
@@ -802,3 +893,4 @@ export class CatalogService {
       .replace(/^-+|-+$/g, '');
   }
 }
+

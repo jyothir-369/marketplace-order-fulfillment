@@ -163,6 +163,11 @@ export class CatalogController {
     }
   }
 
+  @Get(':id/promotion')
+  async getProductWithPromotion(@Param('id', ParseUUIDPipe) id: string, @CorrelationId() correlationId?: string): Promise<ProductResponseDto & { effectivePrice?: number; promotionId?: string | null; discountPercent?: number | null; originalPrice?: number; savings?: number; promotionTitle?: string | null; promotionEndDate?: Date | null; promotionValid?: boolean }> {
+    return this.catalogService.getProductWithPromotion(id, correlationId);
+  }
+
   @Get(':id')
   async getProduct(@Param('id', ParseUUIDPipe) id: string): Promise<ProductResponseDto> {
     return this.catalogService.findById(id);

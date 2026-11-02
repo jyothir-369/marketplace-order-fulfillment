@@ -8,10 +8,11 @@ import { Vendor } from '../common/entities/vendor.entity';
 import { Order } from '../common/entities/order.entity';
 import { OrderLineItem } from '../common/entities/order-line-item.entity';
 import { Review } from '../common/entities/review.entity';
+import { Promotion } from '../common/entities/promotion.entity';
 
 @Module({
   // OrderLineItem + Order power the Phase 1.5 vendor detail/dashboard metrics.
-  imports: [TypeOrmModule.forFeature([Product, Category, Vendor, Order, OrderLineItem, Review])],
+  imports: [TypeOrmModule.forFeature([Product, Category, Vendor, Order, OrderLineItem, Review, Promotion])],
   controllers: [CatalogController],
   providers: [CatalogService],
   exports: [CatalogService],
