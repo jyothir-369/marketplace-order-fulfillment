@@ -454,7 +454,7 @@ function InventoryInner() {
             onClick={(e) => e.stopPropagation()}
             className={cn(
               "relative z-[70] flex flex-col w-full max-w-md rounded-xl border shadow-xl",
-              "border-[var(--color-border)] bg-[var(--color-card)] opacity-100",
+              "border-[var(--color-border)] bg-white opacity-100",
               "p-6 space-y-5"
             )}
           >
