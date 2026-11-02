@@ -9,7 +9,7 @@ if (command === 'up') {
     console.error('BLOCKED: MIGRATION_CONFIRM_WRITE=yes required before migration write');
     process.exit(2);
   }
-  // Explicit up permitted after deployed audit confirms 15 applied + 4 pending.
+  // Migration writes are restricted by the dedicated local test database guard.
   // Guard remains in data-source initialization (assertFailClosedDatabase).
 } else if (command === 'status') {
   // Safe default — show pending/applied.
@@ -32,8 +32,8 @@ async function runMigrations(): Promise<void> {
       return;
     }
     if (command === 'up') {
-      // Explicit up permitted after deployed audit confirms 15 applied + 4 pending.
-      // All duplicate timestamp identities preserved (CategoriesAndCatalogContract already applied).
+      // Migration writes are restricted by the dedicated local test database guard.
+      // Migration identities must remain consistent with the registered migration classes.
       await migrationDataSource.runMigrations({ transaction: 'each' });
       console.log('Migration up completed');
       return;
