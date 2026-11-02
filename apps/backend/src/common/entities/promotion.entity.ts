@@ -9,9 +9,9 @@ export class Promotion {
 
   @Column({ type: 'text', nullable: true }) description: string | null;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2 }) discountPercent: number;
+  @Column({ type: 'decimal', precision: 10, scale: 2, name: 'discount_percent' }) discountPercent: number;
 
-  @Column({ type: 'boolean', default: true }) isActive: boolean;
+  @Column({ type: 'boolean', default: true, name: 'is_active' }) isActive: boolean;
 
   @Column({ type: 'timestamp', name: 'start_date', nullable: true }) startDate: Date | null;
 
