@@ -1,4 +1,5 @@
 import { CommissionPolicy, validatePolicy, PolicyValidationError } from './commission-policy.interface';
+import { DiscountFundingPolicy, validateDiscountFundingPolicy } from './discount-funding.interface';
 
 export interface AllocationInput {
   orderReference: string;
@@ -98,11 +99,12 @@ export function calculateVendorAllocation(
   if (commissionPaise > gross) commissionPaise = gross; // guard against over-commission
 
   const feePaise = p.feePaise ?? 0;
-  const discountPaise = 0; // will be expanded when discount contracts are defined; kept at 0 here with contract note.
+  const fundingPolicy: DiscountFundingPolicy = validateDiscountFundingPolicy(undefined, input.rulesVersion);
+  const discountPaise = Math.max(0, (fundingPolicy.discountTreatment === 'VENDOR_FUNDED' && fundingPolicy.vendorDiscountRatePercent ? gross * fundingPolicy.vendorDiscountRatePercent / 100 : 0)); // vendor-funded % applied to gross; marketplace-funded = 0 funded to vendor
   const taxPaise = 0; // kept at 0 until tax/shipping rules defined; not invented.
 
-  // Vendor payable = gross line - commission (platform share) - fees, with guard so payable >= 0.
-  const vendorPayablePaise = Math.max(0, gross - commissionPaise - feePaise);
+  // Vendor payable = gross - discount (funded per policy) - commission - fees; exact paise reconciliation.
+  const vendorPayablePaise = Math.max(0, gross - discountPaise - commissionPaise - feePaise);
   const platformNetPaise = gross - vendorPayablePaise - feePaise; // should approximate commission
 
   const breakdown: AllocationBreakdown = {
