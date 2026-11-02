@@ -29,11 +29,18 @@ function currentCartStorageKey(): string {
 export interface CartItem {
   productId: string;
   name: string;
-  price: number;
+  price: number; // authoritative original price from DB (never frontend-calculated)
+  originalPrice?: number;
+  effectivePrice?: number;
+  discountPercent?: number | null;
+  promotionId?: string | null;
+  promotionTitle?: string | null;
+  promotionValid?: boolean;
   quantity: number;
   maxStock: number;
   vendorId: string;
   vendorName: string;
+  savings?: number;
 }
 
 export interface CartVendorGroup {
@@ -173,7 +180,10 @@ export const selectTotalItems = (state: CartState): number =>
   state.cart.reduce((sum, item) => sum + item.quantity, 0);
 
 export const selectTotalAmount = (state: CartState): number =>
-  state.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  state.cart.reduce((sum, item) => {
+    const unit = item.effectivePrice ?? item.price;
+    return sum + Math.round(unit * 100) * item.quantity / 100;
+  }, 0);
 
 export const selectItemCount = (productId: string) => (state: CartState): number => {
   const item = state.cart.find((i) => i.productId === productId);
@@ -190,14 +200,14 @@ export const selectCartVendorGroups = (state: CartState): CartVendorGroup[] => {
     const existing = map.get(item.vendorId);
     if (existing) {
       existing.items.push(item);
-      existing.subtotal += item.price * item.quantity;
+      existing.subtotal += Math.round((item.effectivePrice ?? item.price) * 100) * item.quantity / 100;
       existing.itemCount += item.quantity;
     } else {
       map.set(item.vendorId, {
         vendorId: item.vendorId,
         vendorName: item.vendorName,
         items: [item],
-        subtotal: item.price * item.quantity,
+        subtotal: Math.round((item.effectivePrice ?? item.price) * 100) * item.quantity / 100,
         itemCount: item.quantity,
       });
     }

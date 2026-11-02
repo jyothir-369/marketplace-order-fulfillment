@@ -369,7 +369,15 @@ function CheckoutInner() {
                 </td>
 
                 <td className="p-3 text-right font-medium tabular-nums text-[var(--color-foreground)]">
-                  {formatCurrency(item.price * item.quantity)}
+                  <div className="flex flex-col items-end">
+                    <span>{formatCurrency(item.effectivePrice ?? item.price)}</span>
+                    {item.savings && item.savings > 0 && (
+                      <span className="text-[10px] font-semibold text-[var(--color-success)] tabular-nums">Save {formatCurrency(item.savings)}</span>
+                    )}
+                  </div>
+                </td>
+                <td className="p-3 text-right font-medium tabular-nums text-[var(--color-foreground)]">
+                  {formatCurrency((item.effectivePrice ?? item.price) * item.quantity)}
                 </td>
 
                 <td className="p-3">
@@ -387,19 +395,25 @@ function CheckoutInner() {
             ))}
           </tbody>
 
-          <tfoot className="border-t border-[var(--color-warm-border)] bg-[var(--color-ivory)]">
+          <tfoot className="border-t border-[var(--color-border)] bg-[var(--color-ivory)]">
             <tr>
-              <td
-                colSpan={2}
-                className="p-3 text-right text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-warm-muted)]"
-              >
-                Order total
-              </td>
-
-              <td className="p-3 text-right font-display text-2xl font-bold tabular-nums text-[var(--color-foreground)]">
-                {formatCurrency(totalAmount)}
-              </td>
-
+              <td colSpan={2} className="p-3 text-right text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-warm-muted)]">Subtotal</td>
+              <td className="p-3 text-right font-medium tabular-nums">{formatCurrency(cart.reduce((s, i) => s + (i.effectivePrice ?? i.price) * i.quantity, 0))}</td>
+              <td />
+            </tr>
+            <tr>
+              <td colSpan={2} className="p-3 text-right text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-destructive)]">Discounts</td>
+              <td className="p-3 text-right font-medium tabular-nums text-[var(--color-destructive)]">-{formatCurrency(cart.reduce((s, i) => s + (i.savings ?? 0) * i.quantity, 0))}</td>
+              <td />
+            </tr>
+            <tr>
+              <td colSpan={2} className="p-3 text-right text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-warm-muted)]">Shipping</td>
+              <td className="p-3 text-right font-medium tabular-nums">{formatCurrency(totalAmount > 50 ? 0 : 5.99)}</td>
+              <td />
+            </tr>
+            <tr>
+              <td colSpan={2} className="p-3 text-right text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-accent)]">Order total (final payable)</td>
+              <td className="p-3 text-right font-display text-2xl font-bold tabular-nums">{formatCurrency(totalAmount > 50 ? totalAmount : totalAmount + 5.99)}</td>
               <td />
             </tr>
           </tfoot>

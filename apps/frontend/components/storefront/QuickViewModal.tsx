@@ -178,10 +178,42 @@ export function QuickViewModal({ product, open, onOpenChange, onAdd }: QuickView
               </Link>
             </p>
 
-            {/* Price */}
-            <p className="font-display text-3xl font-bold tabular-nums text-[var(--color-ink-navy)]">
-              {formatCurrency(product.price)}
-            </p>
+            {/* Price and vendor promotion */}
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap items-baseline gap-3">
+                <span className={cn(
+                  "font-display text-3xl font-bold tabular-nums",
+                  product.promotionValid ? "text-[var(--color-brass)]" : "text-[var(--color-ink-navy)]"
+                )}>
+                  {formatCurrency(product.promotionValid ? (product.effectivePrice ?? product.price) : product.price)}
+                </span>
+                {product.promotionValid &&
+                  product.originalPrice !== undefined &&
+                  product.originalPrice !== (product.effectivePrice ?? product.price) && (
+                    <span className="text-base text-[var(--color-warm-muted)] line-through">
+                      {formatCurrency(product.originalPrice)}
+                    </span>
+                  )}
+                {product.promotionValid && product.discountPercent != null && (
+                  <span className="rounded bg-[var(--color-brass)]/10 px-2 py-1 text-xs font-bold uppercase text-[var(--color-brass)]">
+                    {product.discountPercent}% off
+                  </span>
+                )}
+              </div>
+              {product.promotionValid && product.promotionTitle && (
+                <p className="text-sm text-[var(--color-warm-muted)]">
+                  {product.promotionTitle}
+                  {product.promotionEndDate
+                    ? ` — ends ${new Date(product.promotionEndDate).toLocaleDateString()}`
+                    : ""}
+                </p>
+              )}
+              {product.promotionValid && (product.savings ?? 0) > 0 && (
+                <p className="text-sm font-medium text-emerald-700">
+                  Save {formatCurrency(product.savings!)}
+                </p>
+              )}
+            </div>
 
             {/* Trust microcopy */}
             <ul className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-[var(--color-warm-muted)]">
@@ -275,3 +307,5 @@ export function QuickViewModal({ product, open, onOpenChange, onAdd }: QuickView
     </Dialog>
   );
 }
+
+

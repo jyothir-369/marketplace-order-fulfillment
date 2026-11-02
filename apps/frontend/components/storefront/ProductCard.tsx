@@ -139,11 +139,27 @@ export function ProductCard({ product, quantity, onQuantityChange, onAdd, justAd
           </Link>
           {/* Vendor */}
           <p className="text-[11px] text-[#777777] leading-none">by {product.vendorName}</p>
-          {/* Price + stock */}
-          <div className="flex items-baseline justify-between gap-3 pt-1">
-            <span className="text-base font-extrabold text-[#16233F] leading-none tracking-tight">{formatCurrency(product.price)}</span>
+          {/* Price + promotion (original / discounted / savings / validity) */}
+          <div className="flex items-baseline justify-between gap-3 pt-1 flex-wrap">
+            <div className="flex items-baseline gap-2">
+              <span className={cn("text-base font-extrabold leading-none tracking-tight", (product as any).promotionValid ? "text-[#C69A4B]" : "text-[#16233F]")}>
+                {formatCurrency((product as any).effectivePrice ?? product.price)}
+              </span>
+              {(product as any).promotionValid && (product as any).originalPrice !== undefined && (product as any).originalPrice !== (product as any).effectivePrice && (
+                <span className="text-xs text-[#777777] line-through">{formatCurrency((product as any).originalPrice)}</span>
+              )}
+              {(product as any).promotionValid && (product as any).discountPercent !== undefined && (
+                <span className="text-[10px] font-bold uppercase tracking-wide text-[#C69A4B] bg-[#C69A4B]/10 px-1.5 py-0.5 rounded">{(product as any).discountPercent}% off</span>
+              )}
+            </div>
             <span className={cn("text-[11px] font-medium leading-none", isOut ? "text-[#777777]" : "text-[#777777]")}>{product.stockCount} in stock</span>
           </div>
+          {(product as any).promotionValid && (product as any).promotionTitle && (
+            <p className="text-[11px] text-[#777777] leading-none">{(product as any).promotionTitle} — ends {(product as any).promotionEndDate ? new Date((product as any).promotionEndDate).toLocaleDateString() : 'soon'}</p>
+          )}
+          {(product as any).promotionValid && (product as any).savings !== undefined && (product as any).savings > 0 && (
+            <p className="text-[11px] font-medium text-emerald-700 leading-none">Save {formatCurrency((product as any).savings)}</p>
+          )}
           {/* Quantity */}
           {!isOut && (
             <div className="flex items-center gap-2 mt-0.5">
