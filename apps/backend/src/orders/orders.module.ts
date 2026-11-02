@@ -5,6 +5,7 @@ import { OrdersService } from './orders.service';
 import { Order } from '../common/entities/order.entity';
 import { OrderLineItem } from '../common/entities/order-line-item.entity';
 import { Product } from '../common/entities/product.entity';
+import { Promotion } from '../common/entities/promotion.entity';
 import { Vendor } from '../common/entities/vendor.entity';
 import { InventoryModule } from '../inventory/inventory.module';
 import { AuditModule } from '../common/audit';
@@ -12,7 +13,7 @@ import { PaymentsModule } from '../payments/payments.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Order, OrderLineItem, Product, Vendor]),
+    TypeOrmModule.forFeature([Order, OrderLineItem, Product, Vendor, Promotion]),
     InventoryModule,
     AuditModule,
     PaymentsModule,

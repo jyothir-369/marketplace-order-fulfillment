@@ -70,6 +70,11 @@ export class OrderLineItemResponseDto {
   fulfillmentStatus: FulfillmentStatus;
   vendorReference?: string;
   failureReason?: string;
+  // Phase 3 snapshot of the applied promotion (or null if no promo applies).
+  promotionId?: string | null;
+  promotionDiscountPercent?: number | null;
+  effectiveUnitPrice?: number | null;
+  originalUnitPrice?: number | null;
 }
 
 export class OrderResponseDto {

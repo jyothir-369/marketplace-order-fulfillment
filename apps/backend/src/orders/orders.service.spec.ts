@@ -22,6 +22,15 @@ describe('OrdersService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OrdersService,
+        {
+          provide: 'PromotionRepository',
+          useValue: {
+            find: jest.fn().mockResolvedValue([]),
+            findOne: jest.fn().mockResolvedValue(null),
+            findOneBy: jest.fn().mockResolvedValue(null),
+          },
+        },
+
         // getOrderById re-reads the just-created order; mock it to echo the
         // order_number that checkout generated from the (seq 1) transaction.
         { provide: getRepositoryToken(Order), useValue: { findOne: jest.fn().mockImplementation(() => {

@@ -4,6 +4,7 @@ import { Repository, DataSource, FindOptionsRelations } from 'typeorm';
 import { Order, OrderStatus } from '../common/entities/order.entity';
 import { OrderLineItem, FulfillmentStatus } from '../common/entities/order-line-item.entity';
 import { Product } from '../common/entities/product.entity';
+import { Promotion } from '../common/entities/promotion.entity';
 import { CheckoutDto, CheckoutResponseDto, OrderResponseDto, OrderLineItemResponseDto, TransitionOrderDto, OrderTransitionAction } from './dto/orders.dto';
 import { InventoryService } from '../inventory/inventory.service';
 import { AuditService, AuditLog, AuditEntityType } from '../common/audit';
@@ -29,6 +30,8 @@ export class OrdersService {
     private readonly lineItemRepository: Repository<OrderLineItem>,
     @InjectRepository(Product)
     private readonly productRepository: Repository<Product>,
+    @InjectRepository(Promotion)
+    private readonly promotionRepository: Repository<Promotion>,
     private readonly dataSource: DataSource,
     private readonly inventoryService: InventoryService,
     private readonly auditService: AuditService,
@@ -52,14 +55,48 @@ export class OrdersService {
     const productMap = new Map<string, Product>();
     products.forEach((p) => productMap.set(p.id, p));
 
-    // Phase 5.1: expected total = sum of price x quantity from the (pre-lock)
-    // product snapshot. Bill this amount BEFORE any stock is decremented so a
-    // decline never touches inventory. The auth row itself is persisted (as
-    // CAPTURED) only after the order exists.
-    const expectedTotal = dto.items.reduce((sum, item) => {
+    // Phase 3 authoritative: promotion-adjusted total must equal authorization,
+    // line totals, order total, and capture. Compute before auth using same
+    // vendor-scoped, scheduled, non-stacking promotion rule; reuse snapshot
+    // inside transaction so promotion can't change between auth and capture.
+    // Phase 3 authoritative: promotion-adjusted total computed from product snapshot
+    // before authorization. Use repository injection if available; else base price.
+    // (OrdersService does not inject promotionRepository — compute with base + query)
+    // Use the injected promotion repository (not an unsafe cast) for
+    // server-authoritative promotion-adjusted total before authorization.
+    // One authoritative promotion and price snapshot per product for this checkout.
+    const pricingSnapshots = new Map<string, { effectiveUnitPricePaise: number; promotionId: string | null; discountPercent: number | null }>();
+    const promotionsByVendor = new Map<string, Promotion[]>();
+    const pricingTime = new Date();
+
+    for (const item of dto.items) {
       const product = productMap.get(item.productId);
-      return sum + Number(product?.price ?? 0) * item.quantity;
-    }, 0);
+      if (!product) throw new BadRequestException("Product not found: " + item.productId);
+      const originalPricePaise = Math.round(Number(product.price) * 100);
+      let effectiveUnitPricePaise = originalPricePaise;
+      let promotionId: string | null = null;
+      let discountPercent: number | null = null;
+      if (!promotionsByVendor.has(product.vendorId)) {
+        const promotions = await this.promotionRepository.find({ where: { vendorId: product.vendorId, isActive: true } });
+        promotionsByVendor.set(product.vendorId, promotions);
+      }
+      const validPromotion = (promotionsByVendor.get(product.vendorId) ?? [])
+        .filter((p) => {
+          const start = p.startDate ? new Date(p.startDate) : null;
+          const end = p.endDate ? new Date(p.endDate) : null;
+          return (!start || start <= pricingTime) && (!end || end >= pricingTime);
+        })
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] ?? null;
+      if (validPromotion && validPromotion.vendorId === product.vendorId) {
+        promotionId = validPromotion.id;
+        discountPercent = Number(validPromotion.discountPercent);
+        effectiveUnitPricePaise = originalPricePaise - Math.round(originalPricePaise * discountPercent / 100);
+      }
+      pricingSnapshots.set(item.productId, { effectiveUnitPricePaise, promotionId, discountPercent });
+    }
+
+    const expectedTotalPaise = dto.items.reduce((sum, item) => sum + pricingSnapshots.get(item.productId)!.effectiveUnitPricePaise * item.quantity, 0);
+    const expectedTotal = expectedTotalPaise / 100;
 
     return this.dataSource.transaction(async (manager) => {
       // Remediation 1 Phase 3 / Phase 4: idempotency key — read inside transaction
@@ -181,8 +218,14 @@ export class OrdersService {
       for (const item of dto.items) {
         const product = productMap.get(item.productId);
         if (product) {
-          const unitPrice = Number(product.price);
-          const lineTotal = unitPrice * item.quantity;
+          const pricingSnapshot = pricingSnapshots.get(item.productId);
+          if (!pricingSnapshot) throw new BadRequestException("Pricing snapshot missing for product " + item.productId);
+          const effectiveUnitPrice = pricingSnapshot.effectiveUnitPricePaise / 100;
+          const appliedPromoId = pricingSnapshot.promotionId;
+          const appliedDiscountPercent = pricingSnapshot.discountPercent;
+          const unitPricePaise = pricingSnapshot.effectiveUnitPricePaise;
+          const lineTotalPaise = Math.round(unitPricePaise * item.quantity);
+          const lineTotal = parseFloat((lineTotalPaise / 100).toFixed(2));
           totalAmount += lineTotal;
 
           const lineItem = (manager.create as any)(OrderLineItem, {
@@ -190,8 +233,11 @@ export class OrdersService {
             productId: item.productId,
             vendorId: product.vendorId,
             quantity: item.quantity,
-            unitPrice: unitPrice,
+            unitPrice: parseFloat((Math.round(Number(product.price) * 100) / 100).toFixed(2)),
             lineTotal: lineTotal,
+            effectiveUnitPrice: parseFloat((unitPricePaise / 100).toFixed(2)),
+            promotionId: appliedPromoId ?? null,
+            promotionDiscountPercent: appliedDiscountPercent ?? null,
             fulfillmentStatus: FulfillmentStatus.PENDING,
           });
 
@@ -459,6 +505,11 @@ export class OrdersService {
       fulfillmentStatus: item.fulfillmentStatus,
       vendorReference: item.vendorReference,
       failureReason: item.failureReason,
+      // Persisted promotion snapshot — never recalculated from current promotions.
+      promotionId: item.promotionId ?? null,
+      promotionDiscountPercent: item.promotionDiscountPercent ?? null,
+      effectiveUnitPrice: item.effectiveUnitPrice ?? null,
+      originalUnitPrice: Number(item.unitPrice),
     };
   }
 }
