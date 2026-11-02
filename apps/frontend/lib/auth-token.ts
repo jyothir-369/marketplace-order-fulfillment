@@ -35,12 +35,37 @@ export function getRefreshToken(): string | null {
 }
 
 export function setTokens(accessToken: string, refreshToken: string): void {
-  if (!canUseStorage()) return;
+  if (!accessToken || !refreshToken) {
+    throw new Error("Authentication returned an incomplete token pair.");
+  }
+
+  if (!canUseStorage()) {
+    throw new Error("Browser storage is unavailable; the session cannot be persisted.");
+  }
+
   try {
     window.localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
     window.localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
-  } catch {
-    // Storage unavailable (e.g. private mode) — session simply won't persist.
+
+    if (
+      window.localStorage.getItem(ACCESS_TOKEN_KEY) !== accessToken ||
+      window.localStorage.getItem(REFRESH_TOKEN_KEY) !== refreshToken
+    ) {
+      throw new Error("Authentication tokens could not be verified in browser storage.");
+    }
+  } catch (error) {
+    try {
+      window.localStorage.removeItem(ACCESS_TOKEN_KEY);
+      window.localStorage.removeItem(REFRESH_TOKEN_KEY);
+    } catch {
+      // Preserve the original storage failure.
+    }
+
+    throw new Error(
+      error instanceof Error
+        ? `Unable to persist authentication session: ${error.message}`
+        : "Unable to persist authentication session."
+    );
   }
 }
 
