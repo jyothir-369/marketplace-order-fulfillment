@@ -33,6 +33,8 @@ export const MIGRATION_REGISTRY = [
   '20261030-AddUserBioColumn',
   '20261101-FixCustomerAddressDefaultColumn',
   '20261101-Phase3-AddPromotionSnapshotColumns',
+  '20261103-CategoryA-PromotionFundingApproval',
+  '20261103-CategoryA-PromotionApprovedAt',
 ];
 
 /* Idempotency check: 1710000000005 (categories applied, fulfillment pending) and 2026101300000 (vendor_applications created by 1749624000000; index + constraints pending). Duplicate suffixes are different schemas, not duplicate identities. */
