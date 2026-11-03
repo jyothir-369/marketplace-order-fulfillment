@@ -1,6 +1,7 @@
 import * as path from 'path';
 import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_PIPE } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { getBullMQConnectionOptions } from './common/config/redis-connection.factory';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -202,6 +203,14 @@ import { CustomerModule } from './customer/customer.module';
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_PIPE,
+      useValue: new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
     },
   ],
 })

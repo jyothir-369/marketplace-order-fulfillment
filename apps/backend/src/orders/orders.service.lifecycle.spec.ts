@@ -9,6 +9,7 @@ import { InventoryService } from '../inventory/inventory.service';
 import { AuditService } from '../common/audit';
 import { VendorQueueService } from '../fulfillment/vendor-queue.service';
 import { PaymentsService } from '../payments/payments.service';
+import { Promotion } from '../common/entities/promotion.entity';
 
 describe('OrdersService - Lifecycle', () => {
   let service: OrdersService;
@@ -62,6 +63,7 @@ describe('OrdersService - Lifecycle', () => {
         { provide: getRepositoryToken(Order), useValue: orderRepositoryMock },
         { provide: getRepositoryToken(OrderLineItem), useValue: lineItemRepositoryMock },
         { provide: getRepositoryToken(Product), useValue: {} },
+        { provide: getRepositoryToken(Promotion), useValue: { find: jest.fn().mockResolvedValue([]) } },
         { provide: DataSource, useValue: dataSourceMock },
         { provide: InventoryService, useValue: inventoryMock },
         { provide: AuditService, useValue: auditMock },

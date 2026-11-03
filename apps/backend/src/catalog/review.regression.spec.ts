@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { CatalogService } from './catalog.service';
 import { Product } from '../common/entities/product.entity';
+import { Promotion } from '../common/entities/promotion.entity';
 import { Vendor } from '../common/entities/vendor.entity';
 import { Category } from '../common/entities/category.entity';
 import { Review } from '../common/entities/review.entity';
@@ -47,6 +48,7 @@ describe('CatalogService — reviews (regression)', () => {
         { provide: getRepositoryToken(Product), useValue: { createQueryBuilder: () => ({ getManyAndCount: () => [[], 0] }) } },
         { provide: getRepositoryToken(Vendor), useValue: {} },
         { provide: getRepositoryToken(Category), useValue: {} },
+        { provide: getRepositoryToken(Promotion), useValue: { find: jest.fn().mockResolvedValue([]) } },
       ],
     }).compile();
 

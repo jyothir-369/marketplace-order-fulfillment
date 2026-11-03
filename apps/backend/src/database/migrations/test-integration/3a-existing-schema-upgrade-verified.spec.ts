@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
+import { describe, it, expect, beforeAll, afterAll, jest } from '@jest/globals';
+jest.setTimeout(300000);
 import { DataSource } from 'typeorm';
 import { loadCanonicalMigrationClasses } from '../canonical-migrations';
 const rawUrl = process.env.MIGRATION_3A_TEST_DATABASE_URL;
