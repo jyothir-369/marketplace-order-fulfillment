@@ -279,7 +279,7 @@ export class OrdersService {
 
       const savedOrder = await (manager.save as any)(Order, order) as Order;
 
-      let totalAmount = 0;
+      let totalAmountCents = 0;
       const lineItems: OrderLineItem[] = [];
 
       for (const item of dto.items) {
@@ -298,7 +298,10 @@ export class OrdersService {
           }
 
           const lineTotal = lineTotalCents / 100;
-          totalAmount += lineTotal;
+          totalAmountCents += lineTotalCents;
+          if (!Number.isSafeInteger(totalAmountCents) || totalAmountCents > 2147483647) {
+            throw new BadRequestException('Checkout order total exceeds supported USD-cent limits');
+          }
 
           const lineItem = (manager.create as any)(OrderLineItem, {
             orderId: savedOrder.id,
@@ -371,9 +374,13 @@ export class OrdersService {
           capturedAmountCents,
         }, manager);
       }
-      if (Math.round(totalAmount * 100) !== expectedTotalCents) {
+      if (
+        !Number.isSafeInteger(totalAmountCents) ||
+        totalAmountCents !== expectedTotalCents
+      ) {
         throw new BadRequestException('Checkout total does not reconcile to integer USD cents');
       }
+      const totalAmount = totalAmountCents / 100;
       await manager.update(Order, { id: savedOrder.id }, { totalAmount: expectedTotalCents / 100 });
 
       // Phase 5.1: authorization already succeeded above (before stock moved);

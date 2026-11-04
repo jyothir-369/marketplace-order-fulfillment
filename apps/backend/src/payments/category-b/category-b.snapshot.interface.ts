@@ -37,11 +37,36 @@ export interface PromotionFundingSnapshot {
 
 /** Deterministic integer-cent discount calculation (half-up, floating-point percentage arithmetic, result in integer cents). */
 export function computeDiscountCents(originalCents: number, discountPercent: number): number {
-  if (!Number.isSafeInteger(originalCents) || originalCents < 0) throw new Error('originalCents must be non-negative safe integer');
-  if (!Number.isFinite(discountPercent) || discountPercent < 0 || discountPercent > 100) throw new Error('discountPercent must be between 0 and 100 inclusive');
-  // Single half-up rounding (no intermediate basis-point rounding). Percentage arithmetic is floating-point; only the final discounted value is rounded to integer cents.
-  const discounted = Math.round(originalCents * (10000 - discountPercent * 100) / 10000);
-  return Math.max(0, Math.min(originalCents, discounted));
+  if (!Number.isSafeInteger(originalCents) || originalCents < 0) {
+    throw new Error('originalCents must be non-negative safe integer');
+  }
+  if (!Number.isFinite(discountPercent) || discountPercent < 0 || discountPercent > 100) {
+    throw new Error('discountPercent must be between 0 and 100 inclusive');
+  }
+
+  // Convert the supplied decimal percentage into an exact rational fraction.
+  const [coefficient, exponentText] = discountPercent.toString().toLowerCase().split('e');
+  const exponent = exponentText === undefined ? 0 : Number(exponentText);
+  const [whole, fraction = ''] = coefficient.split('.');
+  let percentageNumerator = BigInt(whole + fraction);
+  let percentageDenominator = 10n ** BigInt(fraction.length);
+
+  if (exponent > 0) {
+    percentageNumerator *= 10n ** BigInt(exponent);
+  } else if (exponent < 0) {
+    percentageDenominator *= 10n ** BigInt(-exponent);
+  }
+
+  const denominator = 100n * percentageDenominator;
+  const numerator = BigInt(originalCents) *
+    (denominator - percentageNumerator);
+
+  // Exactly one half-up rounding operation, using integer arithmetic.
+  const quotient = numerator / denominator;
+  const remainder = numerator % denominator;
+  const rounded = quotient + (remainder * 2n >= denominator ? 1n : 0n);
+
+  return Number(rounded);
 }
 
 export function computeFundingSplitCents(
