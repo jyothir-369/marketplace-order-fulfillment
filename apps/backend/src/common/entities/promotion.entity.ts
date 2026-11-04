@@ -19,9 +19,25 @@ export class Promotion {
 
   @Column({ type: 'uuid', name: 'vendor_id' }) vendorId: string;
 
+  @Column({ type: 'uuid', name: 'approved_by', nullable: true }) approvedBy: string | null;
+
   @ManyToOne(() => Vendor, (vendor) => vendor.promotions)
   @JoinColumn({ name: 'vendor_id' })
   vendor: Vendor;
+
+  @Column({ type: 'varchar', length: 20, default: 'VENDOR_FUNDED', name: 'funding_type' }) fundingType: 'VENDOR_FUNDED' | 'MARKETPLACE_FUNDED' | 'CO_FUNDED';
+
+  @Column({ type: 'decimal', precision: 5, scale: 2, name: 'vendor_contribution_percent', nullable: true }) vendorContributionPercent: number | null;
+
+  @Column({ type: 'decimal', precision: 5, scale: 2, name: 'marketplace_contribution_percent', nullable: true }) marketplaceContributionPercent: number | null;
+
+  @Column({ type: 'varchar', length: 3, default: 'USD', name: 'currency' }) currency: string;
+
+  @Column({ type: 'varchar', length: 20, default: 'PENDING', name: 'approval_state' }) approvalState: 'PENDING' | 'APPROVED' | 'REJECTED';
+
+  @Column({ type: 'timestamp', name: 'approved_at', nullable: true }) approvedAt: Date | null;
+
+  @Column({ type: 'timestamp', name: 'submitted_at', nullable: true }) submittedAt: Date | null;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;

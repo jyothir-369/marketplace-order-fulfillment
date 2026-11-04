@@ -7,7 +7,7 @@ import { UserRole } from '../common/entities/user.entity';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { VendorPromotionsService } from './vendor-promotions.service';
-import { VendorPromotionDto, VendorPromotionUpdateDto } from './dto/vendor-promotion.dto';
+import { PromotionFundingApprovalDto, PromotionFundingApprovalUpdateDto } from './dto/promotion-funding-approval.dto';
 
 @Controller('vendor/promotions')
 export class VendorPromotionsController {
@@ -24,7 +24,7 @@ export class VendorPromotionsController {
   @Post()
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(UserRole.VENDOR)
-  async create(@CurrentUser() user: AuthenticatedUser, @Body() body: VendorPromotionDto) {
+  async create(@CurrentUser() user: AuthenticatedUser, @Body() body: PromotionFundingApprovalDto) {
     const vendorId = this.verifyVendorId(user);
     return await this.svc.create(vendorId, body);
   }
@@ -32,9 +32,13 @@ export class VendorPromotionsController {
   @Patch(':id')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(UserRole.VENDOR)
-  async update(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() body: VendorPromotionUpdateDto) {
+  async update(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() body: PromotionFundingApprovalUpdateDto) {
     const vendorId = this.verifyVendorId(user);
-    return await this.svc.update(id, vendorId, body);
+    // Vendors must never approve their own promotions; only update non-approval fields.
+    if (body.approvalState !== undefined && body.approvalState !== 'PENDING') {
+      throw new ForbiddenException('Vendor cannot approve/reject own promotion');
+    }
+    return await this.svc.update(id, vendorId, body as any);
   }
 
   @Delete(':id')

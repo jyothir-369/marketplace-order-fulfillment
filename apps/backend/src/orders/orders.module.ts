@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { PromotionCheckoutSnapshot } from '../payments/snapshot/promotion-checkout-snapshot.entity';
+import { PromotionCheckoutSnapshotService } from '../payments/snapshot/promotion-checkout-snapshot.service';
+import { CategoryBCalcService } from '../payments/category-b/category-b-calc.service';
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
 import { Order } from '../common/entities/order.entity';
@@ -13,13 +16,16 @@ import { PaymentsModule } from '../payments/payments.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Order, OrderLineItem, Product, Vendor, Promotion]),
+    TypeOrmModule.forFeature([
+      PromotionCheckoutSnapshot,Order, OrderLineItem, Product, Vendor, Promotion]),
     InventoryModule,
     AuditModule,
     PaymentsModule,
   ],
   controllers: [OrdersController],
-  providers: [OrdersService],
+  providers: [
+    CategoryBCalcService,
+    PromotionCheckoutSnapshotService,OrdersService],
   exports: [OrdersService],
 })
 export class OrdersModule {}
