@@ -1,10 +1,10 @@
-import { CategoryAPromotionFundingApproval20261103 } from './20261103-CategoryA-PromotionFundingApproval';
-import { CategoryAPromotionApprovedAt20261103 } from './20261103-CategoryA-PromotionApprovedAt';
+import { CategoryAPromotionFundingApproval2026110300001 } from './20261103-CategoryA-PromotionFundingApproval';
+import { CategoryAPromotionApprovedAt2026110300002 } from './20261103-CategoryA-PromotionApprovedAt';
 
 describe('Category A migrations registered and ownership-safe', () => {
   it('registers both 20261103 migrations', () => {
-    expect(new CategoryAPromotionFundingApproval20261103()).toBeDefined();
-    expect(new CategoryAPromotionApprovedAt20261103()).toBeDefined();
+    expect(new CategoryAPromotionFundingApproval2026110300001()).toBeDefined();
+    expect(new CategoryAPromotionApprovedAt2026110300002()).toBeDefined();
   });
 
   it('FundingApproval up uses decimal precision 10/2 (not 5/2)', () => {

@@ -4,7 +4,7 @@ describe('Registry completeness (RED)', () => {
   it('registers all canonical migrations including date-based migrations', () => {
     expect(MIGRATION_REGISTRY.length).toBeGreaterThanOrEqual(25);
     // Date-based migration count includes the customer-address column correction.
-    expect(MIGRATION_REGISTRY.filter(n => /^2026/.test(n))).toHaveLength(15);
+    expect(MIGRATION_REGISTRY.filter(n => /^2026/.test(n))).toHaveLength(18);
   });
 
   it('preserves duplicate timestamps with distinct class names', () => {

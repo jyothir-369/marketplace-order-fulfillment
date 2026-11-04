@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
 
-export class CategoryAPromotionApprovedAt20261103 implements MigrationInterface {
-  name = 'CategoryAPromotionApprovedAt20261103';
+export class CategoryAPromotionApprovedAt2026110300002 implements MigrationInterface {
+  name = 'CategoryAPromotionApprovedAt2026110300002';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     const table = await queryRunner.getTable('promotions');

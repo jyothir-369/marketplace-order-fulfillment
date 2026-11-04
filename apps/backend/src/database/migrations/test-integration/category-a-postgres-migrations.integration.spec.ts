@@ -1,6 +1,6 @@
 import { DataSource } from 'typeorm';
-import { CategoryAPromotionFundingApproval20261103 } from '../20261103-CategoryA-PromotionFundingApproval';
-import { CategoryAPromotionApprovedAt20261103 } from '../20261103-CategoryA-PromotionApprovedAt';
+import { CategoryAPromotionFundingApproval2026110300001 } from '../20261103-CategoryA-PromotionFundingApproval';
+import { CategoryAPromotionApprovedAt2026110300002 } from '../20261103-CategoryA-PromotionApprovedAt';
 
 describe('Category A migrations - REAL PostgreSQL upgrade and rollback', () => {
   jest.setTimeout(120000);
@@ -54,8 +54,8 @@ describe('Category A migrations - REAL PostgreSQL upgrade and rollback', () => {
         )
       `);
 
-      const funding = new CategoryAPromotionFundingApproval20261103();
-      const approvedAt = new CategoryAPromotionApprovedAt20261103();
+      const funding = new CategoryAPromotionFundingApproval2026110300001();
+      const approvedAt = new CategoryAPromotionApprovedAt2026110300002();
 
       await funding.up(runner);
       await approvedAt.up(runner);

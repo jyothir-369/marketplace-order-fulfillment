@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddBuyerIdempotencyKeyConstraint2026101500000 implements MigrationInterface {
-  name = 'AddBuyerIdempotencyKeyConstraint2026101500000';
+export class AddBuyerIdempotencyKeyConstraint1792022400001 implements MigrationInterface {
+  name = 'AddBuyerIdempotencyKeyConstraint1792022400001';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Dependency fix: column must exist before index references it

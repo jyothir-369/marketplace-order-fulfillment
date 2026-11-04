@@ -17,18 +17,18 @@ function getTestConfig(): {
 
   if (
     host !== '127.0.0.1' ||
-    portRaw !== '55439' ||
+    portRaw !== '5435' ||
     username !== 'migrationtest' ||
     !password ||
     database !== 'marketplace_migration_constraints_test'
   ) {
     throw new Error(
       'FAIL-CLOSED: set explicit MIGRATION_TEST_DB_* credentials for ' +
-      '127.0.0.1:55439/marketplace_migration_constraints_test as migrationtest.',
+      '127.0.0.1:5435/marketplace_migration_constraints_test as migrationtest.',
     );
   }
 
-  return { host, port: 55439, username, password, database };
+  return { host, port: Number(portRaw), username, password, database };
 }
 describe('Vendor-user constraint migration (20261013)', () => {
   let ds: DataSource;
@@ -57,7 +57,7 @@ describe('Vendor-user constraint migration (20261013)', () => {
     if (
       identity[0]?.database !== 'marketplace_migration_constraints_test' ||
       identity[0]?.username !== 'migrationtest' ||
-      Number(identity[0]?.server_port) !== 5432
+      Number(identity[0]?.server_port) !== 5435
     ) {
       await ds.destroy();
       throw new Error(

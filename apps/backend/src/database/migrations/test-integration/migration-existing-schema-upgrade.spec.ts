@@ -9,7 +9,7 @@ import { DataSource, MigrationInterface, QueryRunner } from 'typeorm';
 import { loadCanonicalMigrationClasses } from '../canonical-migrations';
 
 function validatedDisposableUrl(): { url: string; database: string } {
-  const raw = process.env.MIGRATION_TEST_DATABASE_URL;
+  const raw = process.env.MIGRATION_EXISTING_SCHEMA_TEST_DATABASE_URL;
   if (!raw) {
     throw new Error('BLOCKED: MIGRATION_TEST_DATABASE_URL is required.');
   }
