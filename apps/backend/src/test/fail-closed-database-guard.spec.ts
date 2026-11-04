@@ -2,7 +2,7 @@ import { assertFailClosedDatabase, assertFailClosedDatabaseFromUrl } from './fai
 
 const safeTarget = {
   host: '127.0.0.1',
-  port: 55439,
+  port: 5435,
   database: 'marketplace_migration_test',
   url: '',
 };
@@ -13,7 +13,7 @@ describe('Fail-closed database guard', () => {
   });
 
   it('allows MIGRATION_TEST_DATABASE_URL with correct values', () => {
-    const url = 'postgres://reconcile_test@127.0.0.1:55439/marketplace_migration_test';
+    const url = 'postgres://reconcile_test@127.0.0.1:5435/marketplace_migration_test';
     expect(() => assertFailClosedDatabaseFromUrl(url)).not.toThrow();
   });
 
@@ -78,7 +78,7 @@ describe('Fail-closed database guard', () => {
 
   it('rejects MIGRATION_TEST_DATABASE_URL with remote host', () => {
     expect(() => assertFailClosedDatabaseFromUrl(
-      'postgres://reconcile_test@db.example.com:55439/marketplace_migration_test'
+      'postgres://reconcile_test@db.example.com:5435/marketplace_migration_test'
     )).toThrow(/BLOCKED/);
   });
 
@@ -90,13 +90,13 @@ describe('Fail-closed database guard', () => {
 
   it('rejects MIGRATION_TEST_DATABASE_URL with wrong database', () => {
     expect(() => assertFailClosedDatabaseFromUrl(
-      'postgres://reconcile_test@127.0.0.1:55439/marketplace'
+      'postgres://reconcile_test@127.0.0.1:5435/marketplace'
     )).toThrow(/BLOCKED/);
   });
 
   it('rejects MIGRATION_TEST_DATABASE_URL with test_* database', () => {
     expect(() => assertFailClosedDatabaseFromUrl(
-      'postgres://reconcile_test@127.0.0.1:55439/test_migrations_01'
+      'postgres://reconcile_test@127.0.0.1:5435/test_migrations_01'
     )).toThrow(/BLOCKED/);
   });
 

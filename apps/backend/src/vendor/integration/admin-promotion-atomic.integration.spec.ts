@@ -9,10 +9,10 @@ describe('AdminPromotion atomic approval - REAL PostgreSQL', () => {
   let service: AdminPromotionService;
 
   beforeAll(async () => {
-    const connectionString = process.env.MIGRATION_E2E_DATABASE_URL;
+    const connectionString = process.env.ADMIN_PROMOTION_ATOMIC_DATABASE_URL;
 
     if (!connectionString) {
-      throw new Error('MIGRATION_E2E_DATABASE_URL is required.');
+      throw new Error('ADMIN_PROMOTION_ATOMIC_DATABASE_URL is required.');
     }
 
     const url = new URL(connectionString);

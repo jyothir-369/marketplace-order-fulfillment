@@ -1,6 +1,6 @@
 // Fail-closed guard for the dedicated local reconciliation test database only.
 const ALLOWED_HOSTS = new Set(['localhost', '127.0.0.1']);
-const ALLOWED_PORT = 55439;
+const ALLOWED_PORT = 5435;
 const ALLOWED_DATABASE = 'marketplace_migration_test';
 
 export function assertFailClosedDatabase(config: {
