@@ -6,10 +6,10 @@ describe('CommissionPolicy validation', () => {
     model: 'PERCENTAGE',
     rate: 1500, // 15.00% in basis points / paise scale for expression
     feeBearer: 'PLATFORM',
-    feePaise: 50,
+    feeCents: 50,
     discountTreatment: 'BEFORE_COMMISSION',
     taxShippingAllocation: 'GROSS',
-    currency: 'INR',
+    currency: 'USD',
     activeFrom: new Date('2026-01-01'),
     approved: true,
   };
@@ -43,8 +43,8 @@ describe('CommissionPolicy validation', () => {
     expect(() => validatePolicy({ ...base, model: 'UNKNOWN' as any })).toThrow(/Unsupported/);
   });
 
-  it('rejects unsupported currency', () => {
-    expect(() => validatePolicy({ ...base, currency: 'USD' })).toThrow(/Unsupported currency/);
+  it('rejects unsupported currency (not USD)', () => {
+    expect(() => validatePolicy({ ...base, currency: 'INR' as any })).toThrow(/must be USD/);
   });
 
   it('rejects invalid PERCENTAGE rate (negative / >10000)', () => {
@@ -52,8 +52,8 @@ describe('CommissionPolicy validation', () => {
     expect(() => validatePolicy({ ...base, rate: 10001 })).toThrow(/rate/);
   });
 
-  it('rejects negative feePaise', () => {
-    expect(() => validatePolicy({ ...base, feePaise: -10 })).toThrow(/feePaise/);
+  it('rejects negative feeCents', () => {
+    expect(() => validatePolicy({ ...base, feeCents: -10 })).toThrow(/feeCents/);
   });
 
   it('accepts test-only approved policy', () => {

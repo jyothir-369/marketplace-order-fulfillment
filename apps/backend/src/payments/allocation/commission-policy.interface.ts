@@ -1,12 +1,14 @@
+import { assertUsdCurrency, assertUsdCents, ALLOCATION_CURRENCY } from '../money/usd-cents.contract';
+
 export interface CommissionPolicy {
   rulesVersion: string;
   model: 'PERCENTAGE' | 'FIXED_AMOUNT' | 'CATEGORY_SPECIFIC';
-  rate?: number; // rate in minor units if PERCENTAGE; absolute paise if FIXED_AMOUNT
+  rate?: number; // rate as USD-cents basis (percentage = basis points / 100 = percent; fixed = cents)
   feeBearer: 'PLATFORM' | 'VENDOR' | 'SHARED';
-  feePaise?: number; // gateway/transfer fee in minor units
+  feeCents?: number; // gateway/transfer fee in USD cents (integer)
   discountTreatment: 'BEFORE_COMMISSION' | 'AFTER_COMMISSION';
   taxShippingAllocation: 'GROSS' | 'NET';
-  currency: string; // e.g., 'INR'
+  currency: 'USD'; // USD only per allocation contract
   activeFrom: Date;
   approved: boolean;
 }
@@ -33,17 +35,17 @@ export function validatePolicy(policy: Partial<CommissionPolicy> | null | undefi
   if (!['PERCENTAGE', 'FIXED_AMOUNT', 'CATEGORY_SPECIFIC'].includes(policy.model)) {
     throw new PolicyValidationError(['model'], `Unsupported commission model: ${policy.model}`);
   }
-  if (policy.currency !== 'INR') {
-    throw new PolicyValidationError(['currency'], `Unsupported currency for this contract: ${policy.currency}`);
+  if (policy.currency !== ALLOCATION_CURRENCY) {
+    throw new PolicyValidationError(['currency'], `Policy currency must be USD per allocation contract; got ${policy.currency}`);
   }
-  if (policy.model === 'PERCENTAGE' && (policy.rate === undefined || policy.rate === null || policy.rate < 0 || policy.rate > 10000)) {
-    throw new PolicyValidationError(['rate'], `PERCENTAGE model requires 0 <= rate <= 10000 (paise-scale basis); got ${policy.rate}`);
+  if (policy.model === 'PERCENTAGE' && (policy.rate === undefined || policy.rate === null || typeof policy.rate !== 'number' || policy.rate < 0 || policy.rate > 10000)) {
+    throw new PolicyValidationError(['rate'], `PERCENTAGE model requires 0 <= rate <= 10000 (basis points); got ${policy.rate}`);
   }
-  if (policy.model === 'FIXED_AMOUNT' && (policy.rate === undefined || policy.rate === null || policy.rate < 0)) {
-    throw new PolicyValidationError(['rate'], `FIXED_AMOUNT model requires rate >= 0 (absolute paise); got ${policy.rate}`);
+  if (policy.model === 'FIXED_AMOUNT' && (policy.rate === undefined || policy.rate === null || typeof policy.rate !== 'number' || policy.rate < 0 || !Number.isSafeInteger(policy.rate))) {
+    throw new PolicyValidationError(['rate'], `FIXED_AMOUNT model requires non-negative safe integer USD cents; got ${policy.rate}`);
   }
-  if (policy.feePaise !== undefined && (policy.feePaise < 0 || !Number.isInteger(Number(policy.feePaise)))) {
-    throw new PolicyValidationError(['feePaise'], `feePaise must be non-negative integer minor units; got ${policy.feePaise}`);
+  if (policy.feeCents !== undefined && policy.feeCents !== null && (typeof policy.feeCents !== 'number' || policy.feeCents < 0 || !Number.isSafeInteger(policy.feeCents))) {
+    throw new PolicyValidationError(['feeCents'], `feeCents must be non-negative safe integer USD cents; got ${policy.feeCents}`);
   }
   return policy as CommissionPolicy;
 }

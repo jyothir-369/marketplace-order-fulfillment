@@ -42,8 +42,8 @@ export class AllocationService {
     const expected = {
       orderReference: result.orderReference,
       vendorId: result.vendorId,
-      amountPaise: result.allocationPaise,
-      commissionPaise: result.breakdown.commissionPaise,
+      amountCents: result.allocationCents,
+      commissionCents: result.breakdown.commissionCents,
       currency: result.currency,
       rulesVersion: result.rulesVersion,
     };
@@ -51,8 +51,8 @@ export class AllocationService {
     const matchesExisting = (existing: VendorPaymentAllocation): boolean =>
       existing.orderReference === expected.orderReference &&
       existing.vendorId === expected.vendorId &&
-      existing.amountPaise === expected.amountPaise &&
-      existing.commissionPaise === expected.commissionPaise &&
+      existing.amountCents === expected.amountCents &&
+      existing.commissionCents === expected.commissionCents &&
       existing.currency === expected.currency &&
       existing.rulesVersion === expected.rulesVersion;
 

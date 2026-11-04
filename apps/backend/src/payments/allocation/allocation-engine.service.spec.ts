@@ -7,10 +7,10 @@ describe('AllocationEngine', () => {
     model: 'PERCENTAGE',
     rate: 1500,
     feeBearer: 'PLATFORM',
-    feePaise: 50,
+    feeCents: 50,
     discountTreatment: 'BEFORE_COMMISSION',
     taxShippingAllocation: 'GROSS',
-    currency: 'INR',
+    currency: 'USD',
     activeFrom: new Date(),
     approved: true,
   });
@@ -18,25 +18,25 @@ describe('AllocationEngine', () => {
   const baseInput: AllocationInput = {
     orderReference: 'ORD-001',
     vendorId: 'V-100',
-    lineTotalPaise: 10000, // 100.00 INR
-    currency: 'INR',
+    lineTotalCents: 10000, // 100.00 USD
+    currency: 'USD',
     rulesVersion: approvedPolicy.rulesVersion,
   };
 
   it('single-vendor calculation with approved policy', () => {
     const r = calculateVendorAllocation(baseInput, approvedPolicy);
-    expect(r.allocationPaise).toBeGreaterThanOrEqual(0);
-    expect(r.grossLinePaise).toBe(10000);
+    expect(r.allocationCents).toBeGreaterThanOrEqual(0);
+    expect(r.grossLineCents).toBe(10000);
     expect(r.reconciliationStatus).toBe('MISSING_CAPTURE');
     expect(r.idempotencyKey).toHaveLength(64); // sha256 hex
   });
 
   it('multi-vendor order independent results', () => {
     const r1 = calculateVendorAllocation({ ...baseInput, vendorId: 'V-100' }, approvedPolicy);
-    const r2 = calculateVendorAllocation({ ...baseInput, vendorId: 'V-200', lineTotalPaise: 5000 }, approvedPolicy);
+    const r2 = calculateVendorAllocation({ ...baseInput, vendorId: 'V-200', lineTotalCents: 5000 }, approvedPolicy);
     expect(r1.vendorId).toBe('V-100');
     expect(r2.vendorId).toBe('V-200');
-    expect(r1.allocationPaise).not.toBe(r2.allocationPaise); // different gross
+    expect(r1.allocationCents).not.toBe(r2.allocationCents); // different gross
   });
 
   it('test-only approved policy accepted', () => {
@@ -50,45 +50,45 @@ describe('AllocationEngine', () => {
   });
 
   it('integer minor-unit arithmetic exact', () => {
-    const r = calculateVendorAllocation({ ...baseInput, lineTotalPaise: 3333 }, approvedPolicy);
-    const totalComponents = r.breakdown.commissionPaise + r.breakdown.feePaise + r.allocationPaise;
+    const r = calculateVendorAllocation({ ...baseInput, lineTotalCents: 3333 }, approvedPolicy);
+    const totalComponents = r.breakdown.commissionCents + r.breakdown.feeCents + r.allocationCents;
     expect(totalComponents).toBeLessThanOrEqual(3333);
   });
 
   it('deterministic rounding and remainder handling (not lost)', () => {
-    const r = calculateVendorAllocation({ ...baseInput, lineTotalPaise: 10001 }, approvedPolicy);
+    const r = calculateVendorAllocation({ ...baseInput, lineTotalCents: 10001 }, approvedPolicy);
     // Commission = round(10001 * 1500 / 10000) = round(1500.15) = 1500; fee=50; payable=9501
-    expect(r.breakdown.commissionPaise).toBe(1500);
-    expect(r.allocationPaise).toBeGreaterThanOrEqual(0);
+    expect(r.breakdown.commissionCents).toBe(1500);
+    expect(r.allocationCents).toBeGreaterThanOrEqual(0);
   });
 
   it('reconciliation when captured amount present', () => {
-    const r = calculateVendorAllocation({ ...baseInput, capturedAmountPaise: 10000 }, approvedPolicy);
+    const r = calculateVendorAllocation({ ...baseInput, capturedAmountCents: 10000 }, approvedPolicy);
     expect(r.reconciliationStatus).toBe('RECONCILED');
   });
 
   it('reconciliation mismatch when captured differs', () => {
-    const r = calculateVendorAllocation({ ...baseInput, capturedAmountPaise: 9999 }, approvedPolicy);
+    const r = calculateVendorAllocation({ ...baseInput, capturedAmountCents: 9999 }, approvedPolicy);
     expect(r.reconciliationStatus).toBe('AMOUNT_MISMATCH');
   });
 
   it('negative / invalid input rejected', () => {
-    expect(() => calculateVendorAllocation({ ...baseInput, lineTotalPaise: -10 }, approvedPolicy)).toThrow(/negative/);
+    expect(() => calculateVendorAllocation({ ...baseInput, lineTotalCents: -10 }, approvedPolicy)).toThrow(/negative/);
   });
 
   it('invalid currency rejected at policy validation', () => {
-    expect(() => validatePolicy({ ...approvedPolicy, currency: 'USD' })).toThrow(/currency/);
+    expect(() => validatePolicy({ ...approvedPolicy, currency: 'INR' as any })).toThrow(/must be USD/);
   });
 
   it('untrusted client totals ignored / not trusted (only server input used)', () => {
-    // Engine uses only the input lineTotalPaise; there's no separate client total to override.
+    // Engine uses only the input lineTotalCents; there's no separate client total to override.
     // Confirm result reflects the input exactly.
-    const r = calculateVendorAllocation({ ...baseInput, lineTotalPaise: 7777 }, approvedPolicy);
-    expect(r.grossLinePaise).toBe(7777);
+    const r = calculateVendorAllocation({ ...baseInput, lineTotalCents: 7777 }, approvedPolicy);
+    expect(r.grossLineCents).toBe(7777);
   });
 
   it('pending / failed / uncaptured payments rejected when capture required', () => {
-    // Without a capturedAmountPaise, reconciliation = MISSING_CAPTURE — acceptable for ledger creation.
+    // Without a capturedAmountCents, reconciliation = MISSING_CAPTURE — acceptable for ledger creation.
     // If a policy requires captured before finalization, this is the safeguard.
     const r = calculateVendorAllocation({ ...baseInput }, approvedPolicy);
     expect(r.reconciliationStatus).toBe('MISSING_CAPTURE');
@@ -153,32 +153,32 @@ describe('AllocationEngine', () => {
 
   it('persistence constraints validated by entity (not engine)', () => {
     // Confirm engine produces non-negative integers.
-    const r = calculateVendorAllocation({ ...baseInput, lineTotalPaise: 0 }, approvedPolicy);
-    expect(r.allocationPaise).toBeGreaterThanOrEqual(0);
-    expect(Number.isInteger(r.allocationPaise)).toBe(true);
+    const r = calculateVendorAllocation({ ...baseInput, lineTotalCents: 0 }, approvedPolicy);
+    expect(r.allocationCents).toBeGreaterThanOrEqual(0);
+    expect(Number.isInteger(r.allocationCents)).toBe(true);
   });
 
   it('fractional rounding boundary (half-paise rounds correctly with Math.round)', () => {
     // 0.015 INR = 1.5 paise -> Math.round(1.5) = 2 (positive half rounds up)
     const p = validatePolicy({ ...approvedPolicy, rate: 1000 }); // 10% basis
-    const r = calculateVendorAllocation({ ...baseInput, lineTotalPaise: 15 }, p);
+    const r = calculateVendorAllocation({ ...baseInput, lineTotalCents: 15 }, p);
     // 15 paise * 10% = 1.5 -> round to 2
-    expect(r.breakdown.commissionPaise).toBe(2);
+    expect(r.breakdown.commissionCents).toBe(2);
   });
 
   it('overflow / very large amount guarded by isFinite check', () => {
     // Explicit safe-boundary check: input must be finite integer within safe range.
     const huge = Number.MAX_SAFE_INTEGER;
     expect(Number.isFinite(huge)).toBe(true);
-    const result = calculateVendorAllocation({ ...baseInput, lineTotalPaise: huge }, approvedPolicy);
-    expect(result.grossLinePaise).toBe(huge);
-    expect(Number.isFinite(result.allocationPaise)).toBe(true);
+    const result = calculateVendorAllocation({ ...baseInput, lineTotalCents: huge }, approvedPolicy);
+    expect(result.grossLineCents).toBe(huge);
+    expect(Number.isFinite(result.allocationCents)).toBe(true);
   });
 
   it('regression for checkout / inventory / order lifecycle protected (engine independent)', () => {
     // Allocation does not modify inventory or order status.
     const r = calculateVendorAllocation(baseInput, approvedPolicy);
     expect(r.reconciliationStatus).toBe('MISSING_CAPTURE');
-    expect(r.grossLinePaise).toBe(10000);
+    expect(r.grossLineCents).toBe(10000);
   });
 });

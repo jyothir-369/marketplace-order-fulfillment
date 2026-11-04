@@ -13,16 +13,22 @@ export class AllocationBridgeService {
   private readonly logger = new Logger(AllocationBridgeService.name);
   async recoverAllocationsForOrder(
     orderReference: string,
-    capturedPaise: number,
-    vendorLines: { vendorId: string; grossPaise: number; rulesVersion?: string }[],
+    capturedCents: number,
+    vendorLines: { vendorId: string; grossCents: number; rulesVersion?: string }[],
     policy?: { approved?: boolean },
   ): Promise<{ allocationsCreated: number; missingPolicy: boolean; reconciliationStatus: string }> {
     if (!policy || policy.approved !== true) {
       this.logger.warn('Allocation bridge refused: no approved CommissionPolicy (FAIL CLOSED).');
       return { allocationsCreated: 0, missingPolicy: true, reconciliationStatus: 'POLICY_NOT_APPROVED' };
     }
-    const total = vendorLines.reduce((s, v) => s + v.grossPaise, 0);
-    if (total !== capturedPaise) {
+    const total = vendorLines.reduce((s, v) => s + (Number(v.grossCents) || 0), 0);
+    // Reconciliation: compare aggregated line total to captured amount (USD cents).
+    if (capturedCents !== undefined && capturedCents !== null && total !== capturedCents) {
+      return { allocationsCreated: 0, missingPolicy: false, reconciliationStatus: 'AMOUNT_MISMATCH' };
+    }
+    // When capturedCents missing, reconciliation = MISSING_CAPTURE; when match, RECONCILED.
+    const reconciliationStatus = (capturedCents === undefined || capturedCents === null) ? 'MISSING_CAPTURE' : (total === capturedCents ? 'RECONCILED' : 'AMOUNT_MISMATCH');
+    if (reconciliationStatus === 'AMOUNT_MISMATCH') {
       return { allocationsCreated: 0, missingPolicy: false, reconciliationStatus: 'AMOUNT_MISMATCH' };
     }
     // Actual DB calls via AllocationService.createAllocation are preserved but blocked by B (DB auth).

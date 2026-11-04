@@ -20,19 +20,19 @@ export class VendorPaymentAllocation {
   vendorId: string;
 
   @Column({ type: 'bigint' })
-  amountPaise: number;
+  amountCents: number;
 
   @Column({ type: 'bigint' })
-  commissionPaise: number;
+  commissionCents: number;
 
-  @Column({ type: 'varchar', length: 10, default: 'INR' })
+  @Column({ type: 'varchar', length: 10, default: 'USD' })
   currency: string;
 
   @Column({ type: 'varchar', length: 100 })
   rulesVersion: string;
 
   @Column({ type: 'bigint', nullable: true })
-  grossLinePaise: number | null;
+  grossLineCents: number | null;
 
   @Column({ type: 'varchar', length: 40, nullable: true })
   reconciliationStatus: string | null;
