@@ -46,7 +46,7 @@ describe('Migration registry/datasource reconciliation', () => {
   });
 
   it('retains all registered date-based migrations, including the customer-address correction', () => {
-    expect(MIGRATION_REGISTRY.filter((name) => /^2026/.test(name))).toHaveLength(18);
+    expect(MIGRATION_REGISTRY.filter((name) => /^2026/.test(name))).toHaveLength(19);
     expect(MIGRATION_REGISTRY).toContain('20261101-FixCustomerAddressDefaultColumn');
   });
 

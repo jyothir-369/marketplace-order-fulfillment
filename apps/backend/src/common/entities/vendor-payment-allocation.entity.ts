@@ -19,11 +19,11 @@ export class VendorPaymentAllocation {
   @Column({ type: 'varchar', length: 255 })
   vendorId: string;
 
-  @Column({ type: 'bigint' })
-  amountCents: number;
+  @Column({ name: 'amount_cents', type: 'bigint', nullable: true })
+  amountCents: number | null;
 
-  @Column({ type: 'bigint' })
-  commissionCents: number;
+  @Column({ name: 'commission_cents', type: 'bigint', nullable: true })
+  commissionCents: number | null;
 
   @Column({ type: 'varchar', length: 10, default: 'USD' })
   currency: string;
@@ -31,7 +31,7 @@ export class VendorPaymentAllocation {
   @Column({ type: 'varchar', length: 100 })
   rulesVersion: string;
 
-  @Column({ type: 'bigint', nullable: true })
+  @Column({ name: 'gross_line_cents', type: 'bigint', nullable: true })
   grossLineCents: number | null;
 
   @Column({ type: 'varchar', length: 40, nullable: true })

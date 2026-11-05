@@ -36,7 +36,7 @@ export const MIGRATION_REGISTRY = [
   '20261103-CategoryA-PromotionFundingApproval',
   '20261103-CategoryA-PromotionApprovedAt',
   '20261103-CategoryB-PromotionCheckoutSnapshot',
-  'CategoryCUSDBIntegerCentsAllocationSchema2026102800001', // Stage 0 additive: USD cents contract (no INR reinterpretation; existing rows preserved)
+  '20261104-CategoryC-USDIntegerCentsAllocationSchema',
 ];
 
 /* Idempotency check: 1710000000005 (categories applied, fulfillment pending) and 2026101300000 (vendor_applications created by 1749624000000; index + constraints pending). Duplicate suffixes are different schemas, not duplicate identities. */
@@ -46,5 +46,4 @@ export const DUPLICATE_TIMESTAMPS: string[] = [
 ];
 
 export const DEPLOYED_AUDIT_NOTE = `UNVERIFIED: deployed migration history must be independently reconciled before any migration write.`;
-
 
