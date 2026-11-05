@@ -139,7 +139,7 @@ jobs:
       CATALOG_REGRESSION_DB_USER: migrationtest
       CATALOG_REGRESSION_DB_PASSWORD: migrationtest
       ISOLATED_TEST_DB_HOST: 127.0.0.1
-      ISOLATED_TEST_DB_PORT: "55439"
+      ISOLATED_TEST_DB_PORT: "5435"
       ISOLATED_TEST_DB_NAME: marketplace_migration_constraints_test
       ISOLATED_TEST_DB_USER: migrationtest
       ISOLATED_TEST_DB_PASSWORD: migrationtest
@@ -148,6 +148,7 @@ jobs:
       MIGRATION_TEST_DB_NAME: marketplace_migration_constraints_test
       MIGRATION_TEST_DB_USER: migrationtest
       MIGRATION_TEST_DB_PASSWORD: migrationtest
+      MIGRATION_TEST_DATABASE_URL: postgresql://migrationtest:migrationtest@127.0.0.1:55439/marketplace_migration_test
 
     steps:
       - name: Checkout code
@@ -203,7 +204,7 @@ jobs:
           psql -h 127.0.0.1 -p 55441 -U migrationtest -d postgres \
             -v ON_ERROR_STOP=1 -c "CREATE DATABASE ${db_atomic}"
 
-          echo "MIGRATION_TEST_DATABASE_URL=postgresql://migrationtest:migrationtest@127.0.0.1:55441/${db_existing}" >> "$GITHUB_ENV"
+          echo "CATEGORY_A_MIGRATION_DATABASE_URL=postgresql://migrationtest:migrationtest@127.0.0.1:55441/${db_existing}" >> "$GITHUB_ENV"
           echo "MIGRATION_3A_TEST_DATABASE_URL=postgresql://migrationtest:migrationtest@127.0.0.1:55441/${db_verified_3a}" >> "$GITHUB_ENV"
           echo "MIGRATION_EXISTING_SCHEMA_TEST_DATABASE_URL=postgresql://migrationtest:migrationtest@127.0.0.1:55441/${db_verified_existing}" >> "$GITHUB_ENV"
           echo "MIGRATION_INTEGRATION_DATABASE_URL=postgresql://migrationtest:migrationtest@127.0.0.1:55441/${db_integration}" >> "$GITHUB_ENV"
