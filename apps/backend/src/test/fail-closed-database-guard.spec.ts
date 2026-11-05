@@ -2,7 +2,7 @@ import { assertFailClosedDatabase, assertFailClosedDatabaseFromUrl } from './fai
 
 const safeTarget = {
   host: '127.0.0.1',
-  port: 5435,
+  port: 55439,
   database: 'marketplace_migration_test',
   url: '',
 };
@@ -12,8 +12,8 @@ describe('Fail-closed database guard', () => {
     expect(() => assertFailClosedDatabase(safeTarget)).not.toThrow();
   });
 
-  it('allows MIGRATION_TEST_DATABASE_URL with correct values', () => {
-    const url = 'postgres://reconcile_test@127.0.0.1:5435/marketplace_migration_test';
+  it('requires a 55439 loopback URL (port 5435 is reserved for constraints test)', () => {
+    const url = 'postgres://reconcile_test@127.0.0.1:55439/marketplace_migration_test';
     expect(() => assertFailClosedDatabaseFromUrl(url)).not.toThrow();
   });
 

@@ -3,7 +3,7 @@ import { assertFailClosedDatabase, assertFailClosedDatabaseFromUrl } from './fai
 describe('Database-target guards (false-positive / non-loopback protection)', () => {
   it('rejects production database URL via assertFailClosedDatabase (url field)', () => {
     expect(() => assertFailClosedDatabase({
-      host: '127.0.0.1', port: 5435, database: 'marketplace_migration_test',
+      host: '127.0.0.1', port: 55439, database: 'marketplace_migration_test',
       url: 'postgresql://postgres@aws-0-ap-south-1.pooler.supabase.com:6543/marketplace',
     })).toThrow(/BLOCKED/);
   });
@@ -25,9 +25,9 @@ describe('Database-target guards (false-positive / non-loopback protection)', ()
   });
 
   it('allows only authorized isolated-test user for migration URL', () => {
-    // The CI fix aligned user to migrationtest; guard must allow it.
+    // The CI fix aligned port to 55439; guard must allow it.
     expect(() => assertFailClosedDatabaseFromUrl(
-      'postgresql://migrationtest:migrationtest@127.0.0.1:5435/marketplace_migration_test'
+      'postgresql://migrationtest:migrationtest@127.0.0.1:55439/marketplace_migration_test'
     )).not.toThrow();
   });
 });

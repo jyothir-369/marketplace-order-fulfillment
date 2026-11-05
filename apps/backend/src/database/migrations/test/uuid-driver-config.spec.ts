@@ -13,7 +13,7 @@ describe('TypeORM PostgreSQL UUID driver config', () => {
 
   beforeAll(() => {
     process.env.MIGRATION_TEST_DATABASE_URL =
-      'postgresql://migrationtest:pass@127.0.0.1:5435/marketplace_migration_test';
+      'postgresql://migrationtest:pass@127.0.0.1:55439/marketplace_migration_test';
 
     for (const key of [
       'DATABASE_URL', 'DB_HOST', 'DB_PORT',

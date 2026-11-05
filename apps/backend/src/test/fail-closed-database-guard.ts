@@ -1,6 +1,6 @@
 // Fail-closed guard for the dedicated local reconciliation test database only.
 const ALLOWED_HOSTS = new Set(['localhost', '127.0.0.1']);
-const ALLOWED_PORT = 5435;
+const ALLOWED_PORTS = new Set([55439]);
 const ALLOWED_DATABASE = 'marketplace_migration_test';
 
 export function assertFailClosedDatabase(config: {
@@ -36,8 +36,8 @@ export function assertFailClosedDatabase(config: {
     throw new Error('BLOCKED: migration database must use a loopback host');
   }
 
-  if (config.port !== ALLOWED_PORT) {
-    throw new Error(`BLOCKED: migration database port must be ${ALLOWED_PORT}`);
+  if (!ALLOWED_PORTS.has(config.port)) {
+    throw new Error(`BLOCKED: migration database port must be one of ${[...ALLOWED_PORTS].join(', ')}`);
   }
 
   if (config.database !== ALLOWED_DATABASE) {
@@ -62,8 +62,9 @@ export function assertFailClosedDatabaseFromUrl(url: string): void {
     if (parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') {
       throw new Error('BLOCKED: MIGRATION_TEST_DATABASE_URL must target loopback (localhost/127.0.0.1)');
     }
-    if (parsed.port !== String(ALLOWED_PORT)) {
-      throw new Error(`BLOCKED: MIGRATION_TEST_DATABASE_URL port must be ${ALLOWED_PORT}`);
+    const portNum = parseInt(parsed.port, 10);
+    if (!ALLOWED_PORTS.has(portNum)) {
+      throw new Error(`BLOCKED: MIGRATION_TEST_DATABASE_URL port must be one of ${[...ALLOWED_PORTS].join(', ')}`);
     }
     const dbFromUrl = parsed.pathname && parsed.pathname.startsWith('/')
       ? parsed.pathname.slice(1) || undefined

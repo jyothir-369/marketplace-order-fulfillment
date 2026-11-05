@@ -41,7 +41,10 @@ export function parseMigrationTestDbUrl(): { host: string; port: number; usernam
     try { parsed = new URL(url); } catch (e: any) { throw new Error('FAIL-CLOSED: malformed URL: ' + (e && e.message ? e.message : String(e))); }
     if (parsed.protocol !== 'postgresql:' && parsed.protocol !== 'postgres:') { throw new Error('FAIL-CLOSED: protocol invalid'); }
     if (!['localhost','127.0.0.1'].includes(parsed.hostname)) { throw new Error('FAIL-CLOSED: host invalid'); }
-    if (parsed.port !== '5435') { throw new Error('FAIL-CLOSED: port must be 5435'); }
+    // Migration-test DB (marketplace_migration_test) must target loopback port 55439.
+    // Port 5435 is reserved for marketplace_migration_constraints_test (see vendor-user-constraints.spec.ts),
+    // which bypasses the migration datasource guard and manages its own fail-closed checks.
+    if (!['55439'].includes(parsed.port)) { throw new Error('FAIL-CLOSED: port must be 55439'); }
     if (parsed.pathname === '/' || !parsed.pathname || parsed.pathname === '') { throw new Error('FAIL-CLOSED: database missing'); }
     const segments = parsed.pathname.slice(1).split('/');
     if (segments.length !== 1 || segments[0] !== 'marketplace_migration_test') { throw new Error('FAIL-CLOSED: database must be marketplace_migration_test'); }
@@ -52,7 +55,7 @@ export function parseMigrationTestDbUrl(): { host: string; port: number; usernam
     if (username === '') { throw new Error('FAIL-CLOSED: username missing'); }
     return {
       host: parsed.hostname,
-      port: parseInt(parsed.port, 10) || 5435,
+      port: parseInt(parsed.port, 10) || 55439,
       username: decodeURIComponent(username),
       password: decodeURIComponent(password),
       database: 'marketplace_migration_test',
