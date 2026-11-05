@@ -70,6 +70,9 @@ describe('RazorpayInitiationService — behavioral tests', () => {
     };
 
     manager = {
+      getRepository: jest.fn(() => ({
+        find: jest.fn().mockResolvedValue([]),
+      })),
       query: jest.fn(async (sql: string) => {
         if (sql.includes('pg_advisory_xact_lock')) return [];
         if (sql.includes('FROM payment_authorizations')) return [];

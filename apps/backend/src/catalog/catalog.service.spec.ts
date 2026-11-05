@@ -3,6 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository, SelectQueryBuilder, OptimisticLockVersionMismatchError } from 'typeorm';
 import { CatalogService } from './catalog.service';
 import { Product } from '../common/entities/product.entity';
+import { Promotion } from '../common/entities/promotion.entity';
 import { Category } from '../common/entities/category.entity';
 import { Vendor } from '../common/entities/vendor.entity';
 import { Order } from '../common/entities/order.entity';
@@ -120,6 +121,7 @@ describe('CatalogService', () => {
         { provide: getRepositoryToken(Category), useValue: categoryRepo },
         { provide: getRepositoryToken(OrderLineItem), useValue: lineItemRepo },
         { provide: getRepositoryToken(Order), useValue: orderRepo },
+        { provide: getRepositoryToken(Promotion), useValue: { find: jest.fn().mockResolvedValue([]) } },
         { provide: getRepositoryToken(Review), useValue: reviewRepo },
       ],
     }).compile();

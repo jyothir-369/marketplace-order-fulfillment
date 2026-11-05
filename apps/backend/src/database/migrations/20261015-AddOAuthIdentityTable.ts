@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddOAuthIdentityTable2026101500001 implements MigrationInterface {
-  name = 'AddOAuthIdentityTable2026101500001';
+export class AddOAuthIdentityTable1792022400002 implements MigrationInterface {
+  name = 'AddOAuthIdentityTable1792022400002';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`

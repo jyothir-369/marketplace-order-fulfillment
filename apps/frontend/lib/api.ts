@@ -32,6 +32,9 @@ import type {
   CatalogListResponse,
   ReviewListResponse,
   CreateReviewDto,
+  CreatePromotionDto,
+  UpdatePromotionDto,
+  PromotionDto,
 } from "@/lib/types";
 import { getAccessToken } from "@/lib/auth-token";
 
@@ -775,4 +778,17 @@ export async function getAdminCustomers(opts?:{limit?:number;offset?:number;sear
   const params = new URLSearchParams({ limit: String(opts?.limit ?? 20), offset: String(opts?.offset ?? 0) });
   if (opts?.search) params.set("search", opts.search);
   return apiFetch<{total:number;customers:any[]}>("/admin/customers?" + params.toString());
+}
+// Promotion typed API methods (Phase 1 — vendor-scoped, authenticated via apiFetch)
+export async function getVendorPromotions(): Promise<{ promotions: PromotionDto[] }> {
+  return apiFetch<{ promotions: PromotionDto[] }>("/vendor/promotions");
+}
+export async function createPromotion(payload: CreatePromotionDto): Promise<PromotionDto> {
+  return apiFetch<PromotionDto>("/vendor/promotions", { method: "POST", body: JSON.stringify(payload) });
+}
+export async function updatePromotion(id: string, payload: UpdatePromotionDto): Promise<PromotionDto> {
+  return apiFetch<PromotionDto>(`/vendor/promotions/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+export async function deletePromotion(id: string): Promise<{ message: string }> {
+  return apiFetch<{ message: string }>(`/vendor/promotions/${id}`, { method: "DELETE" });
 }

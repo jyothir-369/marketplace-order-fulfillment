@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pause, Play, RefreshCw } from "lucide-react";
@@ -261,7 +261,14 @@ function VendorOrdersInner() {
                       </ul>
                     </td>
                     <td className="p-3 text-right tabular-nums text-[var(--color-foreground)]">
-                      {order.totalAmount.toFixed(2)}
+                      <div className="flex flex-col items-end gap-0.5">
+                        <span className="font-medium">{order.totalAmount.toFixed(2)}</span>
+                        {(order as typeof order & { snapshot?: { savings?: number } }).snapshot && (
+                          <span className="text-[10px] text-[var(--color-muted-foreground)] tabular-nums">
+                            savings {(((order as typeof order & { snapshot?: { savings?: number } }).snapshot as any)?.savings ?? 0).toFixed(2)}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="p-3 text-xs text-[var(--color-muted-foreground)]">
                       {new Date(order.createdAt).toLocaleString()}
@@ -330,3 +337,4 @@ export default function VendorOrdersPage() {
     </ToastProvider>
   );
 }
+

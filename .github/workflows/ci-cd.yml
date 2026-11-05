@@ -116,6 +116,20 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+      postgres-vendor-constraints:
+        image: postgres:16-alpine
+        command: ["postgres", "-c", "port=5435"]
+        env:
+          POSTGRES_USER: migrationtest
+          POSTGRES_PASSWORD: migrationtest
+          POSTGRES_DB: marketplace_migration_constraints_test
+        ports:
+          - 5435:5435
+        options: >-
+          --health-cmd "pg_isready -h 127.0.0.1 -p 5435 -U migrationtest -d marketplace_migration_constraints_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
 
       MIGRATION_E2E_DATABASE_URL: postgresql://e2euser:e2epass@localhost:55440/marketplace_migration_e2e_tmp
@@ -130,7 +144,7 @@ jobs:
       ISOLATED_TEST_DB_USER: migrationtest
       ISOLATED_TEST_DB_PASSWORD: migrationtest
       MIGRATION_TEST_DB_HOST: 127.0.0.1
-      MIGRATION_TEST_DB_PORT: "55439"
+      MIGRATION_TEST_DB_PORT: "5435"
       MIGRATION_TEST_DB_NAME: marketplace_migration_constraints_test
       MIGRATION_TEST_DB_USER: migrationtest
       MIGRATION_TEST_DB_PASSWORD: migrationtest
@@ -170,19 +184,32 @@ jobs:
         run: |
           set -euo pipefail
 
-          suffix="$(date -u +%Y%m%d%H%M%S)"
-          db_existing="cat3verify_${suffix}"
-          db_verified="cat3verify_$(date -u -d '+1 second' +%Y%m%d%H%M%S)"
+          suffix="$(date -u +%Y%m%d%H%M%S)_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          db_existing="category_a_migration_${suffix}"
+          db_verified_3a="cat3verify_$(date -u +%Y%m%d%H%M%S)"
+          sleep 1
+          db_verified_existing="cat3verify_$(date -u +%Y%m%d%H%M%S)"
+          db_integration="migration_integration_${suffix}"
+          db_atomic="category_a_integration_${suffix}"
 
           psql -h 127.0.0.1 -p 55441 -U migrationtest -d postgres \
             -v ON_ERROR_STOP=1 -c "CREATE DATABASE ${db_existing}"
           psql -h 127.0.0.1 -p 55441 -U migrationtest -d postgres \
-            -v ON_ERROR_STOP=1 -c "CREATE DATABASE ${db_verified}"
+            -v ON_ERROR_STOP=1 -c "CREATE DATABASE ${db_verified_3a}"
+          psql -h 127.0.0.1 -p 55441 -U migrationtest -d postgres \
+            -v ON_ERROR_STOP=1 -c "CREATE DATABASE ${db_verified_existing}"
+          psql -h 127.0.0.1 -p 55441 -U migrationtest -d postgres \
+            -v ON_ERROR_STOP=1 -c "CREATE DATABASE ${db_integration}"
+          psql -h 127.0.0.1 -p 55441 -U migrationtest -d postgres \
+            -v ON_ERROR_STOP=1 -c "CREATE DATABASE ${db_atomic}"
 
           echo "MIGRATION_TEST_DATABASE_URL=postgresql://migrationtest:migrationtest@127.0.0.1:55441/${db_existing}" >> "$GITHUB_ENV"
-          echo "MIGRATION_3A_TEST_DATABASE_URL=postgresql://migrationtest:migrationtest@127.0.0.1:55441/${db_verified}" >> "$GITHUB_ENV"
+          echo "MIGRATION_3A_TEST_DATABASE_URL=postgresql://migrationtest:migrationtest@127.0.0.1:55441/${db_verified_3a}" >> "$GITHUB_ENV"
+          echo "MIGRATION_EXISTING_SCHEMA_TEST_DATABASE_URL=postgresql://migrationtest:migrationtest@127.0.0.1:55441/${db_verified_existing}" >> "$GITHUB_ENV"
+          echo "MIGRATION_INTEGRATION_DATABASE_URL=postgresql://migrationtest:migrationtest@127.0.0.1:55441/${db_integration}" >> "$GITHUB_ENV"
+          echo "ADMIN_PROMOTION_ATOMIC_DATABASE_URL=postgresql://migrationtest:migrationtest@127.0.0.1:55441/${db_atomic}" >> "$GITHUB_ENV"
 
-          echo "Created isolated migration databases: ${db_existing}, ${db_verified}"
+          echo "Created isolated migration databases: ${db_existing}, ${db_verified_3a}, ${db_verified_existing}, ${db_integration}, ${db_atomic}"
 
       - name: Provision catalog regression schema and fixtures
         working-directory: apps/backend

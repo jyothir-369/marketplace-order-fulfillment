@@ -12,6 +12,7 @@ import {
   FulfillmentStatus,
 } from '../common/entities/order-line-item.entity';
 import { Product } from '../common/entities/product.entity';
+import { Promotion } from '../common/entities/promotion.entity';
 import {
   PaymentAuthorization,
   PaymentStatus,
@@ -170,23 +171,39 @@ export class RazorpayInitiationService {
         lockedProducts.set(id, product);
       }
 
+      // Server-authoritative promotion lookup per product (vendor-scoped, non-stacking, UTC-date valid).
+      const checkoutPromotionsRepo = manager.getRepository(Promotion);
+
       let amountPaise = 0;
 
       for (const item of normalizedItems) {
         const product = lockedProducts.get(item.productId)!;
-        const unitPaise = Math.round(Number(product.price) * 100);
+        const pricePaise = Math.round(Number(product.price) * 100);
 
-        if (!Number.isSafeInteger(unitPaise) || unitPaise < 0) {
-          throw new BadRequestException('Invalid product price.');
+        // Compute promotion-adjusted price from DB promotions (not client input).
+        let discountPercent: number | null = null;
+        if (product.vendorId) {
+          const promos = await checkoutPromotionsRepo.find({
+            where: { vendorId: product.vendorId, isActive: true },
+          });
+          const now = new Date();
+          const validPromo = promos
+            .filter((p) => {
+              const start = p.startDate ? new Date(p.startDate) : null;
+              const end = p.endDate ? new Date(p.endDate) : null;
+              return (!start || start <= now) && (!end || end >= now);
+            })
+            .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] ?? null;
+          if (validPromo) discountPercent = Number(validPromo.discountPercent);
         }
+        const effectivePaise = discountPercent !== null
+          ? Math.round(pricePaise * (1 - discountPercent / 100))
+          : pricePaise;
+        const lineAmountPaise = effectivePaise * item.quantity;
 
-        if (Number(product.stockCount) < item.quantity) {
-          throw new ConflictException(
-            `Insufficient stock for ${product.name}.`,
-          );
+        if (!Number.isSafeInteger(effectivePaise) || effectivePaise < 0) {
+          throw new BadRequestException('Invalid computed product price.');
         }
-
-        const lineAmountPaise = unitPaise * item.quantity;
 
         if (!Number.isSafeInteger(lineAmountPaise) || lineAmountPaise < 0) {
           throw new BadRequestException('Cart line amount overflow or invalid.');
@@ -194,6 +211,12 @@ export class RazorpayInitiationService {
 
         if (amountPaise > Number.MAX_SAFE_INTEGER - lineAmountPaise) {
           throw new BadRequestException('Cart total overflow or invalid.');
+        }
+
+        if (Number(product.stockCount) < item.quantity) {
+          throw new ConflictException(
+            `Insufficient stock for ${product.name}.`,
+          );
         }
 
         amountPaise += lineAmountPaise;
@@ -251,11 +274,40 @@ export class RazorpayInitiationService {
 
       const lineItems: OrderLineItem[] = [];
 
+      // Save promotion snapshot into order line items for immutability.
+      const promotionsRepo = manager.getRepository(Promotion);
+
       for (const item of normalizedItems) {
         const product = lockedProducts.get(item.productId)!;
-        const unitPaise = Math.round(Number(product.price) * 100);
-        const unitPrice = unitPaise / 100;
-        const lineTotal = (unitPaise * item.quantity) / 100;
+        const pricePaise = Math.round(Number(product.price) * 100);
+
+        // Recompute promotion (authoritative server-side; never trust client price/discount).
+        let discountPercent: number | null = null;
+        let promotionId: string | null = null;
+        let promotionDiscountPercent: number | null = null;
+        if (product.vendorId) {
+          const promos = await promotionsRepo.find({
+            where: { vendorId: product.vendorId, isActive: true },
+          });
+          const nowLine = new Date();
+          const validPromo = promos
+            .filter((p) => {
+              const start = p.startDate ? new Date(p.startDate) : null;
+              const end = p.endDate ? new Date(p.endDate) : null;
+              return (!start || start <= nowLine) && (!end || end >= nowLine);
+            })
+            .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] ?? null;
+          if (validPromo) {
+            discountPercent = Number(validPromo.discountPercent);
+            promotionId = validPromo.id;
+            promotionDiscountPercent = Number(validPromo.discountPercent);
+          }
+        }
+        const effectivePaise = discountPercent !== null
+          ? Math.round(pricePaise * (1 - discountPercent / 100))
+          : pricePaise;
+        const unitPrice = effectivePaise / 100;
+        const lineTotal = (effectivePaise * item.quantity) / 100;
         const previousStock = Number(product.stockCount);
         const nextStock = previousStock - item.quantity;
 
@@ -281,6 +333,9 @@ export class RazorpayInitiationService {
             quantity: item.quantity,
             unitPrice,
             lineTotal,
+            promotionId,
+            promotionDiscountPercent,
+            effectiveUnitPrice: unitPrice,
             fulfillmentStatus: FulfillmentStatus.PENDING,
           }),
         );

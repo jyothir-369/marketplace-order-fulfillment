@@ -29,8 +29,18 @@ export interface ProductDto {
   vendorName: string;
   category: string | null;
   isActive: boolean;
-  description?: string | null;
-  images?: string[] | null;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
+  description: string | null;
+  images: string[] | null;
+  originalPrice?: number;
+  effectivePrice?: number;
+  promotionId?: string | null;
+  discountPercent?: number | null;
+  savings?: number;
+  promotionTitle?: string | null;
+  promotionEndDate?: string | Date | null;
+  promotionValid?: boolean;
 }
 
 export interface CreateProductDto {
@@ -285,6 +295,37 @@ export interface AdminAuditLogDto {
   createdAt: IsoDateTime;
 }
 
+export interface PromotionDto {
+  id: Uuid;
+  title: string;
+  description: string | null;
+  discountPercent: number;
+  isActive: boolean;
+  startDate: IsoDateTime | null;
+  endDate: IsoDateTime | null;
+  vendorId: Uuid;
+  createdAt: IsoDateTime;
+  updatedAt: IsoDateTime;
+}
+
+export interface CreatePromotionDto {
+  title: string;
+  description?: string | null;
+  discountPercent: number;
+  isActive?: boolean;
+  startDate?: string | null;
+  endDate?: string | null;
+}
+
+export interface UpdatePromotionDto {
+  title?: string;
+  description?: string | null;
+  discountPercent?: number;
+  isActive?: boolean;
+  startDate?: string | null;
+  endDate?: string | null;
+}
+
 export interface AdminAuditLogResponseDto {
   total: number;
   logs: AdminAuditLogDto[];
@@ -487,3 +528,4 @@ export interface CustomerDto {
   orderCount: number;
   totalSpend?: number;
 }
+

@@ -13,25 +13,25 @@ export class VendorPayoutsService {
     @InjectRepository(PaymentTransfer) private transRepo: Repository<PaymentTransfer>,
   ) {}
 
-  async getAllocations(vendorId: string): Promise<{ allocations: any[]; totalPaise: number; commissionPaise: number; message: string }> {
+  async getAllocations(vendorId: string): Promise<{ allocations: any[]; totalCents: number; commissionCents: number; message: string }> {
     const allocations = await this.allocRepo.find({
       where: { vendorId },
       order: { createdAt: 'DESC' },
     });
-    const totalPaise = allocations.reduce((s, a) => s + (a.amountPaise || 0), 0);
-    const totalCommission = allocations.reduce((s, a) => s + (a.commissionPaise || 0), 0);
+    const totalCents = allocations.reduce((s, a) => s + (a.amountCents || 0), 0);
+    const totalCommission = allocations.reduce((s, a) => s + (a.commissionCents || 0), 0);
     return {
       allocations: allocations.map(a => ({
         id: a.id,
         orderReference: a.orderReference,
-        amountPaise: a.amountPaise,
-        commissionPaise: a.commissionPaise,
+        amountCents: a.amountCents,
+        commissionCents: a.commissionCents,
         currency: a.currency,
         rulesVersion: a.rulesVersion,
         createdAt: a.createdAt,
       })),
-      totalPaise,
-      commissionPaise: totalCommission,
+      totalCents,
+      commissionCents: totalCommission,
       message: allocations.length ? 'Real persisted allocations' : 'No allocations yet — allocation creation requires captured payment + approved §9 policy.',
     };
   }

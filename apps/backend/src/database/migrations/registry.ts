@@ -32,6 +32,11 @@ export const MIGRATION_REGISTRY = [
   '20261029-CreateRefundDisputeTables',
   '20261030-AddUserBioColumn',
   '20261101-FixCustomerAddressDefaultColumn',
+  '20261101-Phase3-AddPromotionSnapshotColumns',
+  '20261103-CategoryA-PromotionFundingApproval',
+  '20261103-CategoryA-PromotionApprovedAt',
+  '20261103-CategoryB-PromotionCheckoutSnapshot',
+  'CategoryCUSDBIntegerCentsAllocationSchema2026102800001', // Stage 0 additive: USD cents contract (no INR reinterpretation; existing rows preserved)
 ];
 
 /* Idempotency check: 1710000000005 (categories applied, fulfillment pending) and 2026101300000 (vendor_applications created by 1749624000000; index + constraints pending). Duplicate suffixes are different schemas, not duplicate identities. */
@@ -40,5 +45,6 @@ export const DUPLICATE_TIMESTAMPS: string[] = [
   '2026101300000', // Different operations (vendor user constraints vs partial unique pending-applicant index). Not duplicate identities — both preserved.
 ];
 
-export const DEPLOYED_AUDIT_NOTE = `15 applied migrations confirmed; pending: AddFulfillmentOperationRecord1710000000005, AddVendorApplicationTable1749624000000, AddPartialUniquePendingApplicantIndex2026101300000, AddVendorUserConstraints2026101300000. Preflight counts (vendor constraints): 0.`;
+export const DEPLOYED_AUDIT_NOTE = `UNVERIFIED: deployed migration history must be independently reconciled before any migration write.`;
+
 

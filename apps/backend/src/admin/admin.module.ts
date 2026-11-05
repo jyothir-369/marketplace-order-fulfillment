@@ -19,18 +19,21 @@ import { FulfillmentModule } from '../fulfillment/fulfillment.module';
 import { AuthModule } from '../auth/auth.module';
 import { PaymentsModule } from '../payments/payments.module';
 import { AdminPaymentsController } from './payments/admin-payments.controller';
+import { Promotion } from '../common/entities/promotion.entity';
+import { AdminPromotionController } from '../vendor/admin-promotion.controller';
+import { AdminPromotionService } from '../vendor/admin-promotion.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Order, OrderLineItem, VendorSyncJob, AuditLog, User, Vendor, VendorApplication, Product, Refund, Dispute]),
+    TypeOrmModule.forFeature([Order, OrderLineItem, VendorSyncJob, AuditLog, User, Vendor, VendorApplication, Product, Refund, Dispute, Promotion]),
     AuditModule,
     AuthModule,
     OrdersModule,
     FulfillmentModule,
     PaymentsModule,
   ],
-  controllers: [AdminController, AdminCustomersController, AdminPaymentsController],
-  providers: [AdminService],
-  exports: [AdminService],
+  controllers: [AdminController, AdminCustomersController, AdminPaymentsController, AdminPromotionController],
+  providers: [AdminService, AdminPromotionService],
+  exports: [AdminService, AdminPromotionService],
 })
 export class AdminModule {}

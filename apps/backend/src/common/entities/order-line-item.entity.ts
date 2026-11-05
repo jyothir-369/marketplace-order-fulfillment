@@ -58,6 +58,14 @@ export class OrderLineItem {
 
   @Column({ type: 'decimal', precision: 12, scale: 2 })
   lineTotal: number;
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true, name: 'effective_unit_price' })
+  effectiveUnitPrice: number | null;
+
+  @Column({ type: 'uuid', nullable: true, name: 'promotion_id' })
+  promotionId: string | null;
+
+  @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true, name: 'promotion_discount_percent' })
+  promotionDiscountPercent: number | null;
 
   @Column({
     type: 'enum',

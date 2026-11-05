@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * lib/auth-context.tsx — AuthProvider + useAuth() (Phase 1).
  *

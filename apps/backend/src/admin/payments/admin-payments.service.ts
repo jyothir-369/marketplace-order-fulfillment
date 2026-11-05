@@ -25,7 +25,7 @@ export class AdminPaymentsService {
     const transfers = await this.transRepo.find({ where: { vendorId: filters?.vendorId || undefined }, order: { createdAt: 'DESC' } });
     const accounts = await this.acctRepo.find({ order: { vendorId: 'ASC' } });
     return {
-      allocations: allocations.map(a => ({ id: a.id, vendorId: a.vendorId, orderReference: a.orderReference, amountPaise: a.amountPaise, commissionPaise: a.commissionPaise, currency: a.currency, rulesVersion: a.rulesVersion, createdAt: a.createdAt })),
+      allocations: allocations.map(a => ({ id: a.id, vendorId: a.vendorId, orderReference: a.orderReference, amountCents: a.amountCents, commissionCents: a.commissionCents, currency: a.currency, rulesVersion: a.rulesVersion, createdAt: a.createdAt })),
       transfers: transfers.map(t => ({ id: t.id, vendorId: t.vendorId, orderReference: t.orderReference, amountPaise: t.amountPaise, state: t.state || 'PENDING', providerTransferId: t.providerTransferId || null, attempts: t.attempts || 0, createdAt: t.createdAt, updatedAt: t.updatedAt })),
       accountStatus: accounts.map(ac => ({ vendorId: ac.vendorId, onboardingState: ac.onboardingState, linkedAccountId: ac.linkedAccountId, provider: ac.provider })),
       message: allocations.length || transfers.length || accounts.length ? 'Real persisted records retrieved' : 'No records — requires captured payments + approved §9 rules + DB authorization.',

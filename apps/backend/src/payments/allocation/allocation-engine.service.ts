@@ -3,8 +3,8 @@ import { CommissionPolicy, validatePolicy, PolicyValidationError } from './commi
 export interface AllocationInput {
   orderReference: string;
   vendorId: string;
-  lineTotalPaise: number; // gross line total in minor units (positive integer)
-  capturedAmountPaise?: number; // authoritative captured payment amount for reconciliation
+  lineTotalCents: number; // gross line total in USD cents (positive safe integer)
+  capturedAmountCents?: number; // authoritative captured payment for reconciliation
   currency: string;
   rulesVersion: string;
   vendorAccountState?: string; // e.g., ACTIVE / PENDING / SUSPENDED (Phase 2)
@@ -12,14 +12,14 @@ export interface AllocationInput {
 }
 
 export interface AllocationBreakdown {
-  grossLinePaise: number;
-  discountPaise?: number;
-  taxPaise?: number;
-  shippingPaise?: number;
-  commissionPaise: number;
-  feePaise: number;
-  vendorPayablePaise: number;
-  platformNetPaise: number;
+  grossLineCents: number;
+  discountCents?: number;
+  taxCents?: number;
+  shippingCents?: number;
+  commissionCents: number;
+  feeCents: number;
+  vendorPayableCents: number;
+  platformNetCents: number;
 }
 
 export interface AllocationResult {
@@ -27,9 +27,9 @@ export interface AllocationResult {
   vendorId: string;
   currency: string;
   rulesVersion: string;
-  grossLinePaise: number;
+  grossLineCents: number;
   breakdown: AllocationBreakdown;
-  allocationPaise: number; // vendorPayablePaise
+  allocationCents: number; // vendorPayableCents
   reconciliationStatus: 'RECONCILED' | 'MISSING_CAPTURE' | 'AMOUNT_MISMATCH';
   snapshot: string;
   idempotencyKey: string;
@@ -42,10 +42,11 @@ export class AllocationCalculationError extends Error {
   }
 }
 
-function toPaise(value: number): number {
-  const rounded = Math.round(Number(value) * 100);
+function toCents(value: number): number {
+  const rounded = Math.round(Number(value));
   if (!Number.isFinite(rounded)) throw new AllocationCalculationError('overflow', `Non-finite value: ${value}`);
   if (rounded < 0) throw new AllocationCalculationError('negative', `Negative value not allowed: ${value}`);
+  if (!Number.isSafeInteger(rounded)) throw new AllocationCalculationError('unsafe_integer', `Value is not a safe integer: ${value}`);
   return rounded;
 }
 
@@ -73,60 +74,69 @@ export function calculateVendorAllocation(
   }
 
   // Trust only server-side inputs; reject untrusted/missing totals.
-  if (input.lineTotalPaise === undefined || input.lineTotalPaise === null) {
-    throw new AllocationCalculationError('missing_input', 'lineTotalPaise required');
+  if (input.lineTotalCents === undefined || input.lineTotalCents === null) {
+    throw new AllocationCalculationError('missing_input', 'lineTotalCents required');
   }
-  if (!Number.isInteger(Number(input.lineTotalPaise)) || input.lineTotalPaise < 0) {
-    throw new AllocationCalculationError('invalid_line_total', `lineTotalPaise must be non-negative integer; got ${input.lineTotalPaise}`);
+  if (!Number.isSafeInteger(input.lineTotalCents) || input.lineTotalCents < 0) {
+    throw new AllocationCalculationError('invalid_line_total', `lineTotalCents must be non-negative safe integer; got ${input.lineTotalCents}`);
+  }
+  // Reject non-integer or unsafe amounts; also enforce USD-cents context (positive safe integer only).
+  if (typeof input.lineTotalCents !== 'number' || !Number.isInteger(input.lineTotalCents)) {
+    throw new AllocationCalculationError('invalid_line_total', `lineTotalCents must be integer USD cents; got ${input.lineTotalCents}`);
   }
 
-  const gross = input.lineTotalPaise;
+  const gross = input.lineTotalCents;
 
   // Commission arithmetic in integer minor units.
-  let commissionPaise = 0;
+  let commissionCents = 0;
   if (p.model === 'PERCENTAGE') {
     // rate expressed as basis points (e.g., 1500 = 15.00%) for deterministic integer arithmetic
-    commissionPaise = Math.round((gross * (p.rate || 0)) / 10000);
+    const rateBps = p.rate || 0;
+    commissionCents =
+      Math.floor(gross / 10000) * rateBps +
+      Math.round(((gross % 10000) * rateBps) / 10000);
   } else if (p.model === 'FIXED_AMOUNT') {
-    commissionPaise = Math.round(p.rate || 0);
+    commissionCents = Math.round(p.rate || 0);
   } else {
     // CATEGORY_SPECIFIC requires per-category rate; treat as missing policy until configured.
     throw new AllocationCalculationError('unsupported_policy', `CATEGORY_SPECIFIC requires additional per-category rules (config contract not met)`);
   }
 
-  if (commissionPaise < 0) commissionPaise = 0;
-  if (commissionPaise > gross) commissionPaise = gross; // guard against over-commission
+  if (commissionCents < 0) commissionCents = 0;
+  if (commissionCents > gross) commissionCents = gross; // guard against over-commission
 
-  const feePaise = p.feePaise ?? 0;
-  const discountPaise = 0; // will be expanded when discount contracts are defined; kept at 0 here with contract note.
-  const taxPaise = 0; // kept at 0 until tax/shipping rules defined; not invented.
+  const feeCents = p.feeCents ?? 0;
+  // No discount amount or approved funding policy is supplied to this engine.
+  // Do not invent a funding decision or approval.
+  const discountCents = 0; // vendor-funded % applied to gross; marketplace-funded = 0 funded to vendor
+  const taxCents = 0; // kept at 0 until tax/shipping rules defined; not invented.
 
-  // Vendor payable = gross line - commission (platform share) - fees, with guard so payable >= 0.
-  const vendorPayablePaise = Math.max(0, gross - commissionPaise - feePaise);
-  const platformNetPaise = gross - vendorPayablePaise - feePaise; // should approximate commission
+  // Vendor payable = gross - discount (funded per policy) - commission - fees; exact cents reconciliation (fail-closed: keep rules unapproved).
+  const vendorPayableCents = Math.max(0, gross - discountCents - commissionCents - feeCents);
+  const platformNetCents = gross - vendorPayableCents - feeCents; // approximates commission + fee
 
   const breakdown: AllocationBreakdown = {
-    grossLinePaise: gross,
-    discountPaise,
-    taxPaise,
-    shippingPaise: 0,
-    commissionPaise,
-    feePaise,
-    vendorPayablePaise,
-    platformNetPaise,
+    grossLineCents: gross,
+    discountCents,
+    taxCents,
+    shippingCents: 0,
+    commissionCents,
+    feeCents,
+    vendorPayableCents,
+    platformNetCents,
   };
 
   // Reconciliation against captured amount when available.
   let reconciliationStatus: AllocationResult['reconciliationStatus'] = 'RECONCILED';
-  if (input.capturedAmountPaise !== undefined && input.capturedAmountPaise !== null) {
-    if (!Number.isInteger(Number(input.capturedAmountPaise))) {
-      throw new AllocationCalculationError('invalid_capture_amount', `capturedAmountPaise must be integer; got ${input.capturedAmountPaise}`);
+  if (input.capturedAmountCents !== undefined && input.capturedAmountCents !== null) {
+    if (!Number.isSafeInteger(input.capturedAmountCents)) {
+      throw new AllocationCalculationError('invalid_capture_amount', `capturedAmountCents must be safe integer; got ${input.capturedAmountCents}`);
     }
-    if (input.capturedAmountPaise < 0) {
-      throw new AllocationCalculationError('negative_capture_amount', `capturedAmountPaise < 0: ${input.capturedAmountPaise}`);
+    if (input.capturedAmountCents < 0) {
+      throw new AllocationCalculationError('negative_capture_amount', `capturedAmountCents < 0: ${input.capturedAmountCents}`);
     }
-    // For line-level reconciliation: line gross equals captured when order capture equals line total.
-    reconciliationStatus = (input.capturedAmountPaise === gross) ? 'RECONCILED' : 'AMOUNT_MISMATCH';
+    // Rejection of mismatched currency or non-integer amounts is enforced above; keep reconciliation strict.
+    reconciliationStatus = (input.capturedAmountCents === gross) ? 'RECONCILED' : 'AMOUNT_MISMATCH';
   } else {
     reconciliationStatus = 'MISSING_CAPTURE';
   }
@@ -145,9 +155,9 @@ export function calculateVendorAllocation(
     vendorId: input.vendorId,
     currency: input.currency,
     rulesVersion: input.rulesVersion,
-    grossLinePaise: gross,
+    grossLineCents: gross,
     breakdown,
-    allocationPaise: vendorPayablePaise,
+    allocationCents: vendorPayableCents,
     reconciliationStatus,
     snapshot,
     idempotencyKey,

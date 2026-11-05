@@ -1,16 +1,8 @@
 /**
  * app/(storefront)/deals/page.tsx — "Deals" editorial destination.
  *
- * Curated savings surfaced from live catalog data — no fake markdown UI.
- * Product cards with a sale discount are more expensive to keep in sync
- * with the backend's `ProductDto` (no `salePrice` field yet), so instead
- * Deals re-uses the trusted `getCatalog` contract and highlights a hand
- * curated subset via the existing editorial filter surface: the page shows
- * a brass-accented hero + the same 3-column showcase grid, defaulting to
- * price-ascending so the "savings story" reads naturally.
- *
- * Renders in the storefront shell (header/cart/tabs) for free via the
- * `(storefront)` layout.
+ * Curated savings surfaced from live catalog data — genuine active-promotion
+ * filtering using the backend's promotionValid / discountPercent / effectivePrice.
  */
 
 "use client";
@@ -25,8 +17,6 @@ import { CatalogGridSkeleton } from "@/components/ui/skeleton";
 import { ToastProvider, useToast } from "@/components/ui/toast";
 import { editorialEyebrows } from "@/lib/theme";
 import { cn } from "@/lib/utils";
-
-const DEAL_CURATION = ["{deal}"]; // placeholder — replaced below with real ids
 
 function DealsPageInner() {
   const searchParams = useSearchParams();
@@ -45,10 +35,22 @@ function DealsPageInner() {
     getCatalog()
       .then((data) => {
         if (cancelled) return;
-        const active = data.filter((p) => p.isActive);
-        setProducts(active);
+        // Genuine promotion filtering: active promotion, positive discount,
+        // valid promotion flag, and effectivePrice cheaper than original.
+        const promoted = data.filter((p) => {
+          return (
+            p.isActive === true &&
+            p.promotionValid === true &&
+            typeof p.discountPercent === "number" &&
+            p.discountPercent > 0 &&
+            typeof p.effectivePrice === "number" &&
+            typeof p.originalPrice === "number" &&
+            p.effectivePrice < p.originalPrice
+          );
+        });
+        setProducts(promoted);
         const init: Record<string, number> = {};
-        active.forEach((p) => { init[p.id] = 1; });
+        promoted.forEach((p) => { init[p.id] = 1; });
         setQuantities(init);
       })
       .catch(() => {
@@ -57,26 +59,18 @@ function DealsPageInner() {
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [toast]);
 
   const sorted = useMemo(() => {
     const byPrice =
       sort === "price-desc"
-        ? (a: Product, b: Product) => b.price - a.price
-        : (a: Product, b: Product) => a.price - b.price;
+        ? (a: Product, b: Product) => (b.effectivePrice ?? b.price) - (a.effectivePrice ?? a.price)
+        : (a: Product, b: Product) => (a.effectivePrice ?? a.price) - (b.effectivePrice ?? b.price);
     return [...products].sort(byPrice);
   }, [products, sort]);
 
-  // A curated subset is currently driven by an explicit seed; until a
-  // `discountPercent` field lands on the DTO we derive "deals" as the
-  // lowest-priced third of the live catalog (honest, data-backed, SSR-safe).
-  const deals = useMemo(
-    () => sorted.slice(0, Math.max(3, Math.ceil(sorted.length / 3))),
-    [sorted]
-  );
+  const deals = sorted; // already filtered to promoted products
 
   const setQty = (productId: string, n: number) =>
     setQuantities((prev) => ({ ...prev, [productId]: Math.max(1, n) }));
@@ -86,7 +80,7 @@ function DealsPageInner() {
     addToCart({
       productId: product.id,
       name: product.name,
-      price: product.price,
+      price: (product as any).effectivePrice ?? product.price,
       quantity: qty,
       maxStock: product.stockCount,
       vendorId: product.vendorId,
@@ -129,7 +123,7 @@ function DealsPageInner() {
           </p>
           <span className="inline-flex items-center gap-1.5 text-xs text-white/70">
             <Sparkles className="h-3.5 w-3.5 text-[var(--color-brass)]" />
-            {deals.length} hand-curated picks · sorted low → high
+            {deals.length} active promotion{deals.length === 1 ? "" : "s"}
           </span>
         </div>
       </section>
@@ -145,7 +139,6 @@ function DealsPageInner() {
               const p = new URLSearchParams(searchParams ? searchParams.toString() : "");
               p.set("sort", e.target.value);
               window.history.replaceState(null, "", `/deals?${p.toString()}`);
-              // re-render driven by searchParams change after navigation state
             }}
             className="h-9 px-3 rounded-lg border text-xs font-medium border-[var(--color-warm-border)] bg-[var(--color-card)] text-[var(--color-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)]"
             aria-label="Sort deals"
@@ -178,7 +171,6 @@ function DealsPageInner() {
 export default function DealsPage() {
   return (
     <ToastProvider>
-      {/* useSearchParams requires a Suspense boundary (CSR bailout). */}
       <Suspense fallback={<CatalogGridSkeleton count={6} />}>
         <DealsPageInner />
       </Suspense>

@@ -7,7 +7,7 @@ import { UserRole } from '../common/entities/user.entity';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { VendorPromotionsService } from './vendor-promotions.service';
-import { VendorPromotionDto, VendorPromotionUpdateDto } from './dto/vendor-promotion.dto';
+import { PromotionFundingApprovalDto, PromotionFundingApprovalUpdateDto } from './dto/promotion-funding-approval.dto';
 
 @Controller('vendor/promotions')
 export class VendorPromotionsController {
@@ -15,7 +15,7 @@ export class VendorPromotionsController {
 
   @Get()
   @UseGuards(AuthGuard, RolesGuard)
-  @Roles(UserRole.VENDOR, UserRole.ADMIN)
+  @Roles(UserRole.VENDOR)
   async list(@CurrentUser() user: AuthenticatedUser) {
     const vendorId = this.verifyVendorId(user);
     return { promotions: await this.svc.findByVendor(vendorId) };
@@ -23,23 +23,27 @@ export class VendorPromotionsController {
 
   @Post()
   @UseGuards(AuthGuard, RolesGuard)
-  @Roles(UserRole.VENDOR, UserRole.ADMIN)
-  async create(@CurrentUser() user: AuthenticatedUser, @Body() body: VendorPromotionDto) {
+  @Roles(UserRole.VENDOR)
+  async create(@CurrentUser() user: AuthenticatedUser, @Body() body: PromotionFundingApprovalDto) {
     const vendorId = this.verifyVendorId(user);
     return await this.svc.create(vendorId, body);
   }
 
   @Patch(':id')
   @UseGuards(AuthGuard, RolesGuard)
-  @Roles(UserRole.VENDOR, UserRole.ADMIN)
-  async update(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() body: VendorPromotionUpdateDto) {
+  @Roles(UserRole.VENDOR)
+  async update(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() body: PromotionFundingApprovalUpdateDto) {
     const vendorId = this.verifyVendorId(user);
-    return await this.svc.update(id, vendorId, body);
+    // Vendors must never approve their own promotions; only update non-approval fields.
+    if (body.approvalState !== undefined && body.approvalState !== 'PENDING') {
+      throw new ForbiddenException('Vendor cannot approve/reject own promotion');
+    }
+    return await this.svc.update(id, vendorId, body as any);
   }
 
   @Delete(':id')
   @UseGuards(AuthGuard, RolesGuard)
-  @Roles(UserRole.VENDOR, UserRole.ADMIN)
+  @Roles(UserRole.VENDOR)
   async delete(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     const vendorId = this.verifyVendorId(user);
     return await this.svc.remove(id, vendorId);
@@ -48,13 +52,12 @@ export class VendorPromotionsController {
   private verifyVendorId(user: AuthenticatedUser): string {
     if (user.role === UserRole.VENDOR) {
       if (!user.vendorId || String(user.vendorId).trim() === '') {
-        throw new ForbiddenException('Vendor identity required');
+        throw new ForbiddenException('Verified vendor identity required');
       }
       return String(user.vendorId).trim();
     }
-    if (user.role === UserRole.ADMIN) {
-      throw new ForbiddenException('Admin vendor context not verified');
-    }
+    // Restrict vendor-scoped endpoints to verified VENDOR identities.
+    // ADMIN must not access vendor-scoped promotion endpoints.
     throw new ForbiddenException('Verified vendor context required');
   }
 }

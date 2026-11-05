@@ -2,9 +2,11 @@ import { AddFulfillmentOperationRecord1710000000005 } from './1710000000005-AddF
 import { CustomerAddressesMigration2026101000000 } from './20261010-customer-addresses';
 import { VendorLinkSafeguards2026101200000 } from './20261012-vendor-link-safeguards';
 import { FixProductVendorIdColumn2026101400000 } from './20261014-FixProductVendorIdColumn';
-import { AddBuyerIdempotencyKeyConstraint2026101500000 } from './20261015-AddBuyerIdempotencyKeyConstraint';
-import { AddOAuthIdentityTable2026101500001 } from './20261015-AddOAuthIdentityTable';
+import { AddBuyerIdempotencyKeyConstraint1792022400001 } from './20261015-AddBuyerIdempotencyKeyConstraint';
+import { AddOAuthIdentityTable1792022400002 } from './20261015-AddOAuthIdentityTable';
 import { AddPromotionsTable2026101700000 } from './20261017-AddPromotionsTable';
+import { CategoryAPromotionFundingApproval2026110300001 } from './20261103-CategoryA-PromotionFundingApproval';
+import { CategoryAPromotionApprovedAt2026110300002 } from './20261103-CategoryA-PromotionApprovedAt';
 import { AddPasswordResetTokens2026101600000 } from './20261016-AddPasswordResetTokens';
 import { AddWebhookEventIdempotency1717000000000 } from './1717000000000-AddWebhookEventIdempotency';
 import { assertFailClosedDatabase } from '../../test/fail-closed-database-guard';
@@ -39,7 +41,7 @@ export function parseMigrationTestDbUrl(): { host: string; port: number; usernam
     try { parsed = new URL(url); } catch (e: any) { throw new Error('FAIL-CLOSED: malformed URL: ' + (e && e.message ? e.message : String(e))); }
     if (parsed.protocol !== 'postgresql:' && parsed.protocol !== 'postgres:') { throw new Error('FAIL-CLOSED: protocol invalid'); }
     if (!['localhost','127.0.0.1'].includes(parsed.hostname)) { throw new Error('FAIL-CLOSED: host invalid'); }
-    if (parsed.port !== '55439') { throw new Error('FAIL-CLOSED: port must be 55439'); }
+    if (parsed.port !== '5435') { throw new Error('FAIL-CLOSED: port must be 5435'); }
     if (parsed.pathname === '/' || !parsed.pathname || parsed.pathname === '') { throw new Error('FAIL-CLOSED: database missing'); }
     const segments = parsed.pathname.slice(1).split('/');
     if (segments.length !== 1 || segments[0] !== 'marketplace_migration_test') { throw new Error('FAIL-CLOSED: database must be marketplace_migration_test'); }
@@ -50,7 +52,7 @@ export function parseMigrationTestDbUrl(): { host: string; port: number; usernam
     if (username === '') { throw new Error('FAIL-CLOSED: username missing'); }
     return {
       host: parsed.hostname,
-      port: parseInt(parsed.port, 10) || 55439,
+      port: parseInt(parsed.port, 10) || 5435,
       username: decodeURIComponent(username),
       password: decodeURIComponent(password),
       database: 'marketplace_migration_test',

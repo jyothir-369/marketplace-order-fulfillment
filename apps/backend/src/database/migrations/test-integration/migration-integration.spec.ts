@@ -4,7 +4,7 @@ import { MIGRATION_REGISTRY } from '../registry';
 import { MIGRATION_CLASSES } from '../migration-classes';
 
 function getDisposableUrl(): string | undefined {
-  const raw = process.env.MIGRATION_E2E_DATABASE_URL;
+  const raw = process.env.MIGRATION_INTEGRATION_DATABASE_URL;
   if (!raw || raw !== raw.trim()) return undefined;
 
   try {
@@ -77,7 +77,7 @@ describe('Migration integration harness (canonical registry)', () => {
     it('records complete migration history and applies no migrations twice', async () => {
       if (!getDisposableUrl()) {
         throw new Error(
-          'FAIL-CLOSED: set MIGRATION_E2E_DATABASE_URL to a fresh disposable localhost PostgreSQL database'
+          'FAIL-CLOSED: set MIGRATION_INTEGRATION_DATABASE_URL to a fresh disposable localhost PostgreSQL database'
         );
       }
       if (!ds?.isInitialized) throw new Error('FAIL-CLOSED: disposable datasource unavailable');
@@ -97,7 +97,7 @@ describe('Migration integration harness (canonical registry)', () => {
     it('does not reapply completed migrations on a second run', async () => {
       if (!getDisposableUrl()) {
         throw new Error(
-          'FAIL-CLOSED: set MIGRATION_E2E_DATABASE_URL to a fresh disposable localhost PostgreSQL database'
+          'FAIL-CLOSED: set MIGRATION_INTEGRATION_DATABASE_URL to a fresh disposable localhost PostgreSQL database'
         );
       }
       if (!ds?.isInitialized) throw new Error('FAIL-CLOSED: disposable datasource unavailable');

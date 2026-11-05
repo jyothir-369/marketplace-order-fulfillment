@@ -1,14 +1,17 @@
-import { Injectable, Logger, NotFoundException, BadRequestException, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, HttpException, HttpStatus, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, FindOptionsRelations } from 'typeorm';
 import { Order, OrderStatus } from '../common/entities/order.entity';
 import { OrderLineItem, FulfillmentStatus } from '../common/entities/order-line-item.entity';
 import { Product } from '../common/entities/product.entity';
+import { Promotion } from '../common/entities/promotion.entity';
 import { CheckoutDto, CheckoutResponseDto, OrderResponseDto, OrderLineItemResponseDto, TransitionOrderDto, OrderTransitionAction } from './dto/orders.dto';
 import { InventoryService } from '../inventory/inventory.service';
 import { AuditService, AuditLog, AuditEntityType } from '../common/audit';
 import { PaymentsService } from '../payments/payments.service';
 import { PaymentAuthorization, PaymentStatus } from '../common/entities/payment-authorization.entity';
+import { PromotionCheckoutSnapshotService } from '../payments/snapshot/promotion-checkout-snapshot.service';
+import { computeDiscountCents } from '../payments/category-b/category-b.snapshot.interface';
 
 @Injectable()
 export class OrdersService {
@@ -29,10 +32,13 @@ export class OrdersService {
     private readonly lineItemRepository: Repository<OrderLineItem>,
     @InjectRepository(Product)
     private readonly productRepository: Repository<Product>,
+    @InjectRepository(Promotion)
+    private readonly promotionRepository: Repository<Promotion>,
     private readonly dataSource: DataSource,
     private readonly inventoryService: InventoryService,
     private readonly auditService: AuditService,
     private readonly paymentsService: PaymentsService,
+    @Optional() private readonly promotionSnapshotService?: PromotionCheckoutSnapshotService,
   ) {}
 
   async checkout(dto: CheckoutDto, correlationId: string, buyerUserId?: string): Promise<CheckoutResponseDto> {
@@ -52,14 +58,112 @@ export class OrdersService {
     const productMap = new Map<string, Product>();
     products.forEach((p) => productMap.set(p.id, p));
 
-    // Phase 5.1: expected total = sum of price x quantity from the (pre-lock)
-    // product snapshot. Bill this amount BEFORE any stock is decremented so a
-    // decline never touches inventory. The auth row itself is persisted (as
-    // CAPTURED) only after the order exists.
-    const expectedTotal = dto.items.reduce((sum, item) => {
+    // Phase 3 authoritative: promotion-adjusted total must equal authorization,
+    // line totals, order total, and capture. Compute before auth using same
+    // vendor-scoped, scheduled, non-stacking promotion rule; reuse snapshot
+    // inside transaction so promotion can't change between auth and capture.
+    // Phase 3 authoritative: promotion-adjusted total computed from product snapshot
+    // before authorization. Use repository injection if available; else base price.
+    // (OrdersService does not inject promotionRepository — compute with base + query)
+    // Use the injected promotion repository (not an unsafe cast) for
+    // server-authoritative promotion-adjusted total before authorization.
+    // One authoritative promotion and price snapshot per product for this checkout.
+    const pricingSnapshots = new Map<string, {
+      originalUnitPriceCents: number;
+      effectiveUnitPriceCents: number;
+      promotion: Promotion | null;
+      discountPercent: number;
+    }>();
+    const promotionsByVendor = new Map<string, Promotion[]>();
+    const pricingTime = new Date();
+
+    const parseUsdCents = (value: unknown): number => {
+      const text = String(value).trim();
+      const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(text);
+      if (!match) {
+        throw new BadRequestException('Product price must be a valid USD amount with at most two decimal places');
+      }
+      const cents = Number(match[1]) * 100 + Number((match[2] || '').padEnd(2, '0'));
+      if (!Number.isSafeInteger(cents) || cents < 1 || cents > 2147483647) {
+        throw new BadRequestException('Product price exceeds supported USD-cent limits');
+      }
+      return cents;
+    };
+
+    for (const item of dto.items) {
       const product = productMap.get(item.productId);
-      return sum + Number(product?.price ?? 0) * item.quantity;
+      if (!product) throw new BadRequestException('Product not found: ' + item.productId);
+
+      const originalUnitPriceCents = parseUsdCents(product.price);
+      let promotion: Promotion | null = null;
+
+      if (!promotionsByVendor.has(product.vendorId)) {
+        const promotions = await this.promotionRepository.find({
+          where: { vendorId: product.vendorId, isActive: true },
+        });
+        promotionsByVendor.set(product.vendorId, promotions);
+      }
+
+      promotion = (promotionsByVendor.get(product.vendorId) ?? [])
+        .filter((p) => {
+          const start = p.startDate ? new Date(p.startDate) : null;
+          const end = p.endDate ? new Date(p.endDate) : null;
+          return (
+            p.approvalState === 'APPROVED' &&
+            p.currency === 'USD' &&
+            p.vendorId === product.vendorId &&
+            Number.isFinite(Number(p.discountPercent)) &&
+            Number(p.discountPercent) >= 0 &&
+            Number(p.discountPercent) <= 100 &&
+            (!start || start <= pricingTime) &&
+            (!end || end >= pricingTime)
+          );
+        })
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] ?? null;
+
+      const discountPercent = promotion ? Number(promotion.discountPercent) : 0;
+      // Blocker 3 safeguard: discount percent must be finite, safe, in [0,100] before integer-cent calculation
+      if (!Number.isFinite(discountPercent) || discountPercent < 0 || discountPercent > 100 ) {
+        throw new BadRequestException('Invalid discount percentage for checkout calculation');
+      }
+      // Blocker 3 safeguard: original unit price cents must be safe non-negative integer (not float, not unsafe)
+      if (!Number.isSafeInteger(originalUnitPriceCents) || originalUnitPriceCents < 0) {
+        throw new BadRequestException('Invalid USD cent price for checkout');
+      }
+      const effectiveUnitPriceCents = promotion
+        ? computeDiscountCents(originalUnitPriceCents, discountPercent)
+        : originalUnitPriceCents;
+
+      if (
+        !Number.isSafeInteger(effectiveUnitPriceCents) ||
+        effectiveUnitPriceCents < 0 ||
+        effectiveUnitPriceCents > 2147483647
+      ) {
+        throw new BadRequestException('Discounted USD price exceeds supported cent limits');
+      }
+
+      pricingSnapshots.set(item.productId, {
+        originalUnitPriceCents,
+        effectiveUnitPriceCents,
+        promotion,
+        discountPercent,
+      });
+    }
+
+    const expectedTotalCents = dto.items.reduce((sum, item) => {
+      const price = pricingSnapshots.get(item.productId)!.effectiveUnitPriceCents;
+      const lineCents = price * item.quantity;
+      if (!Number.isSafeInteger(lineCents) || lineCents > 2147483647) {
+        throw new BadRequestException('Checkout line total exceeds supported USD-cent limits');
+      }
+      const next = sum + lineCents;
+      if (!Number.isSafeInteger(next) || next > 2147483647) {
+        throw new BadRequestException('Checkout total exceeds supported USD-cent limits');
+      }
+      return next;
     }, 0);
+
+    const expectedTotal = expectedTotalCents / 100;
 
     return this.dataSource.transaction(async (manager) => {
       // Remediation 1 Phase 3 / Phase 4: idempotency key — read inside transaction
@@ -92,7 +196,7 @@ export class OrdersService {
         }
       }
 
-      const authorization = await this.paymentsService.authorize(expectedTotal, correlationId, dto.paymentMethodToken);
+      const authorization = await this.paymentsService.authorize(expectedTotalCents / 100, correlationId, dto.paymentMethodToken);
 
       if (!authorization.success) {
         // Logged on the audit service's own connection so the decline survives
@@ -175,23 +279,40 @@ export class OrdersService {
 
       const savedOrder = await (manager.save as any)(Order, order) as Order;
 
-      let totalAmount = 0;
+      let totalAmountCents = 0;
       const lineItems: OrderLineItem[] = [];
 
       for (const item of dto.items) {
         const product = productMap.get(item.productId);
         if (product) {
-          const unitPrice = Number(product.price);
-          const lineTotal = unitPrice * item.quantity;
-          totalAmount += lineTotal;
+          const pricingSnapshot = pricingSnapshots.get(item.productId);
+          if (!pricingSnapshot) throw new BadRequestException('Pricing snapshot missing for product ' + item.productId);
+
+          const effectiveUnitPrice = pricingSnapshot.effectiveUnitPriceCents / 100;
+          const appliedPromoId = pricingSnapshot.promotion?.id ?? null;
+          const appliedDiscountPercent = pricingSnapshot.promotion ? pricingSnapshot.discountPercent : null;
+          const lineTotalCents = pricingSnapshot.effectiveUnitPriceCents * item.quantity;
+
+          if (!Number.isSafeInteger(lineTotalCents) || lineTotalCents > 2147483647) {
+            throw new BadRequestException('Order line total exceeds supported USD-cent limits');
+          }
+
+          const lineTotal = lineTotalCents / 100;
+          totalAmountCents += lineTotalCents;
+          if (!Number.isSafeInteger(totalAmountCents) || totalAmountCents > 2147483647) {
+            throw new BadRequestException('Checkout order total exceeds supported USD-cent limits');
+          }
 
           const lineItem = (manager.create as any)(OrderLineItem, {
             orderId: savedOrder.id,
             productId: item.productId,
             vendorId: product.vendorId,
             quantity: item.quantity,
-            unitPrice: unitPrice,
-            lineTotal: lineTotal,
+            unitPrice: pricingSnapshot.originalUnitPriceCents / 100,
+            lineTotal,
+            effectiveUnitPrice,
+            promotionId: appliedPromoId,
+            promotionDiscountPercent: appliedDiscountPercent,
             fulfillmentStatus: FulfillmentStatus.PENDING,
           });
 
@@ -200,12 +321,72 @@ export class OrdersService {
       }
 
       await (manager.save as any)(OrderLineItem, lineItems);
-      await manager.update(Order, { id: savedOrder.id }, { totalAmount: totalAmount });
+
+      // Category B: persist immutable promotion/funding snapshots in this
+      // checkout transaction, after line-item IDs exist and before capture.
+      for (let index = 0; index < dto.items.length; index++) {
+        const item = dto.items[index];
+        const pricingSnapshot = pricingSnapshots.get(item.productId);
+        const lineItem = lineItems[index];
+        const promotion = pricingSnapshot?.promotion;
+
+        if (!pricingSnapshot || !lineItem) {
+          throw new BadRequestException('Category B checkout snapshot is missing its line item');
+        }
+
+        if (!promotion) continue;
+
+        if (promotion.approvalState !== 'APPROVED' || promotion.currency !== 'USD') {
+          throw new BadRequestException('Only approved USD promotions can be snapshotted');
+        }
+
+        const fundingType = promotion.fundingType;
+        const vendorPercent = promotion.vendorContributionPercent == null
+          ? (fundingType === 'VENDOR_FUNDED' ? 100 : fundingType === 'MARKETPLACE_FUNDED' ? 0 : NaN)
+          : Number(promotion.vendorContributionPercent);
+        const marketplacePercent = promotion.marketplaceContributionPercent == null
+          ? (fundingType === 'VENDOR_FUNDED' ? 0 : fundingType === 'MARKETPLACE_FUNDED' ? 100 : NaN)
+          : Number(promotion.marketplaceContributionPercent);
+
+        const capturedAmountCents = pricingSnapshot.effectiveUnitPriceCents * item.quantity;
+
+        if (!this.promotionSnapshotService) {
+          throw new Error('Promotion snapshot service is required for promoted checkout');
+        }
+
+        if (!this.promotionSnapshotService) {
+          throw new Error('Promotion snapshot service is required for promoted checkout');
+        }
+
+        await this.promotionSnapshotService.persistSnapshot({
+          promotionId: promotion.id,
+          checkoutAttemptId: savedOrder.id,
+          orderId: savedOrder.id,
+          lineItemId: lineItem.id,
+          currency: 'USD',
+          fundingType,
+          vendorContributionPercent: vendorPercent,
+          marketplaceContributionPercent: marketplacePercent,
+          approvalState: 'APPROVED',
+          discountPercent: pricingSnapshot.discountPercent,
+          originalUnitPriceCents: pricingSnapshot.originalUnitPriceCents,
+          qty: item.quantity,
+          capturedAmountCents,
+        }, manager);
+      }
+      if (
+        !Number.isSafeInteger(totalAmountCents) ||
+        totalAmountCents !== expectedTotalCents
+      ) {
+        throw new BadRequestException('Checkout total does not reconcile to integer USD cents');
+      }
+      const totalAmount = totalAmountCents / 100;
+      await manager.update(Order, { id: savedOrder.id }, { totalAmount: expectedTotalCents / 100 });
 
       // Phase 5.1: authorization already succeeded above (before stock moved);
       // record the capture against the order NOW that the order id exists. Same
       // transaction, so a crash before commit rolls back inventory + capture.
-      await this.paymentsService.recordCapture(manager, savedOrder.id, totalAmount, authorization, correlationId);
+      await this.paymentsService.recordCapture(manager, savedOrder.id, expectedTotalCents / 100, authorization, correlationId);
 
       await this.auditService.logOrderCreated(correlationId, savedOrder.id, dto.buyerId, totalAmount);
 
@@ -459,6 +640,11 @@ export class OrdersService {
       fulfillmentStatus: item.fulfillmentStatus,
       vendorReference: item.vendorReference,
       failureReason: item.failureReason,
+      // Persisted promotion snapshot — never recalculated from current promotions.
+      promotionId: item.promotionId ?? null,
+      promotionDiscountPercent: item.promotionDiscountPercent ?? null,
+      effectiveUnitPrice: item.effectiveUnitPrice ?? null,
+      originalUnitPrice: Number(item.unitPrice),
     };
   }
 }

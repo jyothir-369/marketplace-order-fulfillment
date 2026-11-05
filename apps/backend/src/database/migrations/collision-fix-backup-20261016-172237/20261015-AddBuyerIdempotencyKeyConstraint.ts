@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddBuyerIdempotencyKeyConstraint20261015 implements MigrationInterface {
-  name = 'AddBuyerIdempotencyKeyConstraint20261015';
+export class AddBuyerIdempotencyKeyConstraint1792022400001 implements MigrationInterface {
+  name = 'AddBuyerIdempotencyKeyConstraint1792022400001';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Partial unique index: buyer-scoped idempotency key (nullable allowed, but when set must be unique per buyer)

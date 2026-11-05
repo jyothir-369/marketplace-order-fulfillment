@@ -286,4 +286,12 @@ export class ProductResponseDto {
   description: string | null;
   /** Real `products.images` column (Phase 2.3) — null when unset. */
   images: string[] | null;
+  originalPrice?: number;
+  effectivePrice?: number;
+  promotionId?: string | null;
+  discountPercent?: number | null;
+  savings?: number;
+  promotionTitle?: string | null;
+  promotionEndDate?: Date | null;
+  promotionValid?: boolean;
 }

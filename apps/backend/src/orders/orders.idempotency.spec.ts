@@ -21,6 +21,7 @@ describe('Checkout idempotency — isolated unit tests', () => {
   let dataSource: any;
   let lockedProduct: any;
   let existingOrder: any;
+  let promotionRepo: any;
 
   const makeOrder = (overrides: Record<string, unknown> = {}) => ({
     id: 'order-existing',
@@ -61,6 +62,10 @@ describe('Checkout idempotency — isolated unit tests', () => {
 
     orderRepo = {
       findOne: jest.fn().mockImplementation(async () => existingOrder),
+    };
+
+    promotionRepo = {
+      find: jest.fn().mockResolvedValue([]),
     };
 
     productRepo = {
@@ -166,6 +171,7 @@ describe('Checkout idempotency — isolated unit tests', () => {
       orderRepo,
       {} as any,
       productRepo,
+      promotionRepo,
       dataSource as DataSource,
       {} as InventoryService,
       audit as AuditService,
