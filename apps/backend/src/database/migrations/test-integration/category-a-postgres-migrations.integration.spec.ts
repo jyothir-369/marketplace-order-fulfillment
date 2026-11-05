@@ -8,16 +8,17 @@ describe('Category A migrations - REAL PostgreSQL upgrade and rollback', () => {
   let dataSource: DataSource;
 
   beforeAll(async () => {
-    const connectionString = process.env.MIGRATION_TEST_DATABASE_URL;
+    const connectionString = process.env.CATEGORY_A_MIGRATION_DATABASE_URL;
 
     if (!connectionString) {
-      throw new Error('MIGRATION_TEST_DATABASE_URL is required.');
+      throw new Error('CATEGORY_A_MIGRATION_DATABASE_URL is required.');
     }
 
     const url = new URL(connectionString);
 
     if (
       !['127.0.0.1', 'localhost'].includes(url.hostname) ||
+      url.port !== '55441' ||
       !/^\/category_a_migration_[a-z0-9_]+$/i.test(url.pathname)
     ) {
       throw new Error('Unsafe migration database URL. Refusing to continue.');
