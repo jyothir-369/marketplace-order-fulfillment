@@ -118,7 +118,7 @@ jobs:
 
       postgres-vendor-constraints:
         image: postgres:16-alpine
-        command: ["postgres", "-c", "port=5435"]
+        command: postgres -c port=5435
         env:
           POSTGRES_USER: migrationtest
           POSTGRES_PASSWORD: migrationtest
