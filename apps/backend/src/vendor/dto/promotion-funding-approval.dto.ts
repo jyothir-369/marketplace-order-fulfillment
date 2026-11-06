@@ -34,6 +34,13 @@ export class PromotionFundingApprovalDto {
   @IsBoolean()
   isActive?: boolean;
 
+  @IsOptional()
+  @IsDateString()
+  startDate?: string | null;
+
+  @IsOptional()
+  @IsDateString()
+  endDate?: string | null;
 }
 
 export class PromotionFundingApprovalUpdateDto {
